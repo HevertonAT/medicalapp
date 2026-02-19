@@ -1,13 +1,10 @@
 fastapi
-uvicorn[standard]  # Servidor para rodar a API
-sqlalchemy         # ORM para falar com o banco
-psycopg2-binary    # Driver do PostgreSQL
-pydantic[email]    # Validação de dados
-python-dotenv      # Ler arquivo .env
-passlib[bcrypt]    # Criptografia de senha
-python-jose[cryptography] # Para criar Tokens JWT de login
-<<<<<<< HEAD
+uvicorn[standard]
+sqlalchemy
+psycopg2-binary
+pydantic[email]
+python-dotenv
+passlib[bcrypt]
+python-jose[cryptography]
 python-multipart
-=======
-python-multipart
->>>>>>> 960a601b3b0ac3753f3a4a9287db0da399775080
+reportlab
