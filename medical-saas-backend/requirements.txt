@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]  # Servidor para rodar a API
+sqlalchemy         # ORM para falar com o banco
+psycopg2-binary    # Driver do PostgreSQL
+pydantic[email]    # Validação de dados
+python-dotenv      # Ler arquivo .env
+passlib[bcrypt]    # Criptografia de senha
+python-jose[cryptography] # Para criar Tokens JWT de login
