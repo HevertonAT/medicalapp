@@ -6,4 +6,8 @@ pydantic[email]    # Validação de dados
 python-dotenv      # Ler arquivo .env
 passlib[bcrypt]    # Criptografia de senha
 python-jose[cryptography] # Para criar Tokens JWT de login
+<<<<<<< HEAD
 python-multipart
+=======
+python-multipart
+>>>>>>> 960a601b3b0ac3753f3a4a9287db0da399775080
