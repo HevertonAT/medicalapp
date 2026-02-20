@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // Alteramos o fallback de localhost para a sua URL da Vercel
-export const API_BASE = import.meta.env.VITE_API_URL || "https://medicalappp.vercel.app";
+export const API_BASE = import.meta.env.VITE_API_URL || "https://medicalapp-mu.vercel.app";
 
 const api = axios.create({
   baseURL: API_BASE,

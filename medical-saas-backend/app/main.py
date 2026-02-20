@@ -49,14 +49,14 @@ app = FastAPI(
 origins = [
     "http://localhost:3000", # Frontend React/Next.js padrão
     "http://localhost:5173", # Frontend Vite/Vue padrão
-    "https://medicalappp.vercel.app"# Não usar '*' quando allow_credentials=True — definir origens explicitamente
+    "https://medicalappfront.vercel.app/"# Não usar '*' quando allow_credentials=True — definir origens explicitamente
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["*"],# Permite GET, POST, PUT, DELETE, OPTIONS, etc
     allow_headers=["*"],
 )
 
@@ -64,8 +64,6 @@ app.add_middleware(
 app.mount("/arquivos", StaticFiles(directory="uploads"), name="uploads")
 
 # --- REGISTRO DAS ROTAS ---
-# Ajustei os prefixos e tags para ficarem bonitos no Swagger (http://localhost:8000/docs)
-
 app.include_router(autenticacao.router, prefix="/auth", tags=["Autenticação"])
 app.include_router(clinicas.router, prefix="/clinics", tags=["Clínicas"])
 app.include_router(profissionais.router, prefix="/doctors", tags=["Profissionais"]) 
