@@ -1,6 +1,7 @@
 import axios from "axios";
 
-export const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+// Alteramos o fallback de localhost para a sua URL da Vercel
+export const API_BASE = import.meta.env.VITE_API_URL || "https://medicalappp.vercel.app";
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -9,13 +10,14 @@ const api = axios.create({
   },
 });
 
-// Interceptor para adicionar token (se você usa auth)
+// Interceptor para adicionar token
 api.interceptors.request.use((config) => {
   try {
-    // Usar a mesma chave que o restante do frontend (`medical_token`)
     const token = localStorage.getItem("medical_token") || localStorage.getItem("token");
     if (token) config.headers.Authorization = `Bearer ${token}`;
-  } catch (e) {}
+  } catch (e) {
+    console.error("Erro ao recuperar token:", e);
+  }
   return config;
 });
 
