@@ -49,7 +49,7 @@ app = FastAPI(
 origins = [
     "http://localhost:3000", # Frontend React/Next.js padrão
     "http://localhost:5173", # Frontend Vite/Vue padrão
-    "https://medicalappp.vercel.app/"# Não usar '*' quando allow_credentials=True — definir origens explicitamente
+    "https://medicalappp.vercel.app"# Não usar '*' quando allow_credentials=True — definir origens explicitamente
 ]
 
 app.add_middleware(
