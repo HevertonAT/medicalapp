@@ -3,17 +3,27 @@ import api from "./api";
 // --- LISTA MESTRA DE ESPECIALIDADES ---
 // Esta lista é usada tanto nas Configurações quanto no Cadastro de Médicos.
 export const MASTER_SPECIALTIES = [
-  "Pediatria",
   "Cardiologia",
-  "Ortopedia",
-  "Ginecologia",
-  "Fonoaudiologia",
-  "Dermatologia",
-  "Oftalmologia",
   "Clínica Geral",
-  "Psiquiatria",
-  "Neurologia",
+  "Clínica Médica",
+  "Dermatologia",
   "Endocrinologia",
+  "Fonoaudiologia",
+  "Gastroenterologia",
+  "Geriatria",
+  "Ginecologia",
+  "Hematologia",
+  "Infectologia",
+  "Nefrologia",
+  "Neurologia",
+  "Nutrologia",
+  "Oftalmologia",
+  "Ortopedia",
+  "Otorrinolaringologia",
+  "Pediatria",
+  "Pneumologia",
+  "Psiquiatria",
+  "Reumatologia",
   "Urologia"
 ];
 

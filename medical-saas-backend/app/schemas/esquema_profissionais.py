@@ -10,7 +10,9 @@ class DoctorBase(BaseModel):
 
 # Usado na criação (POST)
 class DoctorCreate(DoctorBase):
-    pass
+    # NOVOS CAMPOS: Exigidos apenas na hora de cadastrar para criar o login
+    email: str
+    senha: str
 
 # Usado na atualização (PUT/PATCH)
 # Todos os campos são opcionais para permitir atualização parcial

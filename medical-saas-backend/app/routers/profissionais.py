@@ -1,18 +1,22 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
+import bcrypt # Importação adicionada para criptografar a senha do médico
 
 from app.db.base import get_db
 from app.core.deps import get_current_user
 from app.models.profissionais import Doctor
 from app.models.usuarios import User
 
-# Importando os schemas. 
-# Nota: Certifique-se de que DoctorUpdate existe no seu arquivo de schemas.
-# Caso não tenha criado o DoctorUpdate, você pode usar DoctorCreate temporariamente aqui.
 from app.schemas.esquema_profissionais import DoctorCreate, DoctorResponse, DoctorUpdate
 
 router = APIRouter()
+
+# --- FUNÇÃO AUXILIAR PARA SENHA ---
+def get_password_hash(password: str) -> str:
+    salt = bcrypt.gensalt()
+    hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return hashed_password.decode('utf-8')
 
 @router.get("/", response_model=List[DoctorResponse])
 def list_doctors(
@@ -28,12 +32,11 @@ def list_doctors(
     # LÓGICA DE PERMISSÃO:
     
     # 1. Se for PACIENTE, ele precisa ver os médicos para agendar.
-    # Mostramos todos os médicos ATIVOS do sistema (Self-Service).
     if current_user.role in ['patient', 'paciente']:
         print("   -> É paciente: Retornando todos os médicos ativos.")
         return query.filter(Doctor.ativo == True).all()
 
-    # 2. Se for ADMIN ou SUPERUSER, vê os médicos da sua clínica (se tiver clínica vinculada)
+    # 2. Se for ADMIN ou SUPERUSER, vê os médicos da sua clínica
     if current_user.role in ['admin', 'superuser']:
         if current_user.clinic_id:
             query = query.filter(Doctor.clinic_id == current_user.clinic_id)
@@ -54,18 +57,39 @@ def create_doctor(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Apenas admins podem criar médicos
+    # Apenas admins/superusers podem criar médicos
     if current_user.role not in ['admin', 'superuser']:
         raise HTTPException(status_code=403, detail="Sem permissão")
 
+    # 1. Verifica se o email já está em uso no sistema (Tabela User)
+    user_exists = db.query(User).filter(User.email == doctor.email).first()
+    if user_exists:
+        raise HTTPException(status_code=400, detail="Este email já está em uso.")
+
+    # 2. Cria o ACESSO (Usuário) do Médico
+    new_user = User(
+        full_name=doctor.nome,
+        email=doctor.email,
+        hashed_password=get_password_hash(doctor.senha),
+        role="doctor",
+        clinic_id=current_user.clinic_id,
+        is_active=True
+    )
+    db.add(new_user)
+    db.flush() # Gera o ID do usuário (new_user.id) sem commitar definitivamente
+
+    # 3. Cria o PERFIL (Médico) vinculado ao usuário criado acima
     db_doctor = Doctor(
         nome=doctor.nome,
         crm=doctor.crm,
         especialidade=doctor.especialidade,
-        clinic_id=current_user.clinic_id, # Vincula à clínica do admin que criou
+        clinic_id=current_user.clinic_id,
+        user_id=new_user.id, # <-- Vincula o acesso ao perfil
         ativo=True
     )
     db.add(db_doctor)
+    
+    # 4. Salva ambos no banco de dados
     db.commit()
     db.refresh(db_doctor)
     return db_doctor

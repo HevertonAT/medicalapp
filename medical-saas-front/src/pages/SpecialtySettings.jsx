@@ -2,12 +2,12 @@ import React, { useEffect, useState } from "react";
 import {
   Box, Heading, Button, VStack, HStack, Switch, FormControl,
   FormLabel, Spinner, useToast, Text, Divider, Flex, Badge, Card, CardBody,
-  useColorModeValue
+  useColorModeValue, SimpleGrid
 } from "@chakra-ui/react";
 // Importamos a lista mestra daqui
 import { listRules, createRule, updateRule, MASTER_SPECIALTIES } from "../services/specialtyService";
 
-// Configurações padrão
+// Configurações padrão (ATUALIZADO COM AS NOVAS REGRAS)
 const DEFAULT_SETTINGS = {
   require_patient_cpf: true,
   require_responsible_cpf: false,
@@ -16,7 +16,12 @@ const DEFAULT_SETTINGS = {
   require_laterality: false,     
   require_blood_pressure: true,  
   enable_vision_data: false,     
-  enable_session_control: false  
+  enable_session_control: false,
+  // Novos campos:
+  enable_advanced_vitals: false,
+  enable_anthropometry: false,
+  enable_mental_status: false,
+  enable_isolation_alerts: false
 };
 
 export default function SpecialtySettings() {
@@ -36,13 +41,12 @@ export default function SpecialtySettings() {
   const subTextColor = useColorModeValue("gray.500", "gray.400");
   
   // Cores da Lista Lateral
-  const itemHover = useColorModeValue("gray.100", "whiteAlpha.100"); // Ajustado para hover mais suave
+  const itemHover = useColorModeValue("gray.100", "whiteAlpha.100"); 
   const itemActiveBg = useColorModeValue("blue.50", "blue.900");
   const itemActiveText = useColorModeValue("blue.700", "blue.200");
   const itemBorderActive = useColorModeValue("blue.500", "blue.300");
 
   // --- AJUSTE DE FUNDO DAS OPÇÕES ---
-  // Usamos whiteAlpha.50 no dark mode para um fundo sutil e elegante sobre o card cinza
   const blockBg = useColorModeValue("gray.50", "whiteAlpha.50"); 
 
   useEffect(() => { loadData(); }, []);
@@ -154,15 +158,15 @@ export default function SpecialtySettings() {
           {loading ? (
             <Flex justify="center" align="center" h="200px"><Spinner /></Flex>
           ) : (
-            <VStack align="stretch" spacing={8} overflowY="auto" px={2} pb={4}>
+            <VStack align="stretch" spacing={8} overflowY="auto" px={4} pb={8}>
               
               {/* GRUPO 1 */}
               <Box>
                 <Text fontWeight="bold" fontSize="lg" mb={4} color={textColor}>
                 Validação de Documentos
                 </Text>
-                <Flex wrap="wrap" gap={6}>
-                  <FormControl display="flex" alignItems="center" w="auto" bg={blockBg} p={3} borderRadius="md" border="1px solid" borderColor={borderColor}>
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+                  <FormControl display="flex" alignItems="center" bg={blockBg} p={4} borderRadius="md" border="1px solid" borderColor={borderColor}>
                     <Switch 
                       id="cpf-paciente" 
                       isChecked={currentSettings.require_patient_cpf}
@@ -170,10 +174,10 @@ export default function SpecialtySettings() {
                       colorScheme="green" 
                       mr={3} 
                     />
-                    <FormLabel htmlFor="cpf-paciente" mb={0} cursor="pointer" color={textColor}>Exigir CPF do Paciente</FormLabel>
+                    <FormLabel htmlFor="cpf-paciente" mb={0} cursor="pointer" color={textColor} fontSize="sm" fontWeight="medium">Exigir CPF do Paciente</FormLabel>
                   </FormControl>
 
-                  <FormControl display="flex" alignItems="center" w="auto" bg={blockBg} p={3} borderRadius="md" border="1px solid" borderColor={borderColor}>
+                  <FormControl display="flex" alignItems="center" bg={blockBg} p={4} borderRadius="md" border="1px solid" borderColor={borderColor}>
                     <Switch 
                       id="cpf-resp" 
                       isChecked={currentSettings.require_responsible_cpf}
@@ -181,9 +185,9 @@ export default function SpecialtySettings() {
                       colorScheme="green" 
                       mr={3} 
                     />
-                    <FormLabel htmlFor="cpf-resp" mb={0} cursor="pointer" color={textColor}>Exigir CPF Responsável</FormLabel>
+                    <FormLabel htmlFor="cpf-resp" mb={0} cursor="pointer" color={textColor} fontSize="sm" fontWeight="medium">Exigir CPF Responsável</FormLabel>
                   </FormControl>
-                </Flex>
+                </SimpleGrid>
               </Box>
 
               <Divider borderColor={borderColor} />
@@ -191,11 +195,10 @@ export default function SpecialtySettings() {
               {/* GRUPO 2 */}
               <Box>
                 <Text fontWeight="bold" fontSize="lg" mb={4} color={textColor}>
-                Campos Clínicos Específicos
+                Campos Clínicos Básicos
                 </Text>
                 
                 <Flex direction="column" gap={3}>
-                  {/* Item Helper Component */}
                   <ConfigItem 
                     title="Habilitar Dados de Nascimento"
                     desc="Exibe Peso, Altura, PC, APGAR (Pediatria)"
@@ -252,6 +255,50 @@ export default function SpecialtySettings() {
                 </Flex>
               </Box>
 
+              <Divider borderColor={borderColor} />
+
+              {/* GRUPO 3 - NOVOS MÓDULOS AVANÇADOS */}
+              <Box>
+                <Text fontWeight="bold" fontSize="lg" mb={4} color={textColor}>
+                Módulos Avançados
+                </Text>
+                
+                <Flex direction="column" gap={3}>
+                  <ConfigItem 
+                    title="Sinais Vitais Avançados" 
+                    desc="Habilita Freq. Cardíaca, Freq. Respiratória, SatO2 e Temperatura (Cardio, Pneumo, Infecto)" 
+                    isChecked={currentSettings.enable_advanced_vitals} 
+                    onChange={() => toggleFlag("enable_advanced_vitals")} 
+                    colorScheme="purple" 
+                    bg={blockBg} textColor={textColor} subColor={subTextColor} borderColor={borderColor} 
+                  />
+                  <ConfigItem 
+                    title="Módulo Antropometria" 
+                    desc="Cálculo de IMC, Circunferência Abdominal e Composição (Nutrologia, Endócrino)" 
+                    isChecked={currentSettings.enable_anthropometry} 
+                    onChange={() => toggleFlag("enable_anthropometry")} 
+                    colorScheme="purple" 
+                    bg={blockBg} textColor={textColor} subColor={subTextColor} borderColor={borderColor} 
+                  />
+                  <ConfigItem 
+                    title="Alertas de Saúde Mental" 
+                    desc="Flags de rastreio de Risco Suicida e Humor (Psiquiatria, Neurologia)" 
+                    isChecked={currentSettings.enable_mental_status} 
+                    onChange={() => toggleFlag("enable_mental_status")} 
+                    colorScheme="red" 
+                    bg={blockBg} textColor={textColor} subColor={subTextColor} borderColor={borderColor} 
+                  />
+                  <ConfigItem 
+                    title="Protocolos de Isolamento" 
+                    desc="Indicadores de precaução (Gotículas, Aerossóis, Contato) para Infectologia" 
+                    isChecked={currentSettings.enable_isolation_alerts} 
+                    onChange={() => toggleFlag("enable_isolation_alerts")} 
+                    colorScheme="yellow" 
+                    bg={blockBg} textColor={textColor} subColor={subTextColor} borderColor={borderColor} 
+                  />
+                </Flex>
+              </Box>
+
             </VStack>
           )}
         </CardBody>
@@ -260,7 +307,7 @@ export default function SpecialtySettings() {
   );
 }
 
-// Componente auxiliar atualizado para receber borderColor
+// Componente auxiliar mantido intacto
 function ConfigItem({ title, desc, isChecked, onChange, colorScheme, bg, textColor, subColor, borderColor }) {
   return (
     <HStack justify="space-between" bg={bg} p={3} borderRadius="md" border="1px solid" borderColor={borderColor}>

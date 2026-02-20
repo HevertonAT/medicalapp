@@ -47,6 +47,7 @@ Base.metadata.create_all(bind=engine)
 
 # --- CONFIGURAÇÃO DO CORS ---
 origins = [
+    "http://127.0.0.1:8000"
     "http://localhost:3000", # Frontend React/Next.js padrão
     "http://localhost:5173", # Frontend Vite/Vue padrão
     "https://medicalappfront.vercel.app"# Não usar '*' quando allow_credentials=True — definir origens explicitamente

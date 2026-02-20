@@ -1,27 +1,88 @@
 import React from "react";
-import { 
-  Box, FormControl, FormLabel, Input, HStack, SimpleGrid, 
-  Textarea, Select, Heading, Divider, Alert, AlertIcon 
+import { Box, FormControl, FormLabel, Input, HStack,
+SimpleGrid,Textarea, Select, Heading, Divider
 } from "@chakra-ui/react";
+import CardiologiaFields from "./CardiologiaFields";
+import ClinicoGeralFields from "./ClinicoGeralFields";
+import DermatologiaFields from "./DermatologiaFields";
+import FonoaudiologiaFields from "./FonoaudiologiaFields";
+import GinecoFields from "./GinecoFields";
+import OftalmologiaFields from "./OftalmologiaFields";
+import OrtopediaFields from "./OrtopediaFields";
+import PediatriaFields from "./PediatriaFields";
+import ClinicaMedicaFields from "./ClinicaMedicaFields";
+import EndocrinologiaFields from "./EndocrinologiaFields";
+import GastroenterologiaFields from "./GastroenterologiaFields";
+import GeriatriaFields from "./GeriatriaFields";
+import HematologiaFields from "./HematologiaFields";
+import InfectologiaFields from "./InfectologiaFields";
+import NefrologiaFields from "./NefrologiaFields";
+import NeurologiaFields from "./NeurologiaFields";
+import NutrologiaFields from "./NutrologiaFields";
+import PneumologiaFields from "./PneumologiaFields";
+import PsiquiatriaFields from "./PsiquiatriaFields";
+import ReumatologiaFields from "./ReumatologiaFields";
+import UrologiaFields from "./UrologiaFields";
 
-/*
-  Este componente agora é 100% DINÂMICO.
-  Ele renderiza blocos baseados nas flags 'settings' vindas do banco.
-*/
-export default function SpecialtyFormRenderer({ settings = {}, data = {}, onChange }) {
+
+export default function SpecialtyFormRenderer({ specialty, settings = {}, data = {}, onChange }) {
   
-  // Função auxiliar para atualizar o JSON de dados clínicos
+  // Função auxiliar para atualizar o JSON de dados clínicos (usado pelos inputs manuais)
   const updateField = (field, value) => {
     onChange({ ...data, [field]: value });
   };
 
+  // Função auxiliar para atualizar os dados vindos dos componentes específicos (que usam e.target)
+  const handleSpecificChange = (e) => {
+    const { name, value } = e.target;
+    updateField(name, value);
+  };
+
+  // Renderiza o componente específico baseado na string da especialidade
+  const renderSpecificFields = () => {
+    // Props padrão que todos os componentes específicos vão receber
+    const commonProps = {
+      formData: data,
+      handleChange: handleSpecificChange,
+      bgInput: "white",
+      borderColor: "gray.200",
+      textColor: "gray.700"
+    };
+
+    switch (specialty) {
+      case "Cardiologia": return <CardiologiaFields {...commonProps} />;
+      case "Clínica Geral": return <ClinicoGeralFields {...commonProps} />;
+      case "Clínica Médica": return <ClinicaMedicaFields {...commonProps} />;
+      case "Dermatologia": return <DermatologiaFields {...commonProps} />;
+      case "Endocrinologia": return <EndocrinologiaFields {...commonProps} />;
+      case "Fonoaudiologia": return <FonoaudiologiaFields {...commonProps} />;
+      case "Gastroenterologia": return <GastroenterologiaFields {...commonProps} />;
+      case "Geriatria": return <GeriatriaFields {...commonProps} />;
+      case "Ginecologia": return <GinecoFields {...commonProps} />;
+      case "Hematologia": return <HematologiaFields {...commonProps} />;
+      case "Infectologia": return <InfectologiaFields {...commonProps} />;
+      case "Nefrologia": return <NefrologiaFields {...commonProps} />;
+      case "Neurologia": return <NeurologiaFields {...commonProps} />;
+      case "Nutrologia": return <NutrologiaFields {...commonProps} />;
+      case "Oftalmologia": return <OftalmologiaFields {...commonProps} />;
+      case "Ortopedia": return <OrtopediaFields {...commonProps} />;
+      case "Pediatria": return <PediatriaFields {...commonProps} />;
+      case "Pneumologia": return <PneumologiaFields {...commonProps} />;
+      case "Psiquiatria": return <PsiquiatriaFields {...commonProps} />;
+      case "Reumatologia": return <ReumatologiaFields {...commonProps} />;
+      case "Urologia": return <UrologiaFields {...commonProps} />;
+      default: return null; // Retorna null se não tiver arquivo específico ainda
+    }
+  };
+
   return (
     <Box mt={4} p={4} borderWidth={1} borderRadius="md" bg="white" boxShadow="sm">
-      <Heading size="sm" mb={4} color="gray.600">Dados Clínicos Específicos</Heading>
+      <Heading size="sm" mb={4} color="gray.600">Dados Clínicos Específicos: {specialty || "Geral"}</Heading>
 
       <SimpleGrid columns={[1, 2]} spacing={6}>
         
-        {/* --- BLOCO 1: DADOS DE NASCIMENTO (PEDIATRIA) --- */}
+        {/* --- BLOCO DE CONFIGURAÇÕES DINÂMICAS DO BANCO (SETTINGS) --- */}
+
         {settings.enable_birth_data && (
           <Box gridColumn="span 2" p={4} bg="blue.50" borderRadius="md">
             <Heading size="xs" mb={3} color="blue.700">👶 Dados de Nascimento / Crescimento</Heading>
@@ -42,7 +103,6 @@ export default function SpecialtyFormRenderer({ settings = {}, data = {}, onChan
           </Box>
         )}
 
-        {/* --- BLOCO 2: GESTAÇÃO (GINECOLOGIA) --- */}
         {settings.enable_gestation_data && (
           <Box gridColumn="span 2" p={4} bg="pink.50" borderRadius="md">
             <Heading size="xs" mb={3} color="pink.700">🤰 Dados Obstétricos</Heading>
@@ -59,7 +119,6 @@ export default function SpecialtyFormRenderer({ settings = {}, data = {}, onChan
           </Box>
         )}
 
-        {/* --- BLOCO 3: VISÃO (OFTALMOLOGIA) --- */}
         {settings.enable_vision_data && (
           <Box gridColumn="span 2" p={4} bg="teal.50" borderRadius="md">
             <Heading size="xs" mb={3} color="teal.700">👁️ Acuidade Visual</Heading>
@@ -76,7 +135,6 @@ export default function SpecialtyFormRenderer({ settings = {}, data = {}, onChan
           </Box>
         )}
 
-        {/* --- BLOCO 4: LATERALIDADE (ORTOPEDIA) --- */}
         {settings.require_laterality && (
           <FormControl isRequired>
             <FormLabel fontWeight="bold">Lado Acometido (Lateralidade)</FormLabel>
@@ -95,7 +153,6 @@ export default function SpecialtyFormRenderer({ settings = {}, data = {}, onChan
           </FormControl>
         )}
 
-        {/* --- BLOCO 5: CONTROLE DE SESSÕES (FONO/FISIO) --- */}
         {settings.enable_session_control && (
           <FormControl>
             <FormLabel>Controle de Sessão</FormLabel>
@@ -107,7 +164,6 @@ export default function SpecialtyFormRenderer({ settings = {}, data = {}, onChan
           </FormControl>
         )}
 
-        {/* --- BLOCO 6: PRESSÃO ARTERIAL (COMUM) --- */}
         <FormControl isRequired={settings.require_blood_pressure}>
           <FormLabel>
             Pressão Arterial (PA) 
@@ -124,21 +180,25 @@ export default function SpecialtyFormRenderer({ settings = {}, data = {}, onChan
 
       </SimpleGrid>
 
-      {/* Exemplo de alerta se nenhuma configuração específica estiver ativa */}
-      {!settings.enable_birth_data && !settings.enable_gestation_data && !settings.enable_vision_data && (
-        <Box mt={6}>
-          <Divider mb={4} />
-          <FormControl>
-            <FormLabel>Observações Clínicas Gerais</FormLabel>
-            <Textarea 
-              rows={4} 
-              placeholder="Descreva o quadro clínico..." 
-              value={data.obs_geral || ""}
-              onChange={e => updateField("obs_geral", e.target.value)}
-            />
-          </FormControl>
-        </Box>
-      )}
+      <Divider my={6} />
+
+      {/* --- BLOCO DE CAMPOS TEXTUAIS ESPECÍFICOS --- */}
+      <Box mt={4}>
+        {renderSpecificFields()}
+      </Box>
+
+      {/* Observação Geral de Backup (Aparece junto com os campos para anotações extras) */}
+      <Box mt={6}>
+        <FormControl>
+          <FormLabel>Observações Clínicas Gerais Adicionais</FormLabel>
+          <Textarea 
+            rows={3} 
+            placeholder="Descreva observações adicionais, exames físicos extras..." 
+            value={data.obs_geral || ""}
+            onChange={e => updateField("obs_geral", e.target.value)}
+          />
+        </FormControl>
+      </Box>
 
     </Box>
   );

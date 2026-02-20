@@ -9,12 +9,6 @@ export default function MeusExames() {
   const [exames, setExames] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Dados fictícios (Fallback)
-  const dummyExames = [
-    { id: 1, nome: "Hemograma Completo", data: "15/02/2026", status: "Disponível", url: "#" },
-    { id: 2, nome: "Raio-X Tórax", data: "10/01/2026", status: "Arquivado", url: "#" }
-  ];
-
   useEffect(() => {
     async function fetchExames() {
         try {

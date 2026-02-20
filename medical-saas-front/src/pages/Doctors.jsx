@@ -8,15 +8,9 @@ import {
 } from '@chakra-ui/react';
 import { FaPlus, FaEdit, FaBan, FaCheck } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
-
-// 1. IMPORTANDO A API
 import api from '../services/api';
+import { MASTER_SPECIALTIES } from '../services/specialtyService';
 
-// Lista mestra para dropdown
-const MASTER_SPECIALTIES = [
-    "Clínica Geral", "Oftalmologia", "Cardiologia", "Dermatologia", 
-    "Pediatria", "Ginecologia", "Ortopedia", "Neurologia"
-];
 
 export default function Doctors() {
   const [doctors, setDoctors] = useState([]);
@@ -24,7 +18,10 @@ export default function Doctors() {
   const [loading, setLoading] = useState(true);
   const { isOpen, onOpen, onClose } = useDisclosure();
   
-  const [currentDoctor, setCurrentDoctor] = useState({ id: '', nome: '', especialidade: '', crm: '' });
+  // AJUSTE: Adicionamos email e senha ao estado inicial
+  const [currentDoctor, setCurrentDoctor] = useState({ 
+    id: '', nome: '', especialidade: '', crm: '', email: '', senha: '' 
+  });
   const [isEditing, setIsEditing] = useState(false);
   const [filter, setFilter] = useState('ativos');
 
@@ -43,7 +40,7 @@ export default function Doctors() {
   const inactiveColor = useColorModeValue('red.600', 'red.300');
   const jsonBg = useColorModeValue('gray.100', 'gray.900'); 
 
-  // 2. FUNÇÕES REFATORADAS PARA USAR API DIRETO
+  // 2. FUNÇÕES
   const fetchDoctors = async () => {
     setLoading(true);
     try {
@@ -62,7 +59,6 @@ export default function Doctors() {
       const response = await api.get('/specialties/rules/');
       setRules(response.data || []);
     } catch (e) {
-      // Ignora erro de regras se a rota não existir ainda
       console.log('Regras não carregadas');
     }
   };
@@ -80,6 +76,7 @@ export default function Doctors() {
 
   const handleSave = async () => {
     try {
+      // Payload base para Edição (não envia email e senha)
       const payload = {
         nome: currentDoctor.nome,
         especialidade: currentDoctor.especialidade,
@@ -87,13 +84,24 @@ export default function Doctors() {
       };
 
       if (isEditing && currentDoctor.id) {
-        // PUT
+        // PUT (Edição)
         await api.put(`/doctors/${currentDoctor.id}`, payload);
         toast({ title: 'Atualizado!', status: 'success' });
       } else {
-        // POST
-        await api.post('/doctors/', payload);
-        toast({ title: 'Criado!', status: 'success' });
+        // POST (Criação) - Exige email e senha
+        if (!currentDoctor.email || !currentDoctor.senha) {
+          toast({ title: 'Preencha o e-mail e a senha de acesso.', status: 'warning' });
+          return;
+        }
+        
+        const postPayload = {
+          ...payload,
+          email: currentDoctor.email,
+          senha: currentDoctor.senha
+        };
+        
+        await api.post('/doctors/', postPayload);
+        toast({ title: 'Profissional criado com sucesso!', status: 'success' });
       }
       onClose();
       fetchDoctors();
@@ -130,10 +138,12 @@ export default function Doctors() {
     fetchRules();
     
     if (doctor) {
-      setCurrentDoctor(doctor);
+      // Edição: ignora email e senha
+      setCurrentDoctor({ ...doctor, email: '', senha: '' });
       setIsEditing(true);
     } else {
-      setCurrentDoctor({ id: '', nome: '', especialidade: '', crm: '' });
+      // Novo: limpa tudo
+      setCurrentDoctor({ id: '', nome: '', especialidade: '', crm: '', email: '', senha: '' });
       setIsEditing(false);
     }
     onOpen();
@@ -218,6 +228,35 @@ export default function Doctors() {
                   placeholder="Ex: Dr. Silva" 
                 />
               </FormControl>
+
+              {/* CAMPOS DE ACESSO (SÓ APARECEM NA CRIAÇÃO) */}
+              {!isEditing && (
+                <>
+                  <FormControl isRequired>
+                    <FormLabel color={textColor}>E-mail de Acesso</FormLabel>
+                    <Input 
+                      type="email"
+                      bg={inputBg} 
+                      borderColor={borderColor} 
+                      value={currentDoctor.email} 
+                      onChange={(e) => setCurrentDoctor({...currentDoctor, email: e.target.value})} 
+                      placeholder="Ex: medico@clinica.com" 
+                    />
+                  </FormControl>
+
+                  <FormControl isRequired>
+                    <FormLabel color={textColor}>Senha Provisória</FormLabel>
+                    <Input 
+                      type="password"
+                      bg={inputBg} 
+                      borderColor={borderColor} 
+                      value={currentDoctor.senha} 
+                      onChange={(e) => setCurrentDoctor({...currentDoctor, senha: e.target.value})} 
+                      placeholder="Crie uma senha de acesso" 
+                    />
+                  </FormControl>
+                </>
+              )}
 
               <FormControl isRequired>
                 <FormLabel color={textColor}>Especialidade</FormLabel>

@@ -6,11 +6,19 @@ from typing import Optional
 class CriarClinica(BaseModel):
     razao_social: str
     cnpj: str
+    
+    # NOVOS CAMPOS: Dados para criar o primeiro Administrador desta clínica
+    nome_admin: str
+    email_admin: str
+    senha_admin: str
+    
+    # Campos opcionais que adicionamos na rota (caso você queira usar no futuro)
+    endereco: Optional[str] = None
+    telefone: Optional[str] = None
 
-# O que vamos devolver para o frontend? (Escondemos dados sensíveis se tivesse)
 class RespostaClinica(BaseModel):
     id: int
-    razao_social: str
+    razao_social: str 
     cnpj: str
     is_active: bool
 
