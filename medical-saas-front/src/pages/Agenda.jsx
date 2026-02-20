@@ -14,9 +14,10 @@ import {
 import React from 'react'; 
 import { useNavigate } from 'react-router-dom';
 
-// 1. IMPORTANDO API
+// 1. IMPORTANDO A API
 import api from '../services/api';
-
+// 2. IMPORTANDO O SEU RENDERIZADOR DINÂMICO
+import SpecialtyFormRenderer from '../components/SpecialtyFormRenderer';
 export default function Agenda() {
   const [appointments, setAppointments] = useState([]);
   const [doctors, setDoctors] = useState([]);
@@ -41,8 +42,12 @@ export default function Agenda() {
   const [currentAppointment, setCurrentAppointment] = useState(null);
   const [actionReason, setActionReason] = useState('');
   const [rescheduleData, setRescheduleData] = useState({ data: '', hora: '' });
-  const [consultData, setConsultData] = useState({ anamnese: '', prescricao: '', exame_fisico: '', diagnostico_cid: '' });
   
+  // --- NOVOS ESTADOS PARA O PRONTUÁRIO DINÂMICO ---
+  const [consultData, setConsultData] = useState({ anamnese: '', prescricao: '', exame_fisico: '', diagnostico_cid: '' });
+  const [specialtySettings, setSpecialtySettings] = useState({});
+  const [specialtyData, setSpecialtyData] = useState({});
+  const [currentDocSpecialty, setCurrentDocSpecialty] = useState("");
   const [startTime, setStartTime] = useState(null);
 
   const bgPage = useColorModeValue('gray.50', 'gray.900');
@@ -68,13 +73,11 @@ export default function Agenda() {
 
   const fetchData = useCallback(async () => {
     try {
-      // 2. SUBSTITUINDO AXIOS POR API.GET
       const [appRes, docRes, patRes] = await Promise.all([
         api.get('/appointments/'),
         api.get('/doctors/'),
         api.get('/patients/')
       ]);
-
       setAppointments(appRes.data);
       setDoctors(docRes.data);
       setPatients(patRes.data);
@@ -106,7 +109,6 @@ export default function Agenda() {
   const handleCreate = async () => {
     try {
       const dataHorario = `${newApp.data}T${newApp.hora}:00`;
-      // 3. SUBSTITUINDO POST
       await api.post('/appointments/', {
         doctor_id: newApp.doctor_id,
         patient_id: newApp.patient_id,
@@ -121,33 +123,52 @@ export default function Agenda() {
     } catch (error) { toast({ title: 'Erro ao agendar.', status: 'error' }); }
   };
 
+  // --- LÓGICA ATUALIZADA DO INÍCIO DA CONSULTA ---
   const handleStartConsultation = async (app) => {
     setCurrentAppointment(app);
     setStartTime(new Date()); 
     
     try {
       if (app.status === 'agendado' || app.status === 'AGENDADO') {
-          // 4. SUBSTITUINDO PATCH
           await api.patch(`/appointments/${app.id}/status?novo_status=em_andamento`);
           fetchData();
       }
+      
+      // Limpa os dados do prontuário para a nova consulta
       setConsultData({ anamnese: '', prescricao: '', exame_fisico: '', diagnostico_cid: '' });
+      setSpecialtyData({});
+      
+      // Encontra o médico deste agendamento para descobrir a especialidade
+      const doc = doctors.find(d => d.id === app.doctor_id);
+      const spec = doc?.especialidade || "Clínico Geral";
+      setCurrentDocSpecialty(spec);
+
+      // Busca as regras da especialidade no banco
+      try {
+        const rulesRes = await api.get('/specialties/rules/');
+        const rule = rulesRes.data.find(r => r.specialty === spec);
+        setSpecialtySettings(rule ? rule.settings : {});
+      } catch (e) {
+        setSpecialtySettings({});
+      }
+
       onConsultOpen();
     } catch (error) {
       toast({ title: 'Erro ao iniciar atendimento.', status: 'error' });
     }
   };
 
+  // --- LÓGICA ATUALIZADA PARA FINALIZAR A CONSULTA ---
   const handleFinishConsultation = async () => {
-    if (!consultData.anamnese) {
-        toast({ title: 'A anamnese é obrigatória.', status: 'warning' });
+    // Agora só exigimos o preenchimento se for a aba geral, os bloquinhos podem bastar
+    if (!consultData.anamnese && Object.keys(specialtyData).length === 0) {
+        toast({ title: 'Preencha algum dado na anamnese ou formulário.', status: 'warning' });
         return;
     }
 
     try {
         const endTime = new Date(); 
 
-        // 5. SUBSTITUINDO POST FINAL
         await api.post('/medical-records/', {
             appointment_id: currentAppointment.id,
             patient_id: currentAppointment.patient_id,
@@ -155,6 +176,7 @@ export default function Agenda() {
             prescricao: consultData.prescricao,
             exame_fisico: consultData.exame_fisico,
             diagnostico_cid: consultData.diagnostico_cid,
+            specialty_data: specialtyData, // ENVIANDO OS DADOS DINÂMICOS
             data_inicio: startTime,
             data_fim: endTime
         });
@@ -260,7 +282,7 @@ export default function Agenda() {
         </Box>
       )}
 
-      {/* MODAIS (MANTIDOS IDÊNTICOS, APENAS A LÓGICA DE API FOI MUDADA) */}
+      {/* MODAL NOVO AGENDAMENTO */}
       <Modal isOpen={isOpen} onClose={onClose} size="lg">
         <ModalOverlay /><ModalContent bg={modalBg}><ModalHeader>Novo Agendamento</ModalHeader><ModalCloseButton />
           <ModalBody>
@@ -276,12 +298,14 @@ export default function Agenda() {
         </ModalContent>
       </Modal>
 
+      {/* MODAIS AUXILIARES */}
       <Modal isOpen={isCancelOpen} onClose={onCancelClose}><ModalOverlay /><ModalContent bg={modalBg}><ModalHeader>Cancelar</ModalHeader><ModalBody><Textarea bg={inputBg} value={actionReason} onChange={(e) => setActionReason(e.target.value)} placeholder="Motivo..." /></ModalBody><ModalFooter><Button colorScheme="red" mr={3} onClick={handleConfirmCancel}>Confirmar</Button></ModalFooter></ModalContent></Modal>
       <Modal isOpen={isRescheduleOpen} onClose={onRescheduleClose}><ModalOverlay /><ModalContent bg={modalBg}><ModalHeader>Reagendar</ModalHeader><ModalBody><VStack spacing={3}><FormControl><FormLabel>Data</FormLabel><Input type="date" bg={inputBg} value={rescheduleData.data} onChange={(e) => setRescheduleData({...rescheduleData, data: e.target.value})}/></FormControl><FormControl><FormLabel>Hora</FormLabel><Input type="time" bg={inputBg} value={rescheduleData.hora} onChange={(e) => setRescheduleData({...rescheduleData, hora: e.target.value})}/></FormControl><FormControl><FormLabel>Motivo</FormLabel><Textarea bg={inputBg} value={actionReason} onChange={(e) => setActionReason(e.target.value)} /></FormControl></VStack></ModalBody><ModalFooter><Button colorScheme="blue" mr={3} onClick={handleConfirmReschedule}>Confirmar</Button></ModalFooter></ModalContent></Modal>
 
+      {/* --- MODAL DO PRONTUÁRIO ATUALIZADO --- */}
       <Modal isOpen={isConsultOpen} onClose={onConsultClose} size="4xl" closeOnOverlayClick={false}>
         <ModalOverlay />
-        <ModalContent h="85vh" bg={modalBg}>
+        <ModalContent h="90vh" bg={modalBg} display="flex" flexDirection="column">
           <ModalHeader bg={headerBg} borderBottom="1px solid" borderColor={borderColor}>
             <Flex justify="space-between" align="center">
                 <Flex align="center" gap={2}>
@@ -291,28 +315,61 @@ export default function Agenda() {
             </Flex>
           </ModalHeader>
           <ModalCloseButton />
-          <ModalBody py={4}>
-            <Tabs variant="enclosed" colorScheme="teal" h="100%">
+          
+          <ModalBody py={4} display="flex" flexDirection="column" overflowY="hidden">
+            <Tabs variant="enclosed" colorScheme="teal" h="100%" display="flex" flexDirection="column">
                 <TabList>
                     <Tab fontWeight="bold" color={textColor}><Icon as={FaUserMd} mr={2}/> Anamnese</Tab>
                     <Tab fontWeight="bold" color={textColor}><Icon as={FaPrescriptionBottleAlt} mr={2}/> Prescrição</Tab>
                 </TabList>
-                <TabPanels h="full">
+                
+                <TabPanels flex="1" overflowY="auto" mt={2}>
+                    {/* ABA DE ANAMNESE E FORMULÁRIO DINÂMICO */}
                     <TabPanel h="full" display="flex" flexDirection="column">
-                        <FormControl h="full" display="flex" flexDirection="column">
-                            <FormLabel>Histórico e Queixas:</FormLabel>
-                            <Textarea size="sm" flex="1" resize="none" value={consultData.anamnese} onChange={(e) => setConsultData({...consultData, anamnese: e.target.value})} bg={tabBg} borderColor={borderColor} />
-                        </FormControl>
+                        
+                        {/* 3. A MÁGICA ACONTECE AQUI */}
+                        <SpecialtyFormRenderer 
+                            specialty={currentDocSpecialty} 
+                            settings={specialtySettings} 
+                            data={specialtyData} 
+                            onChange={setSpecialtyData} 
+                        />
+
+                        {/* Texto livre tradicional (que já existia) para complementar */}
+                        <FormControl mt={6} display="flex" flexDirection="column" flex="1">
+                          <FormLabel color={textColor}>Histórico e Queixas (Texto Livre):</FormLabel>
+                          <Textarea 
+                              size="sm" 
+                              h="250px" // Altura fixa e confortável
+                              resize="none" // <-- REMOVE A REGULAGEM DE TAMANHO
+                              value={consultData.anamnese} 
+                              onChange={(e) => setConsultData({...consultData, anamnese: e.target.value})} 
+                              bg={tabBg} 
+                              borderColor={borderColor} 
+                              placeholder="Evolução, observações adicionais..."
+                              _focus={{ borderColor: "teal.400", boxShadow: "0 0 0 1px teal.400" }}
+                          />
+                      </FormControl>
                     </TabPanel>
+
                     <TabPanel h="full" display="flex" flexDirection="column">
                         <FormControl h="full" display="flex" flexDirection="column">
-                            <FormLabel>Prescrição Médica:</FormLabel>
-                            <Textarea size="sm" flex="1" resize="none" value={consultData.prescricao} onChange={(e) => setConsultData({...consultData, prescricao: e.target.value})} bg={tabBg} borderColor={borderColor} />
+                            <FormLabel color={textColor}>Prescrição Médica e Pedido de Exames:</FormLabel>
+                            <Textarea 
+                                size="sm" 
+                                flex="1" 
+                                minH="300px"
+                                value={consultData.prescricao} 
+                                onChange={(e) => setConsultData({...consultData, prescricao: e.target.value})} 
+                                bg={tabBg} 
+                                borderColor={borderColor} 
+                            />
                         </FormControl>
                     </TabPanel>
                 </TabPanels>
             </Tabs>
           </ModalBody>
+          
           <ModalFooter borderTop="1px solid" borderColor={borderColor}>
             <Button variant="ghost" size="sm" mr={3} onClick={onConsultClose}>Cancelar</Button>
             <Button colorScheme="green" size="sm" leftIcon={<FaCheckDouble />} onClick={handleFinishConsultation}>Finalizar Prontuário</Button>

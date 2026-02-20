@@ -1,58 +1,68 @@
 import React from "react";
-import { Box, FormControl, FormLabel, Input, HStack,
-SimpleGrid,Textarea, Select, Heading, Divider
+import { 
+  Box, FormControl, FormLabel, Input, HStack, SimpleGrid, 
+  Textarea, Select, Heading, Divider, useColorModeValue 
 } from "@chakra-ui/react";
-import CardiologiaFields from "./CardiologiaFields";
-import ClinicoGeralFields from "./ClinicoGeralFields";
-import DermatologiaFields from "./DermatologiaFields";
-import FonoaudiologiaFields from "./FonoaudiologiaFields";
-import GinecoFields from "./GinecoFields";
-import OftalmologiaFields from "./OftalmologiaFields";
-import OrtopediaFields from "./OrtopediaFields";
-import PediatriaFields from "./PediatriaFields";
-import ClinicaMedicaFields from "./ClinicaMedicaFields";
-import EndocrinologiaFields from "./EndocrinologiaFields";
-import GastroenterologiaFields from "./GastroenterologiaFields";
-import GeriatriaFields from "./GeriatriaFields";
-import HematologiaFields from "./HematologiaFields";
-import InfectologiaFields from "./InfectologiaFields";
-import NefrologiaFields from "./NefrologiaFields";
-import NeurologiaFields from "./NeurologiaFields";
-import NutrologiaFields from "./NutrologiaFields";
-import PneumologiaFields from "./PneumologiaFields";
-import PsiquiatriaFields from "./PsiquiatriaFields";
-import ReumatologiaFields from "./ReumatologiaFields";
-import UrologiaFields from "./UrologiaFields";
 
+// --- IMPORTAÇÕES DOS COMPONENTES ---
+import CardiologiaFields from "./specialties/CardiologiaFields";
+import ClinicoGeralFields from "./specialties/ClinicoGeralFields";
+import DermatologiaFields from "./specialties/DermatologiaFields";
+import FonoaudiologiaFields from "./specialties/FonoaudiologiaFields";
+import GinecoFields from "./specialties/GinecoFields";
+import OftalmologiaFields from "./specialties/OftalmologiaFields";
+import OrtopediaFields from "./specialties/OrtopediaFields";
+import PediatriaFields from "./specialties/PediatriaFields";
+import EndocrinologiaFields from "./specialties/EndocrinologiaFields";
+import GastroenterologiaFields from "./specialties/GastroenterologiaFields";
+import GeriatriaFields from "./specialties/GeriatriaFields";
+import HematologiaFields from "./specialties/HematologiaFields";
+import InfectologiaFields from "./specialties/InfectologiaFields";
+import NefrologiaFields from "./specialties/NefrologiaFields";
+import NeurologiaFields from "./specialties/NeurologiaFields";
+import NutrologiaFields from "./specialties/NutrologiaFields";
+import PneumologiaFields from "./specialties/PneumologiaFields";
+import PsiquiatriaFields from "./specialties/PsiquiatriaFields";
+import ReumatologiaFields from "./specialties/ReumatologiaFields";
+import UrologiaFields from "./specialties/UrologiaFields";
 
 export default function SpecialtyFormRenderer({ specialty, settings = {}, data = {}, onChange }) {
   
-  // Função auxiliar para atualizar o JSON de dados clínicos (usado pelos inputs manuais)
+  // --- DEFINIÇÃO DINÂMICA DE CORES (MODO CLARO / ESCURO) ---
+  const bgContainer = useColorModeValue("white", "gray.800");
+  const borderColor = useColorModeValue("gray.200", "gray.700");
+  const textColor = useColorModeValue("gray.700", "gray.200");
+  const headingColor = useColorModeValue("gray.600", "gray.400");
+  const inputBg = useColorModeValue("white", "gray.700");
+
+  // Cores para os blocos coloridos (ex: pediatria, gineco)
+  const blueBlock = useColorModeValue("blue.50", "blue.900");
+  const pinkBlock = useColorModeValue("pink.50", "pink.900");
+  const tealBlock = useColorModeValue("teal.50", "teal.900");
+  const orangeBlock = useColorModeValue("orange.50", "orange.900");
+  const redBlock = useColorModeValue("red.50", "red.900");
+
   const updateField = (field, value) => {
     onChange({ ...data, [field]: value });
   };
 
-  // Função auxiliar para atualizar os dados vindos dos componentes específicos (que usam e.target)
   const handleSpecificChange = (e) => {
     const { name, value } = e.target;
     updateField(name, value);
   };
 
-  // Renderiza o componente específico baseado na string da especialidade
   const renderSpecificFields = () => {
-    // Props padrão que todos os componentes específicos vão receber
     const commonProps = {
       formData: data,
       handleChange: handleSpecificChange,
-      bgInput: "white",
-      borderColor: "gray.200",
-      textColor: "gray.700"
+      bgInput: inputBg,
+      borderColor: borderColor,
+      textColor: textColor
     };
 
     switch (specialty) {
       case "Cardiologia": return <CardiologiaFields {...commonProps} />;
-      case "Clínica Geral": return <ClinicoGeralFields {...commonProps} />;
-      case "Clínica Médica": return <ClinicaMedicaFields {...commonProps} />;
+      case "Clínico Geral": return <ClinicoGeralFields {...commonProps} />;
       case "Dermatologia": return <DermatologiaFields {...commonProps} />;
       case "Endocrinologia": return <EndocrinologiaFields {...commonProps} />;
       case "Fonoaudiologia": return <FonoaudiologiaFields {...commonProps} />;
@@ -71,65 +81,63 @@ export default function SpecialtyFormRenderer({ specialty, settings = {}, data =
       case "Psiquiatria": return <PsiquiatriaFields {...commonProps} />;
       case "Reumatologia": return <ReumatologiaFields {...commonProps} />;
       case "Urologia": return <UrologiaFields {...commonProps} />;
-      default: return null; // Retorna null se não tiver arquivo específico ainda
+      default: return null;
     }
   };
 
   return (
-    <Box mt={4} p={4} borderWidth={1} borderRadius="md" bg="white" boxShadow="sm">
-      <Heading size="sm" mb={4} color="gray.600">Dados Clínicos Específicos: {specialty || "Geral"}</Heading>
+    <Box mt={4} p={4} borderWidth={1} borderRadius="md" bg={bgContainer} borderColor={borderColor} boxShadow="sm">
+      <Heading size="sm" mb={4} color={headingColor}>Dados Clínicos Específicos: {specialty || "Geral"}</Heading>
 
       <SimpleGrid columns={[1, 2]} spacing={6}>
         
-        {/* --- BLOCO DE CONFIGURAÇÕES DINÂMICAS DO BANCO (SETTINGS) --- */}
-
         {settings.enable_birth_data && (
-          <Box gridColumn="span 2" p={4} bg="blue.50" borderRadius="md">
-            <Heading size="xs" mb={3} color="blue.700">👶 Dados de Nascimento / Crescimento</Heading>
+          <Box gridColumn="span 2" p={4} bg={blueBlock} borderRadius="md">
+            <Heading size="xs" mb={3} color={useColorModeValue("blue.700", "blue.200")}>👶 Dados de Nascimento / Crescimento</Heading>
             <HStack>
               <FormControl>
-                <FormLabel fontSize="sm">Peso (kg)</FormLabel>
-                <Input type="number" bg="white" value={data.peso || ""} onChange={e => updateField("peso", e.target.value)} />
+                <FormLabel fontSize="sm" color={textColor}>Peso (kg)</FormLabel>
+                <Input type="number" bg={inputBg} color={textColor} borderColor={borderColor} value={data.peso || ""} onChange={e => updateField("peso", e.target.value)} />
               </FormControl>
               <FormControl>
-                <FormLabel fontSize="sm">Altura (cm)</FormLabel>
-                <Input type="number" bg="white" value={data.altura || ""} onChange={e => updateField("altura", e.target.value)} />
+                <FormLabel fontSize="sm" color={textColor}>Altura (cm)</FormLabel>
+                <Input type="number" bg={inputBg} color={textColor} borderColor={borderColor} value={data.altura || ""} onChange={e => updateField("altura", e.target.value)} />
               </FormControl>
               <FormControl>
-                <FormLabel fontSize="sm">Perím. Cefálico</FormLabel>
-                <Input type="number" bg="white" value={data.pc || ""} onChange={e => updateField("pc", e.target.value)} />
+                <FormLabel fontSize="sm" color={textColor}>Perím. Cefálico</FormLabel>
+                <Input type="number" bg={inputBg} color={textColor} borderColor={borderColor} value={data.pc || ""} onChange={e => updateField("pc", e.target.value)} />
               </FormControl>
             </HStack>
           </Box>
         )}
 
         {settings.enable_gestation_data && (
-          <Box gridColumn="span 2" p={4} bg="pink.50" borderRadius="md">
-            <Heading size="xs" mb={3} color="pink.700">🤰 Dados Obstétricos</Heading>
+          <Box gridColumn="span 2" p={4} bg={pinkBlock} borderRadius="md">
+            <Heading size="xs" mb={3} color={useColorModeValue("pink.700", "pink.200")}>🤰 Dados Obstétricos</Heading>
             <HStack>
               <FormControl>
-                <FormLabel fontSize="sm">DUM (Data Última Menstruação)</FormLabel>
-                <Input type="date" bg="white" value={data.dum || ""} onChange={e => updateField("dum", e.target.value)} />
+                <FormLabel fontSize="sm" color={textColor}>DUM</FormLabel>
+                <Input type="date" bg={inputBg} color={textColor} borderColor={borderColor} value={data.dum || ""} onChange={e => updateField("dum", e.target.value)} />
               </FormControl>
               <FormControl>
-                <FormLabel fontSize="sm">DPP (Data Provável Parto)</FormLabel>
-                <Input type="date" bg="white" value={data.dpp || ""} onChange={e => updateField("dpp", e.target.value)} />
+                <FormLabel fontSize="sm" color={textColor}>DPP</FormLabel>
+                <Input type="date" bg={inputBg} color={textColor} borderColor={borderColor} value={data.dpp || ""} onChange={e => updateField("dpp", e.target.value)} />
               </FormControl>
             </HStack>
           </Box>
         )}
 
         {settings.enable_vision_data && (
-          <Box gridColumn="span 2" p={4} bg="teal.50" borderRadius="md">
-            <Heading size="xs" mb={3} color="teal.700">👁️ Acuidade Visual</Heading>
+          <Box gridColumn="span 2" p={4} bg={tealBlock} borderRadius="md">
+            <Heading size="xs" mb={3} color={useColorModeValue("teal.700", "teal.200")}>👁️ Acuidade Visual</Heading>
             <SimpleGrid columns={2} spacing={4}>
               <FormControl>
-                <FormLabel fontSize="sm">Olho Direito (OD)</FormLabel>
-                <Input bg="white" placeholder="Ex: 20/20" value={data.od || ""} onChange={e => updateField("od", e.target.value)} />
+                <FormLabel fontSize="sm" color={textColor}>Olho Direito (OD)</FormLabel>
+                <Input bg={inputBg} color={textColor} borderColor={borderColor} placeholder="Ex: 20/20" value={data.od || ""} onChange={e => updateField("od", e.target.value)} />
               </FormControl>
               <FormControl>
-                <FormLabel fontSize="sm">Olho Esquerdo (OE)</FormLabel>
-                <Input bg="white" placeholder="Ex: 20/20" value={data.oe || ""} onChange={e => updateField("oe", e.target.value)} />
+                <FormLabel fontSize="sm" color={textColor}>Olho Esquerdo (OE)</FormLabel>
+                <Input bg={inputBg} color={textColor} borderColor={borderColor} placeholder="Ex: 20/20" value={data.oe || ""} onChange={e => updateField("oe", e.target.value)} />
               </FormControl>
             </SimpleGrid>
           </Box>
@@ -137,11 +145,12 @@ export default function SpecialtyFormRenderer({ specialty, settings = {}, data =
 
         {settings.require_laterality && (
           <FormControl isRequired>
-            <FormLabel fontWeight="bold">Lado Acometido (Lateralidade)</FormLabel>
+            <FormLabel fontWeight="bold" color={textColor}>Lado Acometido</FormLabel>
             <Select 
               placeholder="Selecione..." 
-              bg="orange.50" 
-              borderColor="orange.300"
+              bg={orangeBlock} 
+              color={textColor}
+              borderColor={useColorModeValue("orange.300", "orange.700")}
               value={data.lateralidade || ""} 
               onChange={e => updateField("lateralidade", e.target.value)}
             >
@@ -153,26 +162,16 @@ export default function SpecialtyFormRenderer({ specialty, settings = {}, data =
           </FormControl>
         )}
 
-        {settings.enable_session_control && (
-          <FormControl>
-            <FormLabel>Controle de Sessão</FormLabel>
-            <HStack>
-              <Input type="number" w="80px" placeholder="Atual" value={data.sessao_atual || ""} onChange={e => updateField("sessao_atual", e.target.value)} />
-              <Box>/</Box>
-              <Input type="number" w="80px" placeholder="Total" value={data.sessao_total || ""} onChange={e => updateField("sessao_total", e.target.value)} />
-            </HStack>
-          </FormControl>
-        )}
-
         <FormControl isRequired={settings.require_blood_pressure}>
-          <FormLabel>
+          <FormLabel color={textColor}>
             Pressão Arterial (PA) 
             {settings.require_blood_pressure && <Box as="span" color="red.500" ml={1}>*</Box>}
           </FormLabel>
           <Input 
             placeholder="Ex: 120x80" 
-            bg={settings.require_blood_pressure ? "red.50" : "white"}
-            borderColor={settings.require_blood_pressure ? "red.200" : "gray.200"}
+            bg={settings.require_blood_pressure ? redBlock : inputBg}
+            borderColor={settings.require_blood_pressure ? "red.200" : borderColor}
+            color={textColor}
             value={data.pa || ""} 
             onChange={e => updateField("pa", e.target.value)} 
           />
@@ -180,26 +179,29 @@ export default function SpecialtyFormRenderer({ specialty, settings = {}, data =
 
       </SimpleGrid>
 
-      <Divider my={6} />
+      <Divider my={6} borderColor={borderColor} />
 
-      {/* --- BLOCO DE CAMPOS TEXTUAIS ESPECÍFICOS --- */}
       <Box mt={4}>
         {renderSpecificFields()}
       </Box>
 
-      {/* Observação Geral de Backup (Aparece junto com os campos para anotações extras) */}
-      <Box mt={6}>
-        <FormControl>
-          <FormLabel>Observações Clínicas Gerais Adicionais</FormLabel>
-          <Textarea 
-            rows={3} 
-            placeholder="Descreva observações adicionais, exames físicos extras..." 
-            value={data.obs_geral || ""}
-            onChange={e => updateField("obs_geral", e.target.value)}
-          />
-        </FormControl>
-      </Box>
-
-    </Box>
+    <Box mt={6}>
+      <FormControl>
+        <FormLabel color={textColor}>Observações Clínicas Gerais Adicionais</FormLabel>
+        <Textarea 
+          rows={6}
+          minH="150px" 
+          resize="none" 
+          placeholder="Descreva observações adicionais..." 
+          value={data.obs_geral || ""}
+          onChange={e => updateField("obs_geral", e.target.value)}
+          bg={inputBg}
+          color={textColor}
+          borderColor={borderColor}
+          _focus={{ borderColor: "blue.400", boxShadow: "0 0 0 1px blue.400" }}
+        />
+      </FormControl>
+    </Box> 
+  </Box>
   );
 }

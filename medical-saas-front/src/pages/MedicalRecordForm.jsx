@@ -14,7 +14,7 @@ export default function MedicalRecordForm({ appointment }) {
   useEffect(() => {
     async function load() {
       // obter especialidade do médico
-      const docSpecialty = appointment?.doctor_especialidade || appointment?.doctor?.especialidade || "Clínica Geral";
+      const docSpecialty = appointment?.doctor_especialidade || appointment?.doctor?.especialidade || "Clínico Geral";
       setSpecialty(docSpecialty);
       
       try {

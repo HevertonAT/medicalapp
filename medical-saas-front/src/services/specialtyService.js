@@ -4,8 +4,7 @@ import api from "./api";
 // Esta lista é usada tanto nas Configurações quanto no Cadastro de Médicos.
 export const MASTER_SPECIALTIES = [
   "Cardiologia",
-  "Clínica Geral",
-  "Clínica Médica",
+  "Clínico Geral",
   "Dermatologia",
   "Endocrinologia",
   "Fonoaudiologia",
