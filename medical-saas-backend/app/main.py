@@ -1,10 +1,8 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-
-# --- IMPORTAÇÃO DOS MODELS (Adequado à sua print) ---
-# O padrão é: from app.models.NOME_DO_ARQUIVO import NomeDaClasse
-
+from app.db.base import engine
+from app.db.base import Base
 from app.models.arquivos_pacientes import PatientFile
 from app.models.documentos import Document
 from app.models.prontuarios import MedicalRecord
@@ -44,6 +42,8 @@ app = FastAPI(
     description="API para gerenciamento de clínicas, pacientes, agendamentos e mais.", 
     version="1.0.0"
 )
+
+Base.metadata.create_all(bind=engine)
 
 # --- CONFIGURAÇÃO DO CORS ---
 origins = [
