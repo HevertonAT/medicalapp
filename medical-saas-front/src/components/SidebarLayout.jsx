@@ -1,6 +1,11 @@
-import { Box, Flex, Icon, Text, VStack, Button, Badge, useColorModeValue, IconButton, Tooltip } from '@chakra-ui/react';
-// ADICIONEI: FaHeartbeat, FaFileMedical
-import { FaHome, FaUserInjured, FaUserMd, FaCalendarAlt, FaSignOutAlt, FaChartPie, FaCode, FaBars, FaChevronLeft, FaChevronRight, FaHeartbeat, FaFileMedical } from 'react-icons/fa';
+import { 
+  Box, Flex, Icon, Text, VStack, Button, Badge, useColorModeValue, IconButton, Tooltip 
+} from '@chakra-ui/react';
+import { 
+  FaHome, FaUserInjured, FaUserMd, FaCalendarAlt, FaSignOutAlt, 
+  FaChartPie, FaCode, FaBars, FaChevronLeft, FaChevronRight, 
+  FaHeartbeat, FaFileMedical, FaClock // FaClock adicionado para o menu do médico
+} from 'react-icons/fa';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { jwtDecode } from "jwt-decode"; 
@@ -12,7 +17,6 @@ export default function SidebarLayout() {
   
   // Estado da Sidebar
   const [isSidebarOpen, setSidebarOpen] = useState(true);
-
   const [simulatedRole, setSimulatedRole] = useState('');
   const [realRole, setRealRole] = useState('');
 
@@ -41,14 +45,17 @@ export default function SidebarLayout() {
     }
   }, []);
 
-  // --- MENU AJUSTADO ---
+  // --- MENU AJUSTADO COM "MINHA AGENDA" ---
   const menuItems = [
     // Menu Admin / Médico
     { name: 'Painel', icon: FaHome, path: '/dashboard', roles: ['superuser', 'admin', 'doctor'] },
     { name: 'Pacientes', icon: FaUserInjured, path: '/patients', roles: ['superuser', 'admin', 'doctor'] },
+    
+    // NOVO: Link para o médico configurar sua própria disponibilidade
+    { name: 'Minha Agenda', icon: FaClock, path: '/minha-agenda', roles: ['doctor'] },
+
     { name: 'Profissionais', icon: FaUserMd, path: '/doctors', roles: ['superuser', 'admin'] },
     { name: 'Especialidades', icon: FaCode, path: '/specialties', roles: ['superuser', 'admin'] },
-    // Removi 'patient' daqui pois ele terá o menu próprio abaixo
     { name: 'Agenda', icon: FaCalendarAlt, path: '/agenda', roles: ['superuser', 'admin', 'doctor'] }, 
     { name: 'Financeiro', icon: FaChartPie, path: '/financial', roles: ['superuser', 'admin'] },
     { name: 'Área Dev', icon: FaCode, path: '/dev-tools', roles: ['superuser'] },
@@ -66,22 +73,19 @@ export default function SidebarLayout() {
 
   return (
     <Flex h="100vh" bg={bgMain}>
-      {/* SIDEBAR COM LARGURA VARIÁVEL (250px ou 80px) */}
       <Box 
         w={isSidebarOpen ? "250px" : "80px"} 
         bg={bgSidebar} 
         shadow="md" 
-        p={isSidebarOpen ? 5 : 2} // Menos padding se estiver fechado
+        p={isSidebarOpen ? 5 : 2} 
         display={{ base: 'none', md: 'flex' }} 
         flexDirection="column"
-        transition="width 0.3s ease" // Animação suave
+        transition="width 0.3s ease"
         overflow="hidden"
         whiteSpace="nowrap"
         borderRight="1px solid"
         borderColor={useColorModeValue('gray.100', 'gray.700')}
       >
-        
-        {/* CABEÇALHO DA SIDEBAR */}
         <Flex 
             justify={isSidebarOpen ? "space-between" : "center"} 
             align="center" 
@@ -89,29 +93,20 @@ export default function SidebarLayout() {
             direction={isSidebarOpen ? "row" : "column-reverse"} 
             gap={2}
         >
-            {/* Título (some se fechado) */}
             {isSidebarOpen && (
-                <Text fontSize="xl" fontWeight="bold" color={headingColor}>
-                  Medical
-                </Text>
+                <Text fontSize="xl" fontWeight="bold" color={headingColor}>Medical</Text>
             )}
             
-            {/* Botão de Toggle (Sempre visível) */}
             <IconButton 
                 icon={isSidebarOpen ? <FaChevronLeft /> : <FaBars />} 
                 size="sm" 
                 variant="ghost" 
-                aria-label="Alternar Menu"
                 onClick={() => setSidebarOpen(!isSidebarOpen)}
             />
             
-            {/* Dark Mode Switcher (Centralizado se fechado) */}
-            <Box>
-                <ColorModeSwitcher />
-            </Box>
+            <Box><ColorModeSwitcher /></Box>
         </Flex>
 
-        {/* BADGE DE CARGO */}
         <Flex justify="center" mb={8}>
             {isSidebarOpen ? (
                 <Badge colorScheme={simulatedRole === 'superuser' ? 'purple' : simulatedRole === 'doctor' ? 'green' : simulatedRole === 'patient' || simulatedRole === 'paciente' ? 'orange' : 'blue'}>
@@ -124,7 +119,6 @@ export default function SidebarLayout() {
             )}
         </Flex>
         
-        {/* ITENS DO MENU */}
         <VStack spacing={2} align="stretch" flex="1">
           {menuItems.map((item) => {
             if (item.path === '/dev-tools') {
@@ -139,7 +133,7 @@ export default function SidebarLayout() {
                   <Link to={item.path}>
                     <Flex 
                       align="center" 
-                      justify={isSidebarOpen ? "flex-start" : "center"} // Centraliza ícone se fechado
+                      justify={isSidebarOpen ? "flex-start" : "center"} 
                       p={3} 
                       borderRadius="md" 
                       bg={isActive ? activeBg : 'transparent'} 
@@ -148,8 +142,6 @@ export default function SidebarLayout() {
                       cursor="pointer"
                     >
                       <Icon as={item.icon} boxSize={5} mr={isSidebarOpen ? 3 : 0} />
-                      
-                      {/* Texto (some se fechado) */}
                       {isSidebarOpen && (
                           <Text fontWeight={isActive ? 'bold' : 'normal'}>{item.name}</Text>
                       )}
@@ -160,7 +152,6 @@ export default function SidebarLayout() {
           })}
         </VStack>
 
-        {/* BOTÃO SAIR */}
         <Button 
           variant="outline" 
           colorScheme="red" 
@@ -174,7 +165,6 @@ export default function SidebarLayout() {
         </Button>
       </Box>
 
-      {/* CONTEÚDO PRINCIPAL (Se ajusta automaticamente) */}
       <Box flex="1" p={0} overflowY="auto" w="full">
         <Outlet />
       </Box>

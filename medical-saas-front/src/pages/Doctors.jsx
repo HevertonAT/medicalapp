@@ -4,30 +4,45 @@ import {
   IconButton, useDisclosure, Modal, ModalOverlay, ModalContent,
   ModalHeader, ModalBody, ModalCloseButton, FormControl, FormLabel,
   Input, ModalFooter, useToast, Spinner, Text, HStack, VStack,
-  useColorModeValue, Tooltip, Badge, Select
+  useColorModeValue, Tooltip, Badge, Select, Divider, SimpleGrid
 } from '@chakra-ui/react';
 import { FaPlus, FaEdit, FaBan, FaCheck } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { MASTER_SPECIALTIES } from '../services/specialtyService';
 
+// IMPORTAÇÃO JÁ PRESENTE NO SEU ARQUIVO
+import AgendaConfigFields from '../components/profissionais/AgendaConfigFields';
 
 export default function Doctors() {
+  // --- ESTADOS EXISTENTES ---
   const [doctors, setDoctors] = useState([]);
   const [rules, setRules] = useState([]); 
   const [loading, setLoading] = useState(true);
   const { isOpen, onOpen, onClose } = useDisclosure();
   
-  // AJUSTE: Adicionamos email e senha ao estado inicial
   const [currentDoctor, setCurrentDoctor] = useState({ 
     id: '', nome: '', especialidade: '', crm: '', email: '', senha: '' 
   });
   const [isEditing, setIsEditing] = useState(false);
   const [filter, setFilter] = useState('ativos');
 
-  const toast = useToast();
-  const navigate = useNavigate();
+  // --- 1. NOVO ESTADO: CONFIGURAÇÃO DE AGENDA ---
+  const initialAgendaConfig = {
+    seg: { ativo: true, inicio: "08:00", fim: "18:00" },
+    ter: { ativo: true, inicio: "08:00", fim: "18:00" },
+    qua: { ativo: true, inicio: "08:00", fim: "18:00" },
+    qui: { ativo: true, inicio: "08:00", fim: "18:00" },
+    sex: { ativo: true, inicio: "08:00", fim: "18:00" },
+    sab: { ativo: false, inicio: "08:00", fim: "12:00" },
+    dom: { ativo: false, inicio: "08:00", fim: "12:00" },
+    intervalo: 30 
+  };
+  const [agendaConfig, setAgendaConfig] = useState(initialAgendaConfig);
 
+  const toast = useToast();
+
+  // CORES DO TEMA
   const bgCard = useColorModeValue('white', 'gray.800');
   const bgHeader = useColorModeValue('gray.50', 'gray.700');
   const inputBg = useColorModeValue('gray.50', 'gray.700');
@@ -40,14 +55,13 @@ export default function Doctors() {
   const inactiveColor = useColorModeValue('red.600', 'red.300');
   const jsonBg = useColorModeValue('gray.100', 'gray.900'); 
 
-  // 2. FUNÇÕES
+  // --- FUNÇÕES DE BUSCA ---
   const fetchDoctors = async () => {
     setLoading(true);
     try {
       const response = await api.get('/doctors/');
       setDoctors(response.data);
     } catch (error) {
-      console.error(error);
       toast({ title: 'Erro ao carregar profissionais.', status: 'error' });
     } finally {
       setLoading(false);
@@ -58,9 +72,7 @@ export default function Doctors() {
     try {
       const response = await api.get('/specialties/rules/');
       setRules(response.data || []);
-    } catch (e) {
-      console.log('Regras não carregadas');
-    }
+    } catch (e) { console.log('Regras não carregadas'); }
   };
 
   useEffect(() => { 
@@ -68,27 +80,21 @@ export default function Doctors() {
     fetchRules();
   }, []);
 
-  const filteredDoctors = doctors.filter(doc => {
-    if (filter === 'ativos') return doc.ativo === true;
-    if (filter === 'inativos') return doc.ativo === false;
-    return true;
-  });
-
+  // --- 2. AJUSTE: SALVAR COM CONFIGURAÇÃO DE AGENDA ---
   const handleSave = async () => {
     try {
-      // Payload base para Edição (não envia email e senha)
       const payload = {
         nome: currentDoctor.nome,
         especialidade: currentDoctor.especialidade,
-        crm: currentDoctor.crm
+        crm: currentDoctor.crm,
+        // Envia a configuração da agenda no payload
+        agenda_config: agendaConfig 
       };
 
       if (isEditing && currentDoctor.id) {
-        // PUT (Edição)
         await api.put(`/doctors/${currentDoctor.id}`, payload);
-        toast({ title: 'Atualizado!', status: 'success' });
+        toast({ title: 'Profissional e Agenda atualizados!', status: 'success' });
       } else {
-        // POST (Criação) - Exige email e senha
         if (!currentDoctor.email || !currentDoctor.senha) {
           toast({ title: 'Preencha o e-mail e a senha de acesso.', status: 'warning' });
           return;
@@ -101,16 +107,37 @@ export default function Doctors() {
         };
         
         await api.post('/doctors/', postPayload);
-        toast({ title: 'Profissional criado com sucesso!', status: 'success' });
+        toast({ title: 'Profissional criado com agenda configurada!', status: 'success' });
       }
       onClose();
       fetchDoctors();
     } catch (error) {
-      console.error(error);
       const msg = error.response?.data?.detail || 'Erro ao salvar.';
       toast({ title: msg, status: 'error' });
     }
   };
+
+  // --- 3. AJUSTE: ABRIR MODAL CARREGANDO A AGENDA ---
+  const openModal = (doctor = null) => {
+    fetchRules();
+    if (doctor) {
+      setCurrentDoctor({ ...doctor, email: '', senha: '' });
+      // Se o médico já tiver agenda salva, carrega ela; senão, usa a padrão
+      setAgendaConfig(doctor.agenda_config || initialAgendaConfig);
+      setIsEditing(true);
+    } else {
+      setCurrentDoctor({ id: '', nome: '', especialidade: '', crm: '', email: '', senha: '' });
+      setAgendaConfig(initialAgendaConfig);
+      setIsEditing(false);
+    }
+    onOpen();
+  };
+
+  const filteredDoctors = doctors.filter(doc => {
+    if (filter === 'ativos') return doc.ativo === true;
+    if (filter === 'inativos') return doc.ativo === false;
+    return true;
+  });
 
   const handleInactivate = async (id) => {
     if (!confirm('Inativar este profissional?')) return;
@@ -118,9 +145,7 @@ export default function Doctors() {
       await api.delete(`/doctors/${id}`);
       toast({ title: 'Inativado.', status: 'warning' });
       fetchDoctors();
-    } catch (error) {
-      toast({ title: 'Erro ao inativar.', status: 'error' });
-    }
+    } catch (error) { toast({ title: 'Erro ao inativar.', status: 'error' }); }
   };
 
   const handleReactivate = async (id) => {
@@ -129,24 +154,7 @@ export default function Doctors() {
       await api.patch(`/doctors/${id}/reactivate`);
       toast({ title: 'Profissional reativado!', status: 'success' });
       fetchDoctors();
-    } catch (error) {
-      toast({ title: 'Erro ao reativar.', status: 'error' });
-    }
-  };
-
-  const openModal = (doctor = null) => {
-    fetchRules();
-    
-    if (doctor) {
-      // Edição: ignora email e senha
-      setCurrentDoctor({ ...doctor, email: '', senha: '' });
-      setIsEditing(true);
-    } else {
-      // Novo: limpa tudo
-      setCurrentDoctor({ id: '', nome: '', especialidade: '', crm: '', email: '', senha: '' });
-      setIsEditing(false);
-    }
-    onOpen();
+    } catch (error) { toast({ title: 'Erro ao reativar.', status: 'error' }); }
   };
 
   const linkedRule = (rules || []).find(r => r.specialty === currentDoctor.especialidade);
@@ -187,7 +195,6 @@ export default function Doctors() {
                       {doc.ativo ? 'ATIVO' : 'INATIVO'}
                     </Text>
                   </Td>
-
                   <Td>
                     <IconButton icon={<FaEdit />} size="sm" colorScheme="yellow" mr={2} onClick={() => openModal(doc)} isDisabled={!doc.ativo} aria-label="Editar" />
                     {doc.ativo ? (
@@ -208,7 +215,8 @@ export default function Doctors() {
       )}
 
       {/* --- MODAL DE CADASTRO/EDIÇÃO --- */}
-      <Modal isOpen={isOpen} onClose={onClose} size="lg">
+      {/* Aumentamos o tamanho para "xl" para acomodar a agenda confortavelmente */}
+      <Modal isOpen={isOpen} onClose={onClose} size="xl" scrollBehavior="inside">
         <ModalOverlay />
         <ModalContent bg={modalBg}>
           <ModalHeader color={headingColor}>
@@ -217,90 +225,90 @@ export default function Doctors() {
           <ModalCloseButton />
           
           <ModalBody>
-            <VStack spacing={4}>
-              <FormControl isRequired>
-                <FormLabel color={textColor}>Nome Completo</FormLabel>
-                <Input 
-                  bg={inputBg} 
-                  borderColor={borderColor} 
-                  value={currentDoctor.nome} 
-                  onChange={(e) => setCurrentDoctor({...currentDoctor, nome: e.target.value})} 
-                  placeholder="Ex: Dr. Silva" 
-                />
-              </FormControl>
+            <VStack spacing={6} align="stretch">
+              <VStack spacing={4}>
+                <FormControl isRequired>
+                  <FormLabel color={textColor}>Nome Completo</FormLabel>
+                  <Input 
+                    bg={inputBg} 
+                    borderColor={borderColor} 
+                    value={currentDoctor.nome} 
+                    onChange={(e) => setCurrentDoctor({...currentDoctor, nome: e.target.value})} 
+                    placeholder="Ex: Dr. Silva" 
+                  />
+                </FormControl>
 
-              {/* CAMPOS DE ACESSO (SÓ APARECEM NA CRIAÇÃO) */}
-              {!isEditing && (
-                <>
-                  <FormControl isRequired>
-                    <FormLabel color={textColor}>E-mail de Acesso</FormLabel>
-                    <Input 
-                      type="email"
-                      bg={inputBg} 
-                      borderColor={borderColor} 
-                      value={currentDoctor.email} 
-                      onChange={(e) => setCurrentDoctor({...currentDoctor, email: e.target.value})} 
-                      placeholder="Ex: medico@clinica.com" 
-                    />
-                  </FormControl>
+                {!isEditing && (
+                  <SimpleGrid columns={2} spacing={4} w="full">
+                    <FormControl isRequired>
+                      <FormLabel color={textColor}>E-mail de Acesso</FormLabel>
+                      <Input 
+                        type="email"
+                        bg={inputBg} 
+                        borderColor={borderColor} 
+                        value={currentDoctor.email} 
+                        onChange={(e) => setCurrentDoctor({...currentDoctor, email: e.target.value})} 
+                        placeholder="Ex: medico@clinica.com" 
+                      />
+                    </FormControl>
 
-                  <FormControl isRequired>
-                    <FormLabel color={textColor}>Senha Provisória</FormLabel>
-                    <Input 
-                      type="password"
-                      bg={inputBg} 
-                      borderColor={borderColor} 
-                      value={currentDoctor.senha} 
-                      onChange={(e) => setCurrentDoctor({...currentDoctor, senha: e.target.value})} 
-                      placeholder="Crie uma senha de acesso" 
-                    />
-                  </FormControl>
-                </>
-              )}
-
-              <FormControl isRequired>
-                <FormLabel color={textColor}>Especialidade</FormLabel>
-                <Select 
-                  bg={inputBg} 
-                  borderColor={borderColor} 
-                  value={currentDoctor.especialidade} 
-                  onChange={(e) => setCurrentDoctor({...currentDoctor, especialidade: e.target.value})} 
-                  placeholder="Selecione a especialidade"
-                >
-                  {MASTER_SPECIALTIES.map(spec => (
-                    <option key={spec} value={spec}>{spec}</option>
-                  ))}
-                </Select>
-
-                {currentDoctor.especialidade && (
-                  <Box mt={3} p={3} borderRadius="md" bg={jsonBg} borderLeft="4px solid" borderColor="blue.400">
-                    <HStack justify="space-between" mb={1}>
-                      <Text fontSize="xs" fontWeight="bold" color={textColor}>Configuração do Sistema</Text>
-                      {linkedRule ? <Badge colorScheme="green">Personalizada</Badge> : <Badge colorScheme="gray">Padrão</Badge>}
-                    </HStack>
-                    {linkedRule ? (
-                      <Text fontSize="xs" color={textColor} noOfLines={3}>{JSON.stringify(linkedRule.settings)}</Text>
-                    ) : (
-                      <Text fontSize="xs" color="gray.500" fontStyle="italic">Nenhuma regra específica criada.</Text>
-                    )}
-                  </Box>
+                    <FormControl isRequired>
+                      <FormLabel color={textColor}>Senha Provisória</FormLabel>
+                      <Input 
+                        type="password"
+                        bg={inputBg} 
+                        borderColor={borderColor} 
+                        value={currentDoctor.senha} 
+                        onChange={(e) => setCurrentDoctor({...currentDoctor, senha: e.target.value})} 
+                        placeholder="Senha de acesso" 
+                      />
+                    </FormControl>
+                  </SimpleGrid>
                 )}
-              </FormControl>
 
-              <FormControl isRequired>
-                <FormLabel color={textColor}>Registro Profissional</FormLabel>
-                <Input 
-                  bg={inputBg} 
-                  borderColor={borderColor} 
-                  value={currentDoctor.crm} 
-                  onChange={(e) => setCurrentDoctor({...currentDoctor, crm: e.target.value})} 
-                />
-              </FormControl>
+                <SimpleGrid columns={2} spacing={4} w="full">
+                  <FormControl isRequired>
+                    <FormLabel color={textColor}>Especialidade</FormLabel>
+                    <Select 
+                      bg={inputBg} 
+                      borderColor={borderColor} 
+                      value={currentDoctor.especialidade} 
+                      onChange={(e) => setCurrentDoctor({...currentDoctor, especialidade: e.target.value})} 
+                      placeholder="Selecione"
+                    >
+                      {MASTER_SPECIALTIES.map(spec => (
+                        <option key={spec} value={spec}>{spec}</option>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  <FormControl isRequired>
+                    <FormLabel color={textColor}>Registro Profissional</FormLabel>
+                    <Input 
+                      bg={inputBg} 
+                      borderColor={borderColor} 
+                      value={currentDoctor.crm} 
+                      onChange={(e) => setCurrentDoctor({...currentDoctor, crm: e.target.value})} 
+                    />
+                  </FormControl>
+                </SimpleGrid>
+              </VStack>
+
+              <Divider />
+
+              {/* --- 4. INJEÇÃO DO COMPONENTE DE AGENDA --- */}
+              <AgendaConfigFields 
+                config={agendaConfig} 
+                setConfig={setAgendaConfig} 
+                textColor={textColor}
+                bgInput={inputBg}
+                borderColor={borderColor}
+              />
             </VStack>
           </ModalBody>
 
           <ModalFooter>
-            <Button colorScheme="blue" mr={3} onClick={handleSave}>Salvar</Button>
+            <Button colorScheme="blue" mr={3} onClick={handleSave}>Salvar Profissional</Button>
             <Button onClick={onClose} variant="ghost" color={textColor}>Cancelar</Button>
           </ModalFooter>
         </ModalContent>
