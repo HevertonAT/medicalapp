@@ -22,10 +22,9 @@ export default function PatientArea() {
   const [loading, setLoading] = useState(true);
   const [tabIndex, setTabIndex] = useState(0); 
 
-  // --- NOVOS ESTADOS PARA AGENDA INTELIGENTE ---
+  // --- ESTADOS PARA NOVO AGENDAMENTO ---
   const [availableSlots, setAvailableSlots] = useState([]); 
   const [fetchingSlots, setFetchingSlots] = useState(false); 
-
   const [selectedSpecialty, setSelectedSpecialty] = useState('');
   const [newAppointment, setNewAppointment] = useState({
     doctor_id: '',
@@ -33,6 +32,10 @@ export default function PatientArea() {
     hora: '',
     observacoes: ''
   });
+
+  // --- ESTADOS PARA REAGENDAMENTO ---
+  const [rescheduleSlots, setRescheduleSlots] = useState([]);
+  const [fetchingRescheduleSlots, setFetchingRescheduleSlots] = useState(false);
 
   const [bookingLoading, setBookingLoading] = useState(false);
   const { isOpen: isRescheduleOpen, onOpen: onRescheduleOpen, onClose: onRescheduleClose } = useDisclosure();
@@ -47,7 +50,7 @@ export default function PatientArea() {
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   const inputBg = 'gray.700'; 
 
-  // --- BUSCA DE HORÁRIOS DISPONÍVEIS ---
+  // --- BUSCA DE HORÁRIOS DISPONÍVEIS (NOVO AGENDAMENTO) ---
   const fetchAvailableSlots = useCallback(async () => {
     if (!newAppointment.doctor_id || !newAppointment.data) {
       setAvailableSlots([]);
@@ -75,6 +78,38 @@ export default function PatientArea() {
     fetchAvailableSlots();
   }, [fetchAvailableSlots]);
 
+  // --- BUSCA DE HORÁRIOS DISPONÍVEIS (REAGENDAMENTO) ---
+  const fetchRescheduleSlots = useCallback(async () => {
+    const doctorId = selectedApp?.doctor?.id || selectedApp?.doctor_id;
+
+    if (!doctorId || !rescheduleData.data) {
+      setRescheduleSlots([]);
+      return;
+    }
+
+    setFetchingRescheduleSlots(true);
+    try {
+      const response = await api.get('/appointments/available-slots', {
+        params: {
+          doctor_id: doctorId,
+          data: rescheduleData.data
+        }
+      });
+      setRescheduleSlots(response.data || []);
+    } catch (error) {
+      console.error(error);
+      setRescheduleSlots([]);
+    } finally {
+      setFetchingRescheduleSlots(false);
+    }
+  }, [selectedApp, rescheduleData.data]);
+
+  useEffect(() => {
+    fetchRescheduleSlots();
+  }, [fetchRescheduleSlots]);
+
+
+  // --- CARREGAMENTO INICIAL DOS DADOS ---
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -126,7 +161,6 @@ export default function PatientArea() {
     }
     setSubmitting(true);
     try {
-      // Ajuste a rota '/cancel' conforme o seu backend. Algumas APIs usam um PUT ou PATCH simples.
       await api.patch(`/appointments/${selectedApp.id}/cancel`, { motivo: cancelReason });
       toast({ title: 'Consulta cancelada com sucesso.', status: 'success' });
       fetchData();
@@ -146,7 +180,6 @@ export default function PatientArea() {
     }
     setSubmitting(true);
     try {
-      // Ajuste a rota '/reschedule' conforme o seu backend
       await api.patch(`/appointments/${selectedApp.id}/reschedule`, {
         data_horario: `${rescheduleData.data}T${rescheduleData.hora}:00`,
         motivo: rescheduleData.motivo
@@ -201,8 +234,18 @@ export default function PatientArea() {
                           }) : 'Data indefinida'}
                         </Text>
                         
-                        <Text fontSize="sm" color="gray.400" mt={1}>
-                          Status: {app.status ? app.status.toUpperCase() : 'AGENDADO'}
+                        {/* A Mágica de Ocultar Status Internos Acontece Aqui */}
+                        <Text 
+                          fontSize="sm" 
+                          color={app.status?.toLowerCase() === 'cancelado' ? 'red.400' : 'gray.400'} 
+                          fontWeight={app.status?.toLowerCase() === 'cancelado' ? 'bold' : 'normal'}
+                          mt={1}
+                        >
+                          Status: {
+                            app.status?.toLowerCase() === 'cancelado' ? 'CANCELADO' : 
+                            (app.status?.toLowerCase() === 'concluido' || app.status?.toLowerCase() === 'finalizado') ? 'CONCLUÍDO' : 
+                            'AGENDADO'
+                          }
                         </Text>
                       </Box>
                       
@@ -210,6 +253,9 @@ export default function PatientArea() {
                         <HStack spacing={3} mt={{ base: 4, md: 0 }}>
                           <Button size="sm" colorScheme="blue" variant="outline" onClick={() => {
                             setSelectedApp(app);
+                            // Reseta os dados de reagendamento ao abrir o modal
+                            setRescheduleData({ data: '', hora: '', motivo: '' });
+                            setRescheduleSlots([]);
                             onRescheduleOpen();
                           }}>
                             Reagendar
@@ -275,8 +321,7 @@ export default function PatientArea() {
                       <FormLabel color="gray.300">Data</FormLabel>
                       <Input 
                         type="date" bg={inputBg} border="none" color="white"
-                        min={hoje}
-                        max={dataMaxima}
+                        min={hoje} max={dataMaxima}
                         value={newAppointment.data}
                         onChange={(e) => {
                           const val = e.target.value;
@@ -373,17 +418,31 @@ export default function PatientArea() {
                   type="date" bg={inputBg} color="white" border="none" 
                   min={hoje} max={dataMaxima}
                   value={rescheduleData.data}
-                  onChange={(e) => setRescheduleData({...rescheduleData, data: e.target.value})}
+                  onChange={(e) => {
+                    setRescheduleData({...rescheduleData, data: e.target.value, hora: ''});
+                    setRescheduleSlots([]);
+                  }}
                 />
               </FormControl>
               
-              <FormControl isRequired>
-                <FormLabel color="gray.300">Novo Horário</FormLabel>
-                <Input 
-                  type="time" bg={inputBg} color="white" border="none"
-                  value={rescheduleData.hora}
-                  onChange={(e) => setRescheduleData({...rescheduleData, hora: e.target.value})}
-                />
+              <FormControl isRequired isDisabled={!rescheduleData.data || fetchingRescheduleSlots}>
+                <FormLabel color="gray.300">Horários Disponíveis</FormLabel>
+                {fetchingRescheduleSlots ? (
+                  <HStack bg={inputBg} p={2} borderRadius="md" justify="center">
+                    <Spinner size="xs" /><Text fontSize="xs">Buscando vagas...</Text>
+                  </HStack>
+                ) : (
+                  <Select 
+                    placeholder={rescheduleSlots.length > 0 ? "Escolha um horário" : "Nenhuma vaga"}
+                    bg={inputBg} border="none" color="white"
+                    value={rescheduleData.hora}
+                    onChange={(e) => setRescheduleData({...rescheduleData, hora: e.target.value})}
+                  >
+                    {rescheduleSlots.map((hora) => (
+                      <option key={hora} value={hora} style={{ color: 'black' }}>{hora}</option>
+                    ))}
+                  </Select>
+                )}
               </FormControl>
 
               <FormControl>

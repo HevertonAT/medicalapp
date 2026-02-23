@@ -60,7 +60,7 @@ def get_available_slots(
             Appointment.doctor_id == doctor_id,
             Appointment.data_horario >= start_of_day,
             Appointment.data_horario <= end_of_day,
-            Appointment.status.in_(["agendado", "confirmado"]) 
+            Appointment.status.in_(["agendado", "confirmado", "em_andamento"]) 
         ).all()
 
         horas_ocupadas = [app.data_horario.strftime("%H:%M") for app in appointments_ocupados]
@@ -171,7 +171,6 @@ def cancel_appointment(appointment_id: int, body: dict = Body(...), db: Session 
         raise HTTPException(status_code=404, detail="Agendamento não encontrado.")
     
     app.status = "cancelado"
-    # Se quiser salvar o motivo do cancelamento futuramente, seria: app.observacoes = f"Cancelado: {body.get('motivo')}"
     
     db.commit()
     return {"message": "Consulta cancelada com sucesso"}
@@ -188,7 +187,27 @@ def reschedule_appointment(appointment_id: int, body: dict = Body(...), db: Sess
     if nova_data:
         app.data_horario = datetime.strptime(nova_data, "%Y-%m-%dT%H:%M:%S")
     
-    app.status = "agendado" # Garante que volte a ficar ativo na agenda
+    app.status = "agendado"
     
     db.commit()
     return {"message": "Consulta reagendada com sucesso"}
+
+# --- 7. ATUALIZAR STATUS DA CONSULTA (INICIAR, FINALIZAR, ETC) ---
+@router.patch("/{appointment_id}/status")
+def update_appointment_status(
+    appointment_id: int, 
+    novo_status: str, 
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    # Apenas médicos ou admins/superusers podem mudar status da consulta no painel
+    if current_user.role not in ['doctor', 'admin', 'superuser']:
+        raise HTTPException(status_code=403, detail="Sem permissão para alterar status.")
+
+    app = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not app:
+        raise HTTPException(status_code=404, detail="Agendamento não encontrado.")
+    
+    app.status = novo_status
+    db.commit()
+    return {"message": f"Status atualizado para {novo_status} com sucesso"}
