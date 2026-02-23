@@ -58,7 +58,6 @@ origins = [
     "http://localhost:3000", 
     "http://localhost:5173", 
     "https://medicalappfront.vercel.app",
-    #"https://medicalapp-mu.vercel.app" 
 ]
 
 app.add_middleware(
