@@ -201,7 +201,7 @@ export default function Login() {
             {isLoginView ? 'Acesso à Clínica' : 'Crie sua Conta'}
           </Heading>
           <Text fontSize={'md'} color={textColor} textAlign="center">
-            {isLoginView ? 'Entre para gerenciar seus agendamentos ✌️' : 'Preencha seus dados para começar.'}
+            {isLoginView ? 'Entre para gerenciar seus agendamentos' : 'Preencha seus dados para começar.'}
           </Text>
         </VStack>
 

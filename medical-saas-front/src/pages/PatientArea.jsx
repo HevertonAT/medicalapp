@@ -341,11 +341,11 @@ export default function PatientArea() {
                       <FormLabel color={labelColor}>Horários Disponíveis</FormLabel>
                       {fetchingSlots ? (
                         <HStack bg={inputBg} p={2} borderRadius="md" justify="center" border="1px solid" borderColor={inputBorder}>
-                          <Spinner size="xs" color={highlightColor} /><Text fontSize="xs" color={textColor}>Buscando vagas...</Text>
+                          <Spinner size="xs" color={highlightColor} /><Text fontSize="xs" color={textColor}>Buscando horários...</Text>
                         </HStack>
                       ) : (
                         <Select 
-                          placeholder={availableSlots.length > 0 ? "Escolha um horário" : "Nenhuma vaga"}
+                          placeholder={availableSlots.length > 0 ? "Escolha um horário" : "Nenhum horário disponível"}
                           bg={inputBg} color={textColor} border="1px solid" borderColor={inputBorder}
                           value={newAppointment.hora}
                           onChange={(e) => setNewAppointment({ ...newAppointment, hora: e.target.value })}

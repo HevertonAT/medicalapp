@@ -345,7 +345,7 @@ export default function Agenda() {
 
                         {/* Texto livre tradicional (que já existia) para complementar */}
                         <FormControl mt={6} display="flex" flexDirection="column" flex="1">
-                          <FormLabel color={textColor}>Histórico e Queixas (Texto Livre):</FormLabel>
+                          <FormLabel color={textColor}>Evolução:</FormLabel>
                           <Textarea 
                               size="sm" 
                               h="250px"

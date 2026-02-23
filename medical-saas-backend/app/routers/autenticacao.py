@@ -51,15 +51,21 @@ def login_for_access_token(
         "user_id": user.id
     }
 
-# --- ROTA DE REGISTRO BLINDADA ---
+# --- ROTA DE REGISTRO BLINDADA COM CPF, DATA E TELEFONE ---
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 def register(user: UserCreate, db: Session = Depends(get_db)):
     print(f"📝 Iniciando cadastro para: {user.email}")
 
-    # 1. Verifica se já existe
+    # 1. Verifica se e-mail já existe
     user_exists = db.query(User).filter(User.email == user.email).first()
     if user_exists:
         raise HTTPException(status_code=400, detail="Este e-mail já está cadastrado.")
+
+    # 1.5 Verifica se CPF já existe (Trava de Segurança)
+    if user.cpf:
+        cpf_exists = db.query(Patient).filter(Patient.cpf == user.cpf).first()
+        if cpf_exists:
+            raise HTTPException(status_code=400, detail="Este CPF já está em uso por outro paciente.")
 
     # 2. Cria o Usuário (Login)
     try:
@@ -77,18 +83,18 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         print(f"❌ ERRO FATAL AO CRIAR USER: {e}")
         raise HTTPException(status_code=500, detail="Erro ao salvar usuário no banco.")
 
-    # 3. Tenta criar o perfil de Paciente (com proteção contra falhas)
+    # 3. Tenta criar o perfil de Paciente com todos os dados
     if user.role == 'paciente' or user.role == 'patient':
         try:
             print(f"   -> Criando perfil de Paciente para ID {new_user.id}...")
             
-            # Verifica se o Model Patient tem campos obrigatórios que podem estar faltando
             new_patient = Patient(
                 nome_completo=user.full_name, 
                 user_id=new_user.id,          
                 ativo=True,
-                cpf=None,       # Garante que envie None e não string vazia
-                telefone=None,
+                cpf=user.cpf,                  # Salvando o CPF
+                telefone=user.telefone,        # Salvando o Telefone
+                data_nascimento=user.data_nascimento, # Salvando a Data de Nascimento
                 insurance_id=None
             )
             db.add(new_patient)
@@ -96,14 +102,10 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
             print("   -> ✅ Perfil de paciente criado com sucesso.")
             
         except Exception as e:
-            # Se der erro aqui, NÃO cancelamos o cadastro do usuário, apenas logamos o erro
-            # O usuário conseguirá logar, mas o perfil estará incompleto (pode ser arrumado depois)
             print(f"❌ ERRO AO CRIAR PERFIL DE PACIENTE: {e}")
             print("⚠️ O usuário foi criado, mas o vínculo com Paciente falhou.")
-            # Opcional: rollback apenas do paciente
             db.rollback()
 
-    # Retorno manual para evitar erro de validação do Pydantic
     return {
         "id": new_user.id,
         "email": new_user.email,

@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional
+from datetime import date
 
 class UserCreate(BaseModel):
     full_name: str
@@ -7,6 +8,8 @@ class UserCreate(BaseModel):
     password: str
     # Tornamos opcionais para não quebrar o cadastro simples da tela de login
     cpf: Optional[str] = None        
+    data_nascimento: Optional[date] = None # Acertou em cheio aqui!
+    telefone: Optional[str] = None         # Acertou em cheio aqui!
     clinic_id: Optional[int] = None 
     
     # Campo novo para controlar o acesso
