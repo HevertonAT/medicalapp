@@ -6,6 +6,7 @@ import {
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FaSave, FaClock, FaPrescriptionBottleAlt, FaFileMedical } from 'react-icons/fa';
 import api from '../services/api';
+import SpecialtyFormRenderer from '../components/SpecialtyFormRenderer'; // Trazendo o renderizador de especialidades
 
 export default function Attendance() {
   const location = useLocation();
@@ -19,23 +20,48 @@ export default function Attendance() {
   const [historico, setHistorico] = useState('');
   const [prescricao, setPrescricao] = useState('');
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('anamnese'); // 'anamnese' ou 'prescricao'
+  const [activeTab, setActiveTab] = useState('anamnese');
 
-  // --- LÓGICA DE TEMPO REAL ---
+  // Lógica de Especialidades (Configurações Dinâmicas)
+  const [specialty, setSpecialty] = useState("");
+  const [specialtySettings, setSpecialtySettings] = useState({});
+  const [specialtyData, setSpecialtyData] = useState({});
+
+  // Tempo Real
   const [startTime, setStartTime] = useState(null);
 
-  // Ao montar a tela, marca o horário de início
+  // Ao montar a tela, marca o horário de início e busca as configurações da especialidade
   useEffect(() => {
     if (!appointment && !patient) {
        toast({ title: 'Erro', description: 'Nenhum atendimento selecionado.', status: 'error' });
        navigate('/agenda');
        return;
     }
-    // Define hora de início agora
     setStartTime(new Date());
-  }, []);
 
-  // Formata data para exibir bonitinho (DD/MM/YYYY - HH:MM:SS)
+    async function loadSettings() {
+      // Pega a especialidade do médico que está no appointment
+      const docSpecialty = appointment?.doctor_especialidade || appointment?.doctor?.especialidade || "Clínico Geral";
+      setSpecialty(docSpecialty);
+      
+      try {
+        // Busca as regras que você salvou naquela tela de botões
+        const response = await api.get(`/specialties/rules/${docSpecialty}`);
+        setSpecialtySettings(response.data);
+      } catch (e) {
+        // Se a especialidade não tiver regras salvas, não quebra a tela
+        setSpecialtySettings({});
+      }
+    }
+    
+    loadSettings();
+  }, [appointment, patient, navigate, toast]);
+
+  // Função para lidar com mudanças nos campos dinâmicos da especialidade
+  const handleSpecialtyChange = (newData) => {
+    setSpecialtyData((prev) => ({ ...prev, ...newData }));
+  };
+
   const formatFullDate = (date) => {
     if (!date) return "--";
     return new Intl.DateTimeFormat('pt-BR', {
@@ -54,14 +80,14 @@ export default function Attendance() {
 
     setLoading(true);
     try {
-      const endTime = new Date(); // Hora exata do clique
+      const endTime = new Date(); 
 
       const payload = {
         patient_id: patient?.id,
         appointment_id: appointment?.id,
         historico: historico,
         prescricao: prescricao,
-        // Envia os horários reais
+        specialty_data: specialtyData, // Envia os dados extras preenchidos
         data_inicio: startTime, 
         data_fim: endTime
       };
@@ -75,7 +101,7 @@ export default function Attendance() {
         duration: 5000
       });
 
-      navigate('/agenda'); // Volta para agenda
+      navigate('/agenda');
     } catch (error) {
       console.error(error);
       const msg = error.response?.data?.detail || 'Erro ao salvar prontuário.';
@@ -85,13 +111,11 @@ export default function Attendance() {
     }
   };
 
-  // Cores
   const bgCard = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
 
   return (
     <Box p={6}>
-      {/* CABEÇALHO */}
       <Flex justify="space-between" align="center" mb={6} bg="blue.600" p={4} borderRadius="md" color="white" shadow="md">
         <HStack spacing={4}>
             <FaFileMedical size={24} />
@@ -109,7 +133,6 @@ export default function Attendance() {
 
       <Flex gap={6} direction={{ base: 'column', md: 'row' }}>
         
-        {/* COLUNA DA ESQUERDA: MENU */}
         <VStack w={{ base: '100%', md: '250px' }} align="stretch" spacing={2}>
             <Button 
                 leftIcon={<FaFileMedical />} 
@@ -131,20 +154,31 @@ export default function Attendance() {
             </Button>
         </VStack>
 
-        {/* COLUNA DA DIREITA: CONTEÚDO */}
         <Box flex="1" bg={bgCard} p={6} borderRadius="lg" border="1px" borderColor={borderColor} shadow="sm">
             
             {activeTab === 'anamnese' && (
-                <VStack align="stretch" spacing={4}>
-                    <Heading size="sm" color="gray.500">Histórico e Queixas:</Heading>
-                    <Textarea 
-                        placeholder="Descreva os sintomas, histórico e observações..." 
-                        minH="300px"
-                        value={historico}
-                        onChange={(e) => setHistorico(e.target.value)}
-                        borderColor={borderColor}
-                        _focus={{ borderColor: 'blue.400' }}
+                <VStack align="stretch" spacing={6}>
+                    
+                    <Box>
+                      <Heading size="sm" color="gray.500" mb={2}>Histórico e Queixas Principais:</Heading>
+                      <Textarea 
+                          placeholder="Descreva os sintomas, histórico da doença atual (HDA) e observações gerais..." 
+                          minH="150px"
+                          value={historico}
+                          onChange={(e) => setHistorico(e.target.value)}
+                          borderColor={borderColor}
+                          _focus={{ borderColor: 'blue.400' }}
+                      />
+                    </Box>
+
+                    {/* Aqui entra a mágica: O componente vai ler as regras e mostrar apenas o que foi ativado para a especialidade */}
+                    <SpecialtyFormRenderer 
+                      specialty={specialty} 
+                      settings={specialtySettings} 
+                      data={specialtyData} 
+                      onChange={handleSpecialtyChange} 
                     />
+
                 </VStack>
             )}
 
@@ -152,7 +186,7 @@ export default function Attendance() {
                 <VStack align="stretch" spacing={4}>
                     <Heading size="sm" color="gray.500">Prescrição Médica e Exames:</Heading>
                     <Textarea 
-                        placeholder="Medicamentos, posologia ou exames solicitados..." 
+                        placeholder="Medicamentos, posologia, encaminhamentos ou exames solicitados..." 
                         minH="300px"
                         value={prescricao}
                         onChange={(e) => setPrescricao(e.target.value)}
@@ -166,7 +200,7 @@ export default function Attendance() {
 
             <Flex justify="flex-end" gap={4}>
                 <Button variant="ghost" colorScheme="red" onClick={() => navigate('/agenda')}>
-                    Cancelar
+                    Cancelar / Sair
                 </Button>
                 <Button 
                     leftIcon={<FaSave />} 

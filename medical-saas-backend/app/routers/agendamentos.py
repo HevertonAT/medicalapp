@@ -1,5 +1,5 @@
 import json
-from fastapi import APIRouter, Depends, HTTPException, status, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Body, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from typing import List, Optional
@@ -85,7 +85,6 @@ def list_all_appointments(
         joinedload(Appointment.patient)
     )
 
-    # Lógica de quem pode ver o quê
     if current_user.role == 'doctor':
         doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
         if doctor:
@@ -95,7 +94,6 @@ def list_all_appointments(
     elif current_user.role in ['admin', 'superuser'] and current_user.clinic_id:
         query = query.filter(Appointment.clinic_id == current_user.clinic_id)
 
-    # Filtro de Data Anti-Fuso Horário
     if data:
         try:
             start_of_day = datetime.strptime(f"{data} 00:00:00", "%Y-%m-%d %H:%M:%S")
@@ -107,7 +105,6 @@ def list_all_appointments(
         except Exception as e:
             print(f"Erro ao filtrar data na agenda: {e}")
 
-    # Retorna ordenado pela hora
     return query.order_by(Appointment.data_horario.asc()).all()
 
 
@@ -128,7 +125,6 @@ def create_agendamentos(agendamento: agendamentosCreate, db: Session = Depends(g
     doctor = db.query(Doctor).filter(Doctor.id == agendamento.doctor_id).first()
     if not doctor: raise HTTPException(status_code=404, detail="Médico não encontrado.")
     
-    # Bloqueio de horário duplicado
     horario_conflito = db.query(Appointment).filter(
         Appointment.doctor_id == agendamento.doctor_id,
         Appointment.data_horario == agendamento.data_horario,
@@ -165,7 +161,7 @@ def create_agendamentos(agendamento: agendamentosCreate, db: Session = Depends(g
 
 # --- 5. CANCELAR AGENDAMENTO ---
 @router.patch("/{appointment_id}/cancel")
-def cancel_appointment(appointment_id: int, body: dict = Body(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def cancel_appointment(appointment_id: int, body: dict = Body(default={}), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     app = db.query(Appointment).filter(Appointment.id == appointment_id).first()
     if not app:
         raise HTTPException(status_code=404, detail="Agendamento não encontrado.")
@@ -192,22 +188,32 @@ def reschedule_appointment(appointment_id: int, body: dict = Body(...), db: Sess
     db.commit()
     return {"message": "Consulta reagendada com sucesso"}
 
+
 # --- 7. ATUALIZAR STATUS DA CONSULTA (INICIAR, FINALIZAR, ETC) ---
 @router.patch("/{appointment_id}/status")
 def update_appointment_status(
     appointment_id: int, 
-    novo_status: str, 
+    novo_status: Optional[str] = Query(None), # Tenta buscar da URL da requisição
+    body: Optional[dict] = Body(default=None), # Tenta buscar do corpo JSON da requisição
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
 ):
-    # Apenas médicos ou admins/superusers podem mudar status da consulta no painel
-    if current_user.role not in ['doctor', 'admin', 'superuser']:
+    # Apenas médicos ou admins podem mudar status
+    if current_user.role not in ['doctor', 'admin', 'superuser', 'medico']:
         raise HTTPException(status_code=403, detail="Sem permissão para alterar status.")
 
-    app = db.query(Appointment).filter(Appointment.id == appointment_id).first()
-    if not app:
+    app_db = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not app_db:
         raise HTTPException(status_code=404, detail="Agendamento não encontrado.")
     
-    app.status = novo_status
+    # Lógica blindada: Pega o status seja pela URL ou pelo Body JSON
+    status_final = novo_status
+    if not status_final and body and "novo_status" in body:
+        status_final = body.get("novo_status")
+
+    if not status_final:
+        raise HTTPException(status_code=400, detail="O novo status não foi informado na requisição.")
+
+    app_db.status = status_final
     db.commit()
-    return {"message": f"Status atualizado para {novo_status} com sucesso"}
+    return {"message": f"Status atualizado para {status_final} com sucesso"}
