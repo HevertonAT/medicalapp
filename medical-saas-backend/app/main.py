@@ -1,8 +1,11 @@
+import os
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.base import engine
 from app.db.base import Base
+
+# --- IMPORTAÇÃO DOS MODELOS ---
 from app.models.arquivos_pacientes import PatientFile
 from app.models.documentos import Document
 from app.models.prontuarios import MedicalRecord
@@ -21,10 +24,13 @@ from app.models.unidades import Unit
 from app.models.cargos import Role
 from app.models.logs_auditoria import AuditLog
 from app.models.regras_especialidades import SpecialtyRule
+
+# --- IMPORTAÇÃO DAS ROTAS ---
 from app.routers import (
     agendamentos,
     autenticacao, 
     clinicas,
+    cids,
     macros,
     regras_especialidades, 
     usuarios, 
@@ -45,21 +51,28 @@ app = FastAPI(
 
 Base.metadata.create_all(bind=engine)
 
-# --- CONFIGURAÇÃO DO CORS ---
+# --- CORREÇÃO DA CONFIGURAÇÃO DO CORS ---
+# As vírgulas que faltavam foram adicionadas e a URL exata do seu Front-end Vercel foi incluída
 origins = [
-    "http://127.0.0.1:8000"
-    "http://localhost:3000", # Frontend React/Next.js padrão
-    "http://localhost:5173", # Frontend Vite/Vue padrão
-    "https://medicalappfront.vercel.app"# Não usar '*' quando allow_credentials=True — definir origens explicitamente
+    "http://127.0.0.1:8000",
+    "http://localhost:3000", 
+    "http://localhost:5173", 
+    "https://medicalappfront.vercel.app",
+    #"https://medicalapp-mu.vercel.app" 
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],# Permite GET, POST, PUT, DELETE, OPTIONS, etc
+    allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- PROTEÇÃO PARA AMBIENTE NUVEM (VERCEL) ---
+# Garante que a pasta uploads exista para a API não "quebrar" (erro 500/404) ao iniciar
+if not os.path.exists("uploads"):
+    os.makedirs("uploads")
 
 # MONTAGEM DE ARQUIVOS ESTÁTICOS
 app.mount("/arquivos", StaticFiles(directory="uploads"), name="uploads")
@@ -76,8 +89,14 @@ app.include_router(financeiro.router, prefix="/financial", tags=["Financeiro"])
 app.include_router(arquivos.router, prefix="/files", tags=["Arquivos"]) 
 app.include_router(relatorios.router, prefix="/reports", tags=["Relatórios"])  
 app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
-app.include_router(regras_especialidades.router, prefix="/settings/specialties", tags=["Configuração Especialidades"])
+
+# CORREÇÃO: O prefixo aqui estava "/settings/specialties", o que quebrava a comunicação com o front! Ajustado para "/specialties"
+app.include_router(regras_especialidades.router, prefix="/specialties", tags=["Configuração Especialidades"])
+
 app.include_router(macros.router, prefix="/macros", tags=["Macros"])
+
+# A rota do CID está perfeitamente registrada aqui!
+app.include_router(cids.router, prefix="/cids", tags=["CIDs"])
 
 @app.get("/")
 def health_check():

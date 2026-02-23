@@ -6,13 +6,13 @@ import {
 import { FaSave } from 'react-icons/fa';
 import api from '../services/api';
 import AgendaConfigFields from '../components/profissionais/AgendaConfigFields';
+import MacroManager from '../components/profissionais/MacroManager'; // IMPORTAMOS O GERENCIADOR
 
 export default function ProfessionalProfile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [doctorData, setDoctorData] = useState(null);
   
-  // Estado inicial padrão para evitar erro de leitura de propriedade nula
   const [agendaConfig, setAgendaConfig] = useState({
     seg: { ativo: true, inicio: "08:00", fim: "18:00" },
     ter: { ativo: true, inicio: "08:00", fim: "18:00" },
@@ -26,7 +26,6 @@ export default function ProfessionalProfile() {
   
   const toast = useToast();
   
-  // --- CORES DINÂMICAS PARA MODO CLARO/ESCURO ---
   const bgCard = useColorModeValue('white', 'gray.800');
   const textColor = useColorModeValue('gray.600', 'gray.200');
   const inputBg = useColorModeValue('gray.50', 'gray.700'); 
@@ -67,7 +66,6 @@ export default function ProfessionalProfile() {
     }
   };
 
-  // Se estiver carregando, mostra o Spinner centralizado usando o FLEX
   if (loading) {
     return (
       <Flex h="100vh" align="center" justify="center">
@@ -79,33 +77,34 @@ export default function ProfessionalProfile() {
   return (
     <Box p={8}>
       <Container maxW="container.md">
-        <VStack align="stretch" spacing={6} bg={bgCard} p={8} borderRadius="xl" shadow="lg" border="1px solid" borderColor={borderColor}>
-          <Heading size="md" color="blue.500">Minha Disponibilidade</Heading>
-          <Text color={textColor} fontSize="sm">Ajuste seus dias e horários de atendimento.</Text>
+        <VStack align="stretch" spacing={8}>
+          {/* BLOCO DA AGENDA */}
+          <VStack align="stretch" spacing={6} bg={bgCard} p={8} borderRadius="xl" shadow="lg" border="1px solid" borderColor={borderColor}>
+            <Heading size="md" color="blue.500">Minha Disponibilidade</Heading>
+            <Text color={textColor} fontSize="sm">Ajuste seus dias e horários de atendimento.</Text>
+            
+            <Divider borderColor={borderColor} />
+
+            {agendaConfig && (
+              <AgendaConfigFields 
+                config={agendaConfig} 
+                setConfig={setAgendaConfig} 
+                textColor={textColor}
+                bgInput={inputBg}
+                borderColor={borderColor}
+              />
+            )}
+
+            <Button leftIcon={<FaSave />} colorScheme="blue" onClick={handleSave} isLoading={saving} size="lg" mt={4}>
+              Salvar Minha Agenda
+            </Button>
+          </VStack>
+
+          {/* BLOCO DOS MACROS */}
+          <Box bg={bgCard} p={8} borderRadius="xl" shadow="lg" border="1px solid" borderColor={borderColor}>
+             <MacroManager />
+          </Box>
           
-          <Divider borderColor={borderColor} />
-
-          {/* Renderização condicional segura com CORES DINÂMICAS */}
-          {agendaConfig && (
-            <AgendaConfigFields 
-              config={agendaConfig} 
-              setConfig={setAgendaConfig} 
-              textColor={textColor}
-              bgInput={inputBg}
-              borderColor={borderColor}
-            />
-          )}
-
-          <Button 
-            leftIcon={<FaSave />} 
-            colorScheme="blue" 
-            onClick={handleSave} 
-            isLoading={saving}
-            size="lg"
-            mt={4}
-          >
-            Salvar Minha Agenda
-          </Button>
         </VStack>
       </Container>
     </Box>

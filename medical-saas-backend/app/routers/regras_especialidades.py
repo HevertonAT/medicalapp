@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List
 from app.db.base import get_db
 from app.models.regras_especialidades import SpecialtyRule
@@ -11,17 +12,37 @@ router = APIRouter()
 def list_rules(db: Session = Depends(get_db)):
     return db.query(SpecialtyRule).all()
 
-@router.get("/effective/{specialty_name}")
+# --- ROTA CORRIGIDA PARA BATER COM O FRONT-END ---
+@router.get("/rules/{specialty_name}")
 def get_effective_rule(specialty_name: str, db: Session = Depends(get_db)):
-    # Busca configurações específicas da especialidade
-    rule = db.query(SpecialtyRule).filter(SpecialtyRule.specialty == specialty_name).first()
+    # Busca configurações da especialidade ignorando diferenças de maiúsculas e minúsculas
+    rule = db.query(SpecialtyRule).filter(
+        func.lower(SpecialtyRule.specialty) == specialty_name.lower()
+    ).first()
+    
+    # Se não encontrar regra, devolve Sucesso (200 OK) vazio para não gerar erro 404 na tela
+    if not rule:
+        return {"specialty": specialty_name, "settings": {}}
+    return rule
+
+# --- ROTA RESERVA (Garante compatibilidade caso o prefixo no main.py já inclua o /rules) ---
+@router.get("/{specialty_name}")
+def get_effective_rule_fallback(specialty_name: str, db: Session = Depends(get_db)):
+    rule = db.query(SpecialtyRule).filter(
+        func.lower(SpecialtyRule.specialty) == specialty_name.lower()
+    ).first()
+    
     if not rule:
         return {"specialty": specialty_name, "settings": {}}
     return rule
 
 @router.post("/", response_model=RuleResponse)
 def create_rule(rule: RuleCreate, db: Session = Depends(get_db)):
-    db_rule = db.query(SpecialtyRule).filter(SpecialtyRule.specialty == rule.specialty).first()
+    # Verifica duplicidade ignorando maiúsculas e minúsculas
+    db_rule = db.query(SpecialtyRule).filter(
+        func.lower(SpecialtyRule.specialty) == rule.specialty.lower()
+    ).first()
+    
     if db_rule:
         raise HTTPException(status_code=400, detail="Regra já existe para esta especialidade.")
     

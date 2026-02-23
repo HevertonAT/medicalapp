@@ -5,19 +5,20 @@ import {
   FormControl, FormLabel, Input, Select, ModalFooter, useDisclosure,
   VStack, HStack, IconButton, Icon, Textarea, Tabs, TabList, TabPanels, Tab, TabPanel,
   useColorModeValue, Table, Thead, Tbody, Tr, Th, Td, InputGroup, InputLeftElement,
-  SimpleGrid
+  SimpleGrid, Menu, MenuButton, MenuList, MenuItem
 } from '@chakra-ui/react';
 import { 
   FaPlus, FaUserMd, FaSearch, FaPlay, FaCheckDouble, 
-  FaTimes, FaStethoscope, FaPrescriptionBottleAlt, FaRedo, FaCalendarAlt, FaHistory
+  FaTimes, FaStethoscope, FaPrescriptionBottleAlt, FaRedo, FaCalendarAlt, FaHistory, FaBolt
 } from 'react-icons/fa';
 import React from 'react'; 
 import { useNavigate } from 'react-router-dom';
 
 // 1. IMPORTANDO A API
 import api from '../services/api';
-// 2. IMPORTANDO O SEU RENDERIZADOR DINÂMICO
+// 2. IMPORTANDO O SEU RENDERIZADOR DINÂMICO E O BUSCADOR DE CID
 import SpecialtyFormRenderer from '../components/SpecialtyFormRenderer';
+import CidAutocomplete from '../components/profissionais/CidAutocomplete';
 
 export default function Agenda() {
   const [appointments, setAppointments] = useState([]);
@@ -44,12 +45,13 @@ export default function Agenda() {
   const [actionReason, setActionReason] = useState('');
   const [rescheduleData, setRescheduleData] = useState({ data: '', hora: '' });
   
-  // --- NOVOS ESTADOS PARA O PRONTUÁRIO DINÂMICO ---
+  // --- NOVOS ESTADOS PARA O PRONTUÁRIO DINÂMICO E MACROS ---
   const [consultData, setConsultData] = useState({ anamnese: '', prescricao: '', exame_fisico: '', diagnostico_cid: '' });
   const [specialtySettings, setSpecialtySettings] = useState({});
   const [specialtyData, setSpecialtyData] = useState({});
   const [currentDocSpecialty, setCurrentDocSpecialty] = useState("");
   const [startTime, setStartTime] = useState(null);
+  const [minhasMacros, setMinhasMacros] = useState([]); 
 
   const bgPage = useColorModeValue('gray.50', 'gray.900');
   const bgCard = useColorModeValue('white', 'gray.800');
@@ -124,7 +126,6 @@ export default function Agenda() {
     } catch (error) { toast({ title: 'Erro ao agendar.', status: 'error' }); }
   };
 
-  // --- LÓGICA BLINDADA DO INÍCIO DA CONSULTA ---
   const handleStartConsultation = async (app) => {
     setCurrentAppointment(app);
     setStartTime(new Date()); 
@@ -135,29 +136,29 @@ export default function Agenda() {
           fetchData();
       }
       
-      // Limpa os dados do prontuário para a nova consulta
       setConsultData({ anamnese: '', prescricao: '', exame_fisico: '', diagnostico_cid: '' });
       setSpecialtyData({});
       
-      // Encontra o médico deste agendamento (convertendo para String para evitar falhas de tipagem)
       const doc = doctors.find(d => String(d.id) === String(app.doctor_id));
       
-      // Extrai a especialidade corretamente
       let spec = doc?.especialidade || app.doctor?.especialidade || app.doctor_especialidade || "Clínico Geral";
-      
-      // Capitaliza a primeira letra para garantir o padrão (ex: "fonoaudiologia" vira "Fonoaudiologia")
       if (spec) {
          spec = spec.charAt(0).toUpperCase() + spec.slice(1);
       }
       
       setCurrentDocSpecialty(spec);
 
-      // Busca as regras da especialidade no banco usando a mesma rota infalível do Attendance.jsx
+      try {
+        const macrosRes = await api.get('/macros/');
+        setMinhasMacros(macrosRes.data || []);
+      } catch (e) {
+        console.error("Erro ao buscar macros", e);
+      }
+
       try {
         const rulesRes = await api.get(`/specialties/rules/${spec}`);
         setSpecialtySettings(rulesRes.data || {});
       } catch (e) {
-        console.error("Regras não encontradas para a especialidade, usando padrão.", e);
         setSpecialtySettings({});
       }
 
@@ -167,7 +168,6 @@ export default function Agenda() {
     }
   };
 
-  // --- LÓGICA ATUALIZADA PARA FINALIZAR A CONSULTA ---
   const handleFinishConsultation = async () => {
     if (!consultData.anamnese && Object.keys(specialtyData).length === 0) {
         toast({ title: 'Preencha algum dado na anamnese ou formulário.', status: 'warning' });
@@ -184,7 +184,7 @@ export default function Agenda() {
             prescricao: consultData.prescricao,
             exame_fisico: consultData.exame_fisico,
             diagnostico_cid: consultData.diagnostico_cid,
-            specialty_data: specialtyData, // ENVIANDO OS DADOS DINÂMICOS
+            specialty_data: specialtyData, 
             data_inicio: startTime,
             data_fim: endTime
         });
@@ -332,10 +332,9 @@ export default function Agenda() {
                 </TabList>
                 
                 <TabPanels flex="1" overflowY="auto" mt={2}>
+                    
                     {/* ABA DE ANAMNESE E FORMULÁRIO DINÂMICO */}
                     <TabPanel h="full" display="flex" flexDirection="column">
-                        
-                        {/* A MÁGICA ACONTECE AQUI */}
                         <SpecialtyFormRenderer 
                             specialty={currentDocSpecialty} 
                             settings={specialtySettings} 
@@ -343,9 +342,36 @@ export default function Agenda() {
                             onChange={setSpecialtyData} 
                         />
 
-                        {/* Texto livre tradicional (que já existia) para complementar */}
+                        {/* Texto livre com o botão de Macros */}
                         <FormControl mt={6} display="flex" flexDirection="column" flex="1">
-                          <FormLabel color={textColor}>Evolução:</FormLabel>
+                          <Flex justify="space-between" align="center" mb={2}>
+                            <FormLabel color={textColor} mb={0}>Evolução:</FormLabel>
+                            
+                            {minhasMacros.length > 0 && (
+                              <Menu>
+                                <MenuButton as={Button} size="xs" colorScheme="yellow" variant="solid" leftIcon={<FaBolt />}>
+                                  Inserir Atalho
+                                </MenuButton>
+                                <MenuList bg={bgCard} borderColor={borderColor}>
+                                  {minhasMacros.map(macro => (
+                                    <MenuItem 
+                                      key={macro.id} 
+                                      bg={bgCard} 
+                                      _hover={{ bg: useColorModeValue('gray.100', 'gray.600') }}
+                                      onClick={() => {
+                                        const textoAtual = consultData.anamnese;
+                                        const novoTexto = textoAtual ? `${textoAtual}\n\n${macro.texto_padrao}` : macro.texto_padrao;
+                                        setConsultData({...consultData, anamnese: novoTexto});
+                                      }}
+                                    >
+                                      <Text fontWeight="bold" fontSize="sm">{macro.titulo}</Text>
+                                    </MenuItem>
+                                  ))}
+                                </MenuList>
+                              </Menu>
+                            )}
+                          </Flex>
+                          
                           <Textarea 
                               size="sm" 
                               h="250px"
@@ -360,20 +386,33 @@ export default function Agenda() {
                       </FormControl>
                     </TabPanel>
 
-                    <TabPanel h="full" display="flex" flexDirection="column">
+                    {/* ABA DE PRESCRIÇÃO E CID */}
+                    <TabPanel h="full" display="flex" flexDirection="column" gap={4}>
+                        
+                        <FormControl>
+                            <FormLabel color={textColor} fontWeight="bold">Diagnóstico (CID-10):</FormLabel>
+                            <CidAutocomplete 
+                                value={consultData.diagnostico_cid}
+                                onChange={(val) => setConsultData({...consultData, diagnostico_cid: val})}
+                                specialty={currentDocSpecialty}
+                            />
+                        </FormControl>
+
                         <FormControl h="full" display="flex" flexDirection="column">
-                            <FormLabel color={textColor}>Prescrição Médica e Pedido de Exames:</FormLabel>
+                            <FormLabel color={textColor} fontWeight="bold">Prescrição Médica e Pedido de Exames:</FormLabel>
                             <Textarea 
                                 size="sm" 
                                 flex="1" 
-                                minH="300px"
+                                minH="250px"
                                 value={consultData.prescricao} 
                                 onChange={(e) => setConsultData({...consultData, prescricao: e.target.value})} 
                                 bg={tabBg} 
                                 borderColor={borderColor} 
+                                _focus={{ borderColor: "teal.400", boxShadow: "0 0 0 1px teal.400" }}
                             />
                         </FormControl>
                     </TabPanel>
+
                 </TabPanels>
             </Tabs>
           </ModalBody>

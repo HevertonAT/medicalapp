@@ -3,7 +3,8 @@ from sqlalchemy.orm import relationship
 from app.db.base import Base
 
 class Macro(Base):
-    __tablename__ = "macros"
+    # MUDAMOS O NOME DA TABELA AQUI PARA FORÇAR O BANCO A CRIAR UMA NOVA COM A ESTRUTURA CERTA
+    __tablename__ = "macros_profissionais"
 
     # ID Inteiro (Serial)
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
@@ -14,5 +15,5 @@ class Macro(Base):
     titulo = Column(String, nullable=False) # Ex: "Evolução Fono", "Anamnese Inicial"
     texto_padrao = Column(Text, nullable=False)
 
-    # Relacionamento (Assumindo que a sua classe de profissional se chama Doctor)
+    # Relacionamento 
     doctor = relationship("Doctor")

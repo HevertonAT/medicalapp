@@ -45,21 +45,16 @@ export default function SidebarLayout() {
     }
   }, []);
 
-  // --- MENU AJUSTADO COM "MINHA AGENDA" ---
   const menuItems = [
     // Menu Admin / Médico
     { name: 'Painel', icon: FaHome, path: '/dashboard', roles: ['superuser', 'admin', 'doctor'] },
     { name: 'Pacientes', icon: FaUserInjured, path: '/patients', roles: ['superuser', 'admin', 'doctor'] },
-    
-    // NOVO: Link para o médico configurar sua própria disponibilidade
-    { name: 'Minha Agenda', icon: FaClock, path: '/minha-agenda', roles: ['doctor'] },
-
+    { name: 'Configurações', icon: FaClock, path: '/minha-agenda', roles: ['doctor'] },
     { name: 'Profissionais', icon: FaUserMd, path: '/doctors', roles: ['superuser', 'admin'] },
     { name: 'Especialidades', icon: FaCode, path: '/specialties', roles: ['superuser', 'admin'] },
     { name: 'Agenda', icon: FaCalendarAlt, path: '/agenda', roles: ['superuser', 'admin', 'doctor'] }, 
     { name: 'Financeiro', icon: FaChartPie, path: '/financial', roles: ['superuser', 'admin'] },
     { name: 'Área Dev', icon: FaCode, path: '/dev-tools', roles: ['superuser'] },
-
     // Menu Exclusivo Paciente
     { name: 'Minha Saúde', icon: FaHeartbeat, path: '/minha-saude', roles: ['patient', 'paciente'] },
     { name: 'Meus Exames', icon: FaFileMedical, path: '/meus-exames', roles: ['patient', 'paciente'] },
