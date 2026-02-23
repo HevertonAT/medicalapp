@@ -96,6 +96,7 @@ export default function PatientArea() {
     ? doctors.filter(d => d.especialidade === selectedSpecialty)
     : doctors;
 
+  // --- FUNÇÕES DE AÇÃO (CRIAR, CANCELAR, REAGENDAR) ---
   const handleCreateAppointment = async () => {
     if (!newAppointment.doctor_id || !newAppointment.data || !newAppointment.hora) {
       toast({ title: 'Preencha todos os campos obrigatórios.', status: 'warning' });
@@ -111,11 +112,54 @@ export default function PatientArea() {
       });
       toast({ title: 'Agendamento Confirmado!', status: 'success' });
       setNewAppointment({ doctor_id: '', data: '', hora: '', observacoes: '' });
-      fetchData();
+      fetchData(); 
       setTabIndex(0); 
     } catch (error) {
-      toast({ title: 'Erro ao agendar', status: 'error' });
+      toast({ title: 'Erro ao agendar', description: error.response?.data?.detail || '', status: 'error' });
     } finally { setBookingLoading(false); }
+  };
+
+  const handleCancelAppointment = async () => {
+    if (!cancelReason) {
+      toast({ title: 'Por favor, informe o motivo do cancelamento.', status: 'warning' });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      // Ajuste a rota '/cancel' conforme o seu backend. Algumas APIs usam um PUT ou PATCH simples.
+      await api.patch(`/appointments/${selectedApp.id}/cancel`, { motivo: cancelReason });
+      toast({ title: 'Consulta cancelada com sucesso.', status: 'success' });
+      fetchData();
+      onCancelClose();
+      setCancelReason('');
+    } catch (error) {
+      toast({ title: 'Erro ao cancelar consulta.', status: 'error' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRescheduleAppointment = async () => {
+    if (!rescheduleData.data || !rescheduleData.hora) {
+      toast({ title: 'Preencha a nova data e horário.', status: 'warning' });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      // Ajuste a rota '/reschedule' conforme o seu backend
+      await api.patch(`/appointments/${selectedApp.id}/reschedule`, {
+        data_horario: `${rescheduleData.data}T${rescheduleData.hora}:00`,
+        motivo: rescheduleData.motivo
+      });
+      toast({ title: 'Consulta reagendada com sucesso!', status: 'success' });
+      fetchData();
+      onRescheduleClose();
+      setRescheduleData({ data: '', hora: '', motivo: '' });
+    } catch (error) {
+      toast({ title: 'Erro ao reagendar consulta.', status: 'error' });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -129,10 +173,64 @@ export default function PatientArea() {
         </TabList>
 
         <TabPanels>
+          {/* ABA 1: MEUS AGENDAMENTOS */}
           <TabPanel px={0}>
-            {/* Listagem de agendamentos omitida para brevidade, mas mantida no seu arquivo */}
+            <VStack spacing={4} align="stretch">
+              {loading ? (
+                <Flex justify="center" p={8}><Spinner color="blue.500" size="xl" /></Flex>
+              ) : appointments.length === 0 ? (
+                <Box bg={bgCard} p={8} borderRadius="xl" textAlign="center" border="1px solid" borderColor={borderColor}>
+                  <Icon as={FaCalendarAlt} boxSize={10} color="gray.400" mb={4} />
+                  <Text color="gray.400" fontSize="lg">Você ainda não possui agendamentos.</Text>
+                </Box>
+              ) : (
+                appointments.map((app) => (
+                  <Box key={app.id} p={5} bg={bgCard} borderRadius="xl" shadow="sm" border="1px solid" borderColor={borderColor}>
+                    <Flex justify="space-between" align="center" direction={{ base: 'column', md: 'row' }} gap={4}>
+                      <Box>
+                        <Text fontWeight="bold" fontSize="lg" color="blue.300" display="flex" alignItems="center" gap={2}>
+                          <Icon as={FaUserMd} />
+                          {app.doctor?.nome || 'Profissional não informado'}
+                        </Text>
+                        
+                        <Text color="gray.300" display="flex" alignItems="center" gap={2} mt={2}>
+                          <Icon as={FaClock} />
+                          {app.data_horario ? new Date(app.data_horario).toLocaleString('pt-BR', {
+                            day: '2-digit', month: '2-digit', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit'
+                          }) : 'Data indefinida'}
+                        </Text>
+                        
+                        <Text fontSize="sm" color="gray.400" mt={1}>
+                          Status: {app.status ? app.status.toUpperCase() : 'AGENDADO'}
+                        </Text>
+                      </Box>
+                      
+                      {app.status?.toLowerCase() !== 'cancelado' && (
+                        <HStack spacing={3} mt={{ base: 4, md: 0 }}>
+                          <Button size="sm" colorScheme="blue" variant="outline" onClick={() => {
+                            setSelectedApp(app);
+                            onRescheduleOpen();
+                          }}>
+                            Reagendar
+                          </Button>
+                          
+                          <Button size="sm" colorScheme="red" variant="outline" onClick={() => {
+                            setSelectedApp(app);
+                            onCancelOpen();
+                          }}>
+                            Cancelar
+                          </Button>
+                        </HStack>
+                      )}
+                    </Flex>
+                  </Box>
+                ))
+              )}
+            </VStack>
           </TabPanel>
 
+          {/* ABA 2: NOVO AGENDAMENTO */}
           <TabPanel px={0}>
             <Container maxW="container.md" p={0}>
               <Box bg={bgCard} p={8} borderRadius="xl" border="1px solid" borderColor={borderColor} shadow="lg">
@@ -177,13 +275,12 @@ export default function PatientArea() {
                       <FormLabel color="gray.300">Data</FormLabel>
                       <Input 
                         type="date" bg={inputBg} border="none" color="white"
-                        min={hoje} // Impede retroativos
-                        max={dataMaxima} // Impede mais de 1 ano à frente
+                        min={hoje}
+                        max={dataMaxima}
                         value={newAppointment.data}
                         onChange={(e) => {
                           const val = e.target.value;
                           const year = val.split('-')[0];
-                          // Trava para evitar anos com mais de 4 dígitos
                           if (year.length > 4) return;
                           
                           setNewAppointment({ ...newAppointment, data: val, hora: '' });
@@ -227,6 +324,88 @@ export default function PatientArea() {
           </TabPanel>
         </TabPanels>
       </Tabs>
+
+      {/* --- MODAIS DE AÇÃO --- */}
+
+      {/* MODAL DE CANCELAMENTO */}
+      <Modal isOpen={isCancelOpen} onClose={onCancelClose} isCentered>
+        <ModalOverlay />
+        <ModalContent bg={bgCard} border="1px solid" borderColor={borderColor}>
+          <ModalHeader color={useColorModeValue('gray.700', 'white')}>Cancelar Consulta</ModalHeader>
+          <ModalCloseButton color="gray.400" />
+          <ModalBody>
+            <Text mb={4} color="gray.300">
+              Deseja realmente cancelar sua consulta com Dr(a) <b>{selectedApp?.doctor?.nome}</b> no dia <b>{selectedApp?.data_horario ? new Date(selectedApp.data_horario).toLocaleDateString('pt-BR') : ''}</b>?
+            </Text>
+            <FormControl isRequired>
+              <FormLabel color="gray.300">Motivo do Cancelamento</FormLabel>
+              <Textarea
+                bg={inputBg} color="white" border="none"
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Informe o motivo brevemente..."
+              />
+            </FormControl>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onCancelClose} color="gray.400">Voltar</Button>
+            <Button colorScheme="red" onClick={handleCancelAppointment} isLoading={submitting}>
+              Confirmar Cancelamento
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* MODAL DE REAGENDAMENTO */}
+      <Modal isOpen={isRescheduleOpen} onClose={onRescheduleClose} isCentered>
+        <ModalOverlay />
+        <ModalContent bg={bgCard} border="1px solid" borderColor={borderColor}>
+          <ModalHeader color={useColorModeValue('gray.700', 'white')}>Reagendar Consulta</ModalHeader>
+          <ModalCloseButton color="gray.400" />
+          <ModalBody>
+            <Text mb={4} color="gray.300">
+              Escolha uma nova data e horário para a consulta com Dr(a) <b>{selectedApp?.doctor?.nome}</b>.
+            </Text>
+            <VStack spacing={4}>
+              <FormControl isRequired>
+                <FormLabel color="gray.300">Nova Data</FormLabel>
+                <Input 
+                  type="date" bg={inputBg} color="white" border="none" 
+                  min={hoje} max={dataMaxima}
+                  value={rescheduleData.data}
+                  onChange={(e) => setRescheduleData({...rescheduleData, data: e.target.value})}
+                />
+              </FormControl>
+              
+              <FormControl isRequired>
+                <FormLabel color="gray.300">Novo Horário</FormLabel>
+                <Input 
+                  type="time" bg={inputBg} color="white" border="none"
+                  value={rescheduleData.hora}
+                  onChange={(e) => setRescheduleData({...rescheduleData, hora: e.target.value})}
+                />
+              </FormControl>
+
+              <FormControl>
+                <FormLabel color="gray.300">Motivo (Opcional)</FormLabel>
+                <Input 
+                  type="text" bg={inputBg} color="white" border="none"
+                  value={rescheduleData.motivo}
+                  onChange={(e) => setRescheduleData({...rescheduleData, motivo: e.target.value})}
+                  placeholder="Ex: Imprevisto no trabalho"
+                />
+              </FormControl>
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onRescheduleClose} color="gray.400">Voltar</Button>
+            <Button colorScheme="blue" onClick={handleRescheduleAppointment} isLoading={submitting}>
+              Confirmar Reagendamento
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
     </Box>
   );
 }
