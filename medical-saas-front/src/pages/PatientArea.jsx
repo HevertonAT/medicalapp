@@ -46,9 +46,15 @@ export default function PatientArea() {
   const [submitting, setSubmitting] = useState(false);
   const toast = useToast();
 
+  // --- DEFINIÇÃO DINÂMICA DE CORES (CLARO / ESCURO) ---
   const bgCard = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
-  const inputBg = 'gray.700'; 
+  const inputBg = useColorModeValue('gray.50', 'gray.700'); 
+  const inputBorder = useColorModeValue('gray.300', 'gray.600');
+  const textColor = useColorModeValue('gray.800', 'white');
+  const subTextColor = useColorModeValue('gray.600', 'gray.300');
+  const labelColor = useColorModeValue('gray.700', 'gray.300');
+  const highlightColor = useColorModeValue('blue.600', 'blue.300');
 
   // --- BUSCA DE HORÁRIOS DISPONÍVEIS (NOVO AGENDAMENTO) ---
   const fetchAvailableSlots = useCallback(async () => {
@@ -107,7 +113,6 @@ export default function PatientArea() {
   useEffect(() => {
     fetchRescheduleSlots();
   }, [fetchRescheduleSlots]);
-
 
   // --- CARREGAMENTO INICIAL DOS DADOS ---
   const fetchData = useCallback(async () => {
@@ -197,12 +202,12 @@ export default function PatientArea() {
 
   return (
     <Box p={8} maxW="1200px" mx="auto">
-      <Heading size="lg" mb={8} color={useColorModeValue("gray.700", "white")}>Área do Paciente</Heading>
+      <Heading size="lg" mb={8} color={textColor}>Área do Paciente</Heading>
 
       <Tabs variant="line" colorScheme="blue" index={tabIndex} onChange={setTabIndex}>
         <TabList mb={6}>
-          <Tab fontWeight="bold">Meus Agendamentos</Tab>
-          <Tab fontWeight="bold">Novo Agendamento</Tab>
+          <Tab fontWeight="bold" color={textColor}>Meus Agendamentos</Tab>
+          <Tab fontWeight="bold" color={textColor}>Novo Agendamento</Tab>
         </TabList>
 
         <TabPanels>
@@ -213,20 +218,20 @@ export default function PatientArea() {
                 <Flex justify="center" p={8}><Spinner color="blue.500" size="xl" /></Flex>
               ) : appointments.length === 0 ? (
                 <Box bg={bgCard} p={8} borderRadius="xl" textAlign="center" border="1px solid" borderColor={borderColor}>
-                  <Icon as={FaCalendarAlt} boxSize={10} color="gray.400" mb={4} />
-                  <Text color="gray.400" fontSize="lg">Você ainda não possui agendamentos.</Text>
+                  <Icon as={FaCalendarAlt} boxSize={10} color={subTextColor} mb={4} />
+                  <Text color={subTextColor} fontSize="lg">Você ainda não possui agendamentos.</Text>
                 </Box>
               ) : (
                 appointments.map((app) => (
                   <Box key={app.id} p={5} bg={bgCard} borderRadius="xl" shadow="sm" border="1px solid" borderColor={borderColor}>
                     <Flex justify="space-between" align="center" direction={{ base: 'column', md: 'row' }} gap={4}>
                       <Box>
-                        <Text fontWeight="bold" fontSize="lg" color="blue.300" display="flex" alignItems="center" gap={2}>
+                        <Text fontWeight="bold" fontSize="lg" color={highlightColor} display="flex" alignItems="center" gap={2}>
                           <Icon as={FaUserMd} />
                           {app.doctor?.nome || 'Profissional não informado'}
                         </Text>
                         
-                        <Text color="gray.300" display="flex" alignItems="center" gap={2} mt={2}>
+                        <Text color={subTextColor} display="flex" alignItems="center" gap={2} mt={2}>
                           <Icon as={FaClock} />
                           {app.data_horario ? new Date(app.data_horario).toLocaleString('pt-BR', {
                             day: '2-digit', month: '2-digit', year: 'numeric',
@@ -234,10 +239,9 @@ export default function PatientArea() {
                           }) : 'Data indefinida'}
                         </Text>
                         
-                        {/* A Mágica de Ocultar Status Internos Acontece Aqui */}
                         <Text 
                           fontSize="sm" 
-                          color={app.status?.toLowerCase() === 'cancelado' ? 'red.400' : 'gray.400'} 
+                          color={app.status?.toLowerCase() === 'cancelado' ? 'red.500' : subTextColor} 
                           fontWeight={app.status?.toLowerCase() === 'cancelado' ? 'bold' : 'normal'}
                           mt={1}
                         >
@@ -253,7 +257,6 @@ export default function PatientArea() {
                         <HStack spacing={3} mt={{ base: 4, md: 0 }}>
                           <Button size="sm" colorScheme="blue" variant="outline" onClick={() => {
                             setSelectedApp(app);
-                            // Reseta os dados de reagendamento ao abrir o modal
                             setRescheduleData({ data: '', hora: '', motivo: '' });
                             setRescheduleSlots([]);
                             onRescheduleOpen();
@@ -280,30 +283,30 @@ export default function PatientArea() {
           <TabPanel px={0}>
             <Container maxW="container.md" p={0}>
               <Box bg={bgCard} p={8} borderRadius="xl" border="1px solid" borderColor={borderColor} shadow="lg">
-                <Heading size="md" mb={6} color="blue.300" display="flex" alignItems="center" gap={2}>
+                <Heading size="md" mb={6} color={highlightColor} display="flex" alignItems="center" gap={2}>
                   <Icon as={FaCalendarPlus} /> Agende sua consulta
                 </Heading>
 
                 <VStack spacing={5}>
                   <FormControl>
-                    <FormLabel color="gray.300">Especialidade</FormLabel>
+                    <FormLabel color={labelColor}>Especialidade</FormLabel>
                     <Select 
                       placeholder="Todas as especialidades" 
-                      bg={inputBg} border="none" color="white"
+                      bg={inputBg} color={textColor} border="1px solid" borderColor={inputBorder}
                       value={selectedSpecialty}
                       onChange={(e) => setSelectedSpecialty(e.target.value)}
                     >
                       {specialties.map((spec, idx) => (
-                        <option key={idx} value={spec} style={{ color: 'black' }}>{spec}</option>
+                        <option key={idx} value={spec}>{spec}</option>
                       ))}
                     </Select>
                   </FormControl>
 
                   <FormControl isRequired>
-                    <FormLabel color="gray.300">Profissional</FormLabel>
+                    <FormLabel color={labelColor}>Profissional</FormLabel>
                     <Select 
                       placeholder="Selecione o médico..." 
-                      bg={inputBg} border="none" color="white"
+                      bg={inputBg} color={textColor} border="1px solid" borderColor={inputBorder}
                       value={newAppointment.doctor_id}
                       onChange={(e) => {
                         setNewAppointment({ ...newAppointment, doctor_id: e.target.value, hora: '' });
@@ -311,16 +314,16 @@ export default function PatientArea() {
                       }}
                     >
                       {filteredDoctors.map((doc) => (
-                        <option key={doc.id} value={doc.id} style={{ color: 'black' }}>{doc.nome}</option>
+                        <option key={doc.id} value={doc.id}>{doc.nome}</option>
                       ))}
                     </Select>
                   </FormControl>
 
                   <SimpleGrid columns={{ base: 1, md: 2 }} spacing={5} w="full">
                     <FormControl isRequired>
-                      <FormLabel color="gray.300">Data</FormLabel>
+                      <FormLabel color={labelColor}>Data</FormLabel>
                       <Input 
-                        type="date" bg={inputBg} border="none" color="white"
+                        type="date" bg={inputBg} color={textColor} border="1px solid" borderColor={inputBorder}
                         min={hoje} max={dataMaxima}
                         value={newAppointment.data}
                         onChange={(e) => {
@@ -335,20 +338,20 @@ export default function PatientArea() {
                     </FormControl>
 
                     <FormControl isRequired isDisabled={!newAppointment.data || fetchingSlots}>
-                      <FormLabel color="gray.300">Horários Disponíveis</FormLabel>
+                      <FormLabel color={labelColor}>Horários Disponíveis</FormLabel>
                       {fetchingSlots ? (
-                        <HStack bg={inputBg} p={2} borderRadius="md" justify="center">
-                          <Spinner size="xs" /><Text fontSize="xs">Buscando vagas...</Text>
+                        <HStack bg={inputBg} p={2} borderRadius="md" justify="center" border="1px solid" borderColor={inputBorder}>
+                          <Spinner size="xs" color={highlightColor} /><Text fontSize="xs" color={textColor}>Buscando vagas...</Text>
                         </HStack>
                       ) : (
                         <Select 
                           placeholder={availableSlots.length > 0 ? "Escolha um horário" : "Nenhuma vaga"}
-                          bg={inputBg} border="none" color="white"
+                          bg={inputBg} color={textColor} border="1px solid" borderColor={inputBorder}
                           value={newAppointment.hora}
                           onChange={(e) => setNewAppointment({ ...newAppointment, hora: e.target.value })}
                         >
                           {availableSlots.map((hora) => (
-                            <option key={hora} value={hora} style={{ color: 'black' }}>{hora}</option>
+                            <option key={hora} value={hora}>{hora}</option>
                           ))}
                         </Select>
                       )}
@@ -376,16 +379,16 @@ export default function PatientArea() {
       <Modal isOpen={isCancelOpen} onClose={onCancelClose} isCentered>
         <ModalOverlay />
         <ModalContent bg={bgCard} border="1px solid" borderColor={borderColor}>
-          <ModalHeader color={useColorModeValue('gray.700', 'white')}>Cancelar Consulta</ModalHeader>
-          <ModalCloseButton color="gray.400" />
+          <ModalHeader color={textColor}>Cancelar Consulta</ModalHeader>
+          <ModalCloseButton color={subTextColor} />
           <ModalBody>
-            <Text mb={4} color="gray.300">
-              Deseja realmente cancelar sua consulta com Dr(a) <b>{selectedApp?.doctor?.nome}</b> no dia <b>{selectedApp?.data_horario ? new Date(selectedApp.data_horario).toLocaleDateString('pt-BR') : ''}</b>?
+            <Text mb={4} color={subTextColor}>
+              Deseja realmente cancelar sua consulta com o(a) <b>{selectedApp?.doctor?.nome}</b> no dia <b>{selectedApp?.data_horario ? new Date(selectedApp.data_horario).toLocaleDateString('pt-BR') : ''}</b>?
             </Text>
             <FormControl isRequired>
-              <FormLabel color="gray.300">Motivo do Cancelamento</FormLabel>
+              <FormLabel color={labelColor}>Motivo do Cancelamento</FormLabel>
               <Textarea
-                bg={inputBg} color="white" border="none"
+                bg={inputBg} color={textColor} border="1px solid" borderColor={inputBorder}
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
                 placeholder="Informe o motivo brevemente..."
@@ -393,7 +396,7 @@ export default function PatientArea() {
             </FormControl>
           </ModalBody>
           <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={onCancelClose} color="gray.400">Voltar</Button>
+            <Button variant="ghost" mr={3} onClick={onCancelClose} color={subTextColor}>Voltar</Button>
             <Button colorScheme="red" onClick={handleCancelAppointment} isLoading={submitting}>
               Confirmar Cancelamento
             </Button>
@@ -405,17 +408,17 @@ export default function PatientArea() {
       <Modal isOpen={isRescheduleOpen} onClose={onRescheduleClose} isCentered>
         <ModalOverlay />
         <ModalContent bg={bgCard} border="1px solid" borderColor={borderColor}>
-          <ModalHeader color={useColorModeValue('gray.700', 'white')}>Reagendar Consulta</ModalHeader>
-          <ModalCloseButton color="gray.400" />
+          <ModalHeader color={textColor}>Reagendar Consulta</ModalHeader>
+          <ModalCloseButton color={subTextColor} />
           <ModalBody>
-            <Text mb={4} color="gray.300">
-              Escolha uma nova data e horário para a consulta com Dr(a) <b>{selectedApp?.doctor?.nome}</b>.
+            <Text mb={4} color={subTextColor}>
+              Escolha uma nova data e horário para a consulta com o(a) <b>{selectedApp?.doctor?.nome}</b>.
             </Text>
             <VStack spacing={4}>
               <FormControl isRequired>
-                <FormLabel color="gray.300">Nova Data</FormLabel>
+                <FormLabel color={labelColor}>Nova Data</FormLabel>
                 <Input 
-                  type="date" bg={inputBg} color="white" border="none" 
+                  type="date" bg={inputBg} color={textColor} border="1px solid" borderColor={inputBorder}
                   min={hoje} max={dataMaxima}
                   value={rescheduleData.data}
                   onChange={(e) => {
@@ -426,29 +429,29 @@ export default function PatientArea() {
               </FormControl>
               
               <FormControl isRequired isDisabled={!rescheduleData.data || fetchingRescheduleSlots}>
-                <FormLabel color="gray.300">Horários Disponíveis</FormLabel>
+                <FormLabel color={labelColor}>Horários Disponíveis</FormLabel>
                 {fetchingRescheduleSlots ? (
-                  <HStack bg={inputBg} p={2} borderRadius="md" justify="center">
-                    <Spinner size="xs" /><Text fontSize="xs">Buscando vagas...</Text>
+                  <HStack bg={inputBg} p={2} borderRadius="md" justify="center" border="1px solid" borderColor={inputBorder}>
+                    <Spinner size="xs" color={highlightColor} /><Text fontSize="xs" color={textColor}>Buscando vagas...</Text>
                   </HStack>
                 ) : (
                   <Select 
                     placeholder={rescheduleSlots.length > 0 ? "Escolha um horário" : "Nenhuma vaga"}
-                    bg={inputBg} border="none" color="white"
+                    bg={inputBg} color={textColor} border="1px solid" borderColor={inputBorder}
                     value={rescheduleData.hora}
                     onChange={(e) => setRescheduleData({...rescheduleData, hora: e.target.value})}
                   >
                     {rescheduleSlots.map((hora) => (
-                      <option key={hora} value={hora} style={{ color: 'black' }}>{hora}</option>
+                      <option key={hora} value={hora}>{hora}</option>
                     ))}
                   </Select>
                 )}
               </FormControl>
 
               <FormControl>
-                <FormLabel color="gray.300">Motivo (Opcional)</FormLabel>
+                <FormLabel color={labelColor}>Motivo (Opcional)</FormLabel>
                 <Input 
-                  type="text" bg={inputBg} color="white" border="none"
+                  type="text" bg={inputBg} color={textColor} border="1px solid" borderColor={inputBorder}
                   value={rescheduleData.motivo}
                   onChange={(e) => setRescheduleData({...rescheduleData, motivo: e.target.value})}
                   placeholder="Ex: Imprevisto no trabalho"
@@ -457,7 +460,7 @@ export default function PatientArea() {
             </VStack>
           </ModalBody>
           <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={onRescheduleClose} color="gray.400">Voltar</Button>
+            <Button variant="ghost" mr={3} onClick={onRescheduleClose} color={subTextColor}>Voltar</Button>
             <Button colorScheme="blue" onClick={handleRescheduleAppointment} isLoading={submitting}>
               Confirmar Reagendamento
             </Button>

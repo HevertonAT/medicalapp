@@ -25,8 +25,12 @@ export default function ProfessionalProfile() {
   });
   
   const toast = useToast();
+  
+  // --- CORES DINÂMICAS PARA MODO CLARO/ESCURO ---
   const bgCard = useColorModeValue('white', 'gray.800');
   const textColor = useColorModeValue('gray.600', 'gray.200');
+  const inputBg = useColorModeValue('gray.50', 'gray.700'); 
+  const borderColor = useColorModeValue('gray.300', 'gray.600');
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -75,20 +79,20 @@ export default function ProfessionalProfile() {
   return (
     <Box p={8}>
       <Container maxW="container.md">
-        <VStack align="stretch" spacing={6} bg={bgCard} p={8} borderRadius="xl" shadow="lg">
-          <Heading size="md" color="blue.400">Minha Disponibilidade</Heading>
+        <VStack align="stretch" spacing={6} bg={bgCard} p={8} borderRadius="xl" shadow="lg" border="1px solid" borderColor={borderColor}>
+          <Heading size="md" color="blue.500">Minha Disponibilidade</Heading>
           <Text color={textColor} fontSize="sm">Ajuste seus dias e horários de atendimento.</Text>
           
-          <Divider />
+          <Divider borderColor={borderColor} />
 
-          {/* Renderização condicional segura */}
+          {/* Renderização condicional segura com CORES DINÂMICAS */}
           {agendaConfig && (
             <AgendaConfigFields 
               config={agendaConfig} 
               setConfig={setAgendaConfig} 
               textColor={textColor}
-              bgInput="gray.700"
-              borderColor="gray.600"
+              bgInput={inputBg}
+              borderColor={borderColor}
             />
           )}
 

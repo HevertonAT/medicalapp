@@ -35,7 +35,7 @@ export default function SpecialtyFormRenderer({ specialty, settings = {}, data =
   const headingColor = useColorModeValue("gray.600", "gray.400");
   const inputBg = useColorModeValue("white", "gray.700");
 
-  // Cores para os blocos coloridos (ex: pediatria, gineco)
+  // Cores para os blocos coloridos
   const blueBlock = useColorModeValue("blue.50", "blue.900");
   const pinkBlock = useColorModeValue("pink.50", "pink.900");
   const tealBlock = useColorModeValue("teal.50", "teal.900");
@@ -162,20 +162,22 @@ export default function SpecialtyFormRenderer({ specialty, settings = {}, data =
           </FormControl>
         )}
 
-        <FormControl isRequired={settings.require_blood_pressure}>
-          <FormLabel color={textColor}>
-            Pressão Arterial (PA) 
-            {settings.require_blood_pressure && <Box as="span" color="red.500" ml={1}>*</Box>}
-          </FormLabel>
-          <Input 
-            placeholder="Ex: 120x80" 
-            bg={settings.require_blood_pressure ? redBlock : inputBg}
-            borderColor={settings.require_blood_pressure ? "red.200" : borderColor}
-            color={textColor}
-            value={data.pa || ""} 
-            onChange={e => updateField("pa", e.target.value)} 
-          />
-        </FormControl>
+        {/* --- CORREÇÃO: O campo P.A agora fica totalmente oculto se não for exigido --- */}
+        {(settings.require_blood_pressure || settings.enable_blood_pressure) && (
+          <FormControl isRequired>
+            <FormLabel color={textColor}>
+              Pressão Arterial (PA) <Box as="span" color="red.500" ml={1}>*</Box>
+            </FormLabel>
+            <Input 
+              placeholder="Ex: 120x80" 
+              bg={redBlock}
+              borderColor="red.200"
+              color={textColor}
+              value={data.pa || ""} 
+              onChange={e => updateField("pa", e.target.value)} 
+            />
+          </FormControl>
+        )}
 
       </SimpleGrid>
 

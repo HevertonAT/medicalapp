@@ -18,6 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 // 2. IMPORTANDO O SEU RENDERIZADOR DINÂMICO
 import SpecialtyFormRenderer from '../components/SpecialtyFormRenderer';
+
 export default function Agenda() {
   const [appointments, setAppointments] = useState([]);
   const [doctors, setDoctors] = useState([]);
@@ -123,7 +124,7 @@ export default function Agenda() {
     } catch (error) { toast({ title: 'Erro ao agendar.', status: 'error' }); }
   };
 
-  // --- LÓGICA ATUALIZADA DO INÍCIO DA CONSULTA ---
+  // --- LÓGICA BLINDADA DO INÍCIO DA CONSULTA ---
   const handleStartConsultation = async (app) => {
     setCurrentAppointment(app);
     setStartTime(new Date()); 
@@ -138,17 +139,25 @@ export default function Agenda() {
       setConsultData({ anamnese: '', prescricao: '', exame_fisico: '', diagnostico_cid: '' });
       setSpecialtyData({});
       
-      // Encontra o médico deste agendamento para descobrir a especialidade
-      const doc = doctors.find(d => d.id === app.doctor_id);
-      const spec = doc?.especialidade || "Clínico Geral";
+      // Encontra o médico deste agendamento (convertendo para String para evitar falhas de tipagem)
+      const doc = doctors.find(d => String(d.id) === String(app.doctor_id));
+      
+      // Extrai a especialidade corretamente
+      let spec = doc?.especialidade || app.doctor?.especialidade || app.doctor_especialidade || "Clínico Geral";
+      
+      // Capitaliza a primeira letra para garantir o padrão (ex: "fonoaudiologia" vira "Fonoaudiologia")
+      if (spec) {
+         spec = spec.charAt(0).toUpperCase() + spec.slice(1);
+      }
+      
       setCurrentDocSpecialty(spec);
 
-      // Busca as regras da especialidade no banco
+      // Busca as regras da especialidade no banco usando a mesma rota infalível do Attendance.jsx
       try {
-        const rulesRes = await api.get('/specialties/rules/');
-        const rule = rulesRes.data.find(r => r.specialty === spec);
-        setSpecialtySettings(rule ? rule.settings : {});
+        const rulesRes = await api.get(`/specialties/rules/${spec}`);
+        setSpecialtySettings(rulesRes.data || {});
       } catch (e) {
+        console.error("Regras não encontradas para a especialidade, usando padrão.", e);
         setSpecialtySettings({});
       }
 
@@ -160,7 +169,6 @@ export default function Agenda() {
 
   // --- LÓGICA ATUALIZADA PARA FINALIZAR A CONSULTA ---
   const handleFinishConsultation = async () => {
-    // Agora só exigimos o preenchimento se for a aba geral, os bloquinhos podem bastar
     if (!consultData.anamnese && Object.keys(specialtyData).length === 0) {
         toast({ title: 'Preencha algum dado na anamnese ou formulário.', status: 'warning' });
         return;
@@ -327,7 +335,7 @@ export default function Agenda() {
                     {/* ABA DE ANAMNESE E FORMULÁRIO DINÂMICO */}
                     <TabPanel h="full" display="flex" flexDirection="column">
                         
-                        {/* 3. A MÁGICA ACONTECE AQUI */}
+                        {/* A MÁGICA ACONTECE AQUI */}
                         <SpecialtyFormRenderer 
                             specialty={currentDocSpecialty} 
                             settings={specialtySettings} 
@@ -340,8 +348,8 @@ export default function Agenda() {
                           <FormLabel color={textColor}>Histórico e Queixas (Texto Livre):</FormLabel>
                           <Textarea 
                               size="sm" 
-                              h="250px" // Altura fixa e confortável
-                              resize="none" // <-- REMOVE A REGULAGEM DE TAMANHO
+                              h="250px"
+                              resize="none" 
                               value={consultData.anamnese} 
                               onChange={(e) => setConsultData({...consultData, anamnese: e.target.value})} 
                               bg={tabBg} 

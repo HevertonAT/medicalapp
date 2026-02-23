@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Body, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app.db.base import get_db
 from app.core.deps import get_current_user
@@ -64,7 +64,25 @@ def get_available_slots(
         ).all()
 
         horas_ocupadas = [app.data_horario.strftime("%H:%M") for app in appointments_ocupados]
-        slots_livres = [s for s in slots if s not in horas_ocupadas]
+        
+        # --- TRAVA DE HORÁRIOS QUE JÁ PASSARAM (FUSO HORÁRIO DO BRASIL) ---
+        fuso_brasil = timezone(timedelta(hours=-3))
+        agora = datetime.now(fuso_brasil)
+        data_hoje_str = agora.strftime("%Y-%m-%d")
+
+        slots_livres = []
+        for s in slots:
+            # 1. Se já tem consulta marcada, ignora
+            if s in horas_ocupadas:
+                continue
+            
+            # 2. Se a data selecionada for HOJE, verifica se o horário já passou
+            if data == data_hoje_str:
+                hora_slot = datetime.strptime(s, "%H:%M").time()
+                if hora_slot <= agora.time():
+                    continue # Já passou, não adiciona na lista!
+            
+            slots_livres.append(s)
 
         return slots_livres
 
