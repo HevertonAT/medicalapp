@@ -8,11 +8,11 @@ class Macro(Base):
     # ID Inteiro (Serial)
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     
-    # FK corrigida para a tabela em português e tipo Inteiro
-    clinic_id = Column(Integer, ForeignKey("clinicas.id"), nullable=False)
+    # FK vinculando o macro diretamente ao perfil do profissional
+    doctor_id = Column(Integer, ForeignKey("profissionais.id"), nullable=False)
     
-    titulo = Column(String, nullable=False) # Ex: "Evolução Padrão", "Anamnese Inicial"
+    titulo = Column(String, nullable=False) # Ex: "Evolução Fono", "Anamnese Inicial"
     texto_padrao = Column(Text, nullable=False)
 
-    # Relacionamento (opcional, mas útil)
-    clinic = relationship("Clinic")
+    # Relacionamento (Assumindo que a sua classe de profissional se chama Doctor)
+    doctor = relationship("Doctor")

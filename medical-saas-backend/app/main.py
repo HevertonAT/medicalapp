@@ -25,6 +25,7 @@ from app.routers import (
     agendamentos,
     autenticacao, 
     clinicas,
+    macros,
     regras_especialidades, 
     usuarios, 
     profissionais, 
@@ -33,7 +34,6 @@ from app.routers import (
     financeiro, 
     arquivos, 
     relatorios, 
-    # novo router
     dashboard
 )
 
@@ -77,6 +77,7 @@ app.include_router(arquivos.router, prefix="/files", tags=["Arquivos"])
 app.include_router(relatorios.router, prefix="/reports", tags=["Relatórios"])  
 app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
 app.include_router(regras_especialidades.router, prefix="/settings/specialties", tags=["Configuração Especialidades"])
+app.include_router(macros.router, prefix="/macros", tags=["Macros"])
 
 @app.get("/")
 def health_check():
