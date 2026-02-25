@@ -18,7 +18,6 @@ def get_password_hash(password: str) -> str:
     return hashed_password.decode('utf-8')
 
 # --- 1. ROTA /ME (ORDEM PRIORITÁRIA) ---
-# Deve ficar acima de /{doctor_id} para evitar que o FastAPI confunda "me" com um ID numérico.
 @router.get("/me", response_model=DoctorResponse)
 def get_my_doctor_profile(
     db: Session = Depends(get_db),
@@ -42,13 +41,12 @@ def list_doctors(
     if current_user.role in ['patient', 'paciente']:
         return query.filter(Doctor.ativo == True).all()
 
-    # Admins e Médicos veem os colegas da mesma clínica.
-    if current_user.role in ['admin', 'superuser', 'doctor']:
-        if current_user.clinic_id:
-            query = query.filter(Doctor.clinic_id == current_user.clinic_id)
-        return query.all()
-
-    return []
+    # Admins e Médicos veem apenas os colegas da SUA própria clínica.
+    if current_user.role in ['admin', 'doctor']:
+        query = query.filter(Doctor.clinic_id == current_user.clinic_id)
+        
+    # Superuser (dono do sistema) vê absolutamente todos
+    return query.all()
 
 # --- 3. CRIAÇÃO DE MÉDICO ---
 @router.post("/", response_model=DoctorResponse, status_code=status.HTTP_201_CREATED)
@@ -60,6 +58,15 @@ def create_doctor(
     if current_user.role not in ['admin', 'superuser']:
         raise HTTPException(status_code=403, detail="Sem permissão para criar profissionais.")
 
+    # LÓGICA SAAS: Define a qual clínica o médico vai pertencer
+    target_clinic_id = current_user.clinic_id
+    if current_user.role == "superuser" and hasattr(doctor, "clinic_id") and doctor.clinic_id:
+        # Se for o dono do sistema criando, permite passar o ID da clínica na requisição
+        target_clinic_id = doctor.clinic_id
+        
+    if not target_clinic_id:
+        raise HTTPException(status_code=400, detail="Não foi possível identificar a clínica para este cadastro.")
+
     user_exists = db.query(User).filter(User.email == doctor.email).first()
     if user_exists:
         raise HTTPException(status_code=400, detail="Este email já está em uso.")
@@ -70,7 +77,7 @@ def create_doctor(
         email=doctor.email,
         hashed_password=get_password_hash(doctor.senha),
         role="doctor",
-        clinic_id=current_user.clinic_id,
+        clinic_id=target_clinic_id,
         is_active=True
     )
     db.add(new_user)
@@ -81,7 +88,7 @@ def create_doctor(
         nome=doctor.nome,
         crm=doctor.crm,
         especialidade=doctor.especialidade,
-        clinic_id=current_user.clinic_id,
+        clinic_id=target_clinic_id,
         user_id=new_user.id,
         agenda_config=doctor.agenda_config, # Salva a agenda inicial se enviada
         ativo=True
@@ -92,7 +99,6 @@ def create_doctor(
     return db_doctor
 
 # --- 4. ATUALIZAÇÃO (PUT) ---
-# Ajustado para permitir que o médico edite a si mesmo e salve a agenda.
 @router.put("/{doctor_id}", response_model=DoctorResponse)
 def update_doctor(
     doctor_id: int, 
@@ -104,12 +110,13 @@ def update_doctor(
     if not db_doctor:
         raise HTTPException(status_code=404, detail="Médico não encontrado")
 
-    # PERMISSÃO: Admin ou o próprio dono do perfil pode editar.
+    # PERMISSÕES ISOLADAS:
     is_owner = db_doctor.user_id == current_user.id
-    is_admin = current_user.role in ['admin', 'superuser']
+    is_admin_of_same_clinic = current_user.role == 'admin' and db_doctor.clinic_id == current_user.clinic_id
+    is_superuser = current_user.role == 'superuser'
 
-    if not is_admin and not is_owner:
-        raise HTTPException(status_code=403, detail="Você não tem permissão para editar este perfil.")
+    if not (is_owner or is_admin_of_same_clinic or is_superuser):
+        raise HTTPException(status_code=403, detail="Você não tem permissão para editar este perfil de outra clínica.")
 
     # Atualiza campos básicos
     if doctor_data.nome: db_doctor.nome = doctor_data.nome
@@ -131,12 +138,15 @@ def inactivate_doctor(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role not in ['admin', 'superuser']:
-        raise HTTPException(status_code=403, detail="Sem permissão")
-
     db_doctor = db.query(Doctor).filter(Doctor.id == doctor_id).first()
     if not db_doctor:
         raise HTTPException(status_code=404, detail="Médico não encontrado")
+
+    is_admin_of_same_clinic = current_user.role == 'admin' and db_doctor.clinic_id == current_user.clinic_id
+    is_superuser = current_user.role == 'superuser'
+
+    if not (is_admin_of_same_clinic or is_superuser):
+        raise HTTPException(status_code=403, detail="Sem permissão para inativar profissionais de outras clínicas.")
 
     db_doctor.ativo = False
     db.commit()
@@ -149,12 +159,15 @@ def reactivate_doctor(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role not in ['admin', 'superuser']:
-        raise HTTPException(status_code=403, detail="Sem permissão")
-
     db_doctor = db.query(Doctor).filter(Doctor.id == doctor_id).first()
     if not db_doctor:
         raise HTTPException(status_code=404, detail="Médico não encontrado")
+
+    is_admin_of_same_clinic = current_user.role == 'admin' and db_doctor.clinic_id == current_user.clinic_id
+    is_superuser = current_user.role == 'superuser'
+
+    if not (is_admin_of_same_clinic or is_superuser):
+        raise HTTPException(status_code=403, detail="Sem permissão para reativar profissionais de outras clínicas.")
 
     db_doctor.ativo = True
     db.commit()

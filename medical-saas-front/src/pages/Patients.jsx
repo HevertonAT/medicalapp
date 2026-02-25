@@ -233,7 +233,7 @@ export default function Patients() {
         <Button size="sm" variant={filter === 'inativos' ? 'solid' : 'outline'} colorScheme="red" onClick={() => setFilter('inativos')}>Inativos</Button>
       </HStack>
 
-      <Box bg={bgCard} shadow="sm" borderRadius="lg" overflow="hidden">
+      <Box bg={bgCard} shadow="sm" borderRadius="sm" overflow="hidden">
         <Table variant="simple">
           <Thead bg={bgHeader}>
               <Tr>
@@ -255,7 +255,7 @@ export default function Patients() {
                 <Td>
                     <Text 
                         fontWeight="extrabold" 
-                        fontSize="xs" 
+                        fontSize="sm" 
                         letterSpacing="wide"
                         color={p.ativo ? activeColor : inactiveColor}
                     >

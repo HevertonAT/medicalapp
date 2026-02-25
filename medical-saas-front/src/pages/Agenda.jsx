@@ -9,14 +9,14 @@ import {
 } from '@chakra-ui/react';
 import { 
   FaPlus, FaUserMd, FaSearch, FaPlay, FaCheckDouble, 
-  FaTimes, FaStethoscope, FaPrescriptionBottleAlt, FaRedo, FaCalendarAlt, FaHistory, FaBolt
+  FaTimes, FaStethoscope, FaPrescriptionBottleAlt, FaRedo, 
+  FaCalendarAlt, FaHistory, FaBolt, FaPrint
 } from 'react-icons/fa';
 import React from 'react'; 
 import { useNavigate } from 'react-router-dom';
 
-// 1. IMPORTANDO A API
+// IMPORTS CORRIGIDOS PARA A PASTA src/pages/
 import api from '../services/api';
-// 2. IMPORTANDO O SEU RENDERIZADOR DINÂMICO E O BUSCADOR DE CID
 import SpecialtyFormRenderer from '../components/SpecialtyFormRenderer';
 import CidAutocomplete from '../components/profissionais/CidAutocomplete';
 
@@ -33,6 +33,9 @@ export default function Agenda() {
   const { isOpen: isConsultOpen, onOpen: onConsultOpen, onClose: onConsultClose } = useDisclosure(); 
   const { isOpen: isCancelOpen, onOpen: onCancelOpen, onClose: onCancelClose } = useDisclosure();
   const { isOpen: isRescheduleOpen, onOpen: onRescheduleOpen, onClose: onRescheduleClose } = useDisclosure();
+  
+  // Controle do Modal de Impressão
+  const { isOpen: isPrintModalOpen, onOpen: onPrintModalOpen, onClose: onPrintModalClose } = useDisclosure();
 
   const toast = useToast();
   const navigate = useNavigate();
@@ -45,7 +48,6 @@ export default function Agenda() {
   const [actionReason, setActionReason] = useState('');
   const [rescheduleData, setRescheduleData] = useState({ data: '', hora: '' });
   
-  // --- NOVOS ESTADOS PARA O PRONTUÁRIO DINÂMICO E MACROS ---
   const [consultData, setConsultData] = useState({ anamnese: '', prescricao: '', exame_fisico: '', diagnostico_cid: '' });
   const [specialtySettings, setSpecialtySettings] = useState({});
   const [specialtyData, setSpecialtyData] = useState({});
@@ -59,8 +61,8 @@ export default function Agenda() {
   const inputBg = useColorModeValue('gray.50', 'gray.700');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
   const textColor = useColorModeValue('gray.600', 'gray.200');
-  const headingColor = useColorModeValue('purple.600', 'purple.300');
-  const tabBg = useColorModeValue('yellow.50', 'gray.900');
+  const headingColor = useColorModeValue('blue.600', 'blue.300');
+  const tabBg = useColorModeValue('blue.50', 'gray.900');
   const headerBg = useColorModeValue('gray.50', 'gray.700');
   const hoverTr = useColorModeValue('gray.50', 'gray.700');
 
@@ -70,7 +72,7 @@ export default function Agenda() {
         case 'cancelado': return useColorModeValue('red.600', 'red.300');
         case 'em_andamento': return useColorModeValue('orange.500', 'orange.300');
         case 'reagendado': return useColorModeValue('cyan.600', 'cyan.300');
-        default: return useColorModeValue('purple.600', 'purple.300');
+        default: return useColorModeValue('blue.600', 'blue.300');
     }
   };
 
@@ -89,7 +91,7 @@ export default function Agenda() {
     } finally {
       setLoading(false);
     }
-  }, [navigate]);
+  }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -140,27 +142,19 @@ export default function Agenda() {
       setSpecialtyData({});
       
       const doc = doctors.find(d => String(d.id) === String(app.doctor_id));
-      
       let spec = doc?.especialidade || app.doctor?.especialidade || app.doctor_especialidade || "Clínico Geral";
-      if (spec) {
-         spec = spec.charAt(0).toUpperCase() + spec.slice(1);
-      }
-      
+      if (spec) spec = spec.charAt(0).toUpperCase() + spec.slice(1);
       setCurrentDocSpecialty(spec);
 
       try {
         const macrosRes = await api.get('/macros/');
         setMinhasMacros(macrosRes.data || []);
-      } catch (e) {
-        console.error("Erro ao buscar macros", e);
-      }
+      } catch (e) { console.error("Erro ao buscar macros", e); }
 
       try {
         const rulesRes = await api.get(`/specialties/rules/${spec}`);
         setSpecialtySettings(rulesRes.data || {});
-      } catch (e) {
-        setSpecialtySettings({});
-      }
+      } catch (e) { setSpecialtySettings({}); }
 
       onConsultOpen();
     } catch (error) {
@@ -168,15 +162,17 @@ export default function Agenda() {
     }
   };
 
+  // FUNÇÃO FINALIZAR: SALVA PRIMEIRO, ABRE IMPRESSÃO DEPOIS
   const handleFinishConsultation = async () => {
-    if (!consultData.anamnese && Object.keys(specialtyData).length === 0) {
-        toast({ title: 'Preencha algum dado na anamnese ou formulário.', status: 'warning' });
+    if (!consultData.anamnese && Object.keys(specialtyData).length === 0 && !consultData.prescricao) {
+        toast({ title: 'Preencha algum dado antes de finalizar.', status: 'warning' });
         return;
     }
 
     try {
         const endTime = new Date(); 
 
+        // PASSO 1: Salva no Banco de Dados com Segurança Total
         await api.post('/medical-records/', {
             appointment_id: currentAppointment.id,
             patient_id: currentAppointment.patient_id,
@@ -189,13 +185,98 @@ export default function Agenda() {
             data_fim: endTime
         });
 
-        toast({ title: 'Atendimento finalizado! ✅', status: 'success' });
+        // PASSO 2: Se deu certo, atualiza a tela e fecha o prontuário
+        toast({ title: 'Atendimento finalizado com sucesso! ✅', status: 'success' });
         onConsultClose();
         fetchData();
+
+        // PASSO 3: Abre a tela perguntando se deseja imprimir
+        onPrintModalOpen();
+
     } catch (error) {
         const errorMsg = error.response?.data?.detail || 'Erro ao finalizar atendimento.';
         toast({ title: 'Erro ao finalizar.', description: errorMsg, status: 'error' });
     }
+  };
+
+  // GERA O RECEITUÁRIO PARA IMPRESSÃO
+  const handlePrintRecord = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        toast({ title: "Pop-up bloqueado", description: "Por favor, permita os pop-ups neste site para poder imprimir.", status: "warning" });
+        return;
+    }
+
+    const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Receituário - ${currentAppointment?.patient_nome}</title>
+            <style>
+                body { font-family: 'Arial', sans-serif; padding: 40px; color: #333; line-height: 1.6; }
+                .header { text-align: center; border-bottom: 2px solid #3182CE; padding-bottom: 20px; margin-bottom: 30px; }
+                .header h1 { margin: 0; color: #3182CE; font-size: 24px; text-transform: uppercase; }
+                .header p { margin: 5px 0 0 0; font-size: 14px; color: #666; }
+                .section { margin-bottom: 25px; page-break-inside: avoid; }
+                .title { font-size: 16px; font-weight: bold; color: #3182CE; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+                .content { white-space: pre-wrap; font-size: 14px; }
+                .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
+                .signature-block { margin-top: 80px; text-align: center; width: 300px; float: right; }
+                .signature-line { border-top: 1px solid #333; margin-bottom: 5px; }
+                .clear { clear: both; }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>Prontuario Médico</h1>
+                <p>Resumo do Atendimento</p>
+            </div>
+            
+            <div class="section">
+                <div class="content"><strong>Paciente:</strong> ${currentAppointment?.patient_nome || 'Não informado'}</div>
+                <div class="content"><strong>Data:</strong> ${new Date().toLocaleDateString('pt-BR')}</div>
+            </div>
+
+            ${consultData.diagnostico_cid ? `
+            <div class="section">
+                <div class="title">Diagnóstico (CID-10)</div>
+                <div class="content">${consultData.diagnostico_cid}</div>
+            </div>` : ''}
+
+            ${consultData.prescricao ? `
+            <div class="section">
+                <div class="title">Prescrição e Exames</div>
+                <div class="content">${consultData.prescricao}</div>
+            </div>` : ''}
+
+            ${consultData.anamnese ? `
+            <div class="section" style="margin-top: 40px;">
+                <div class="title">Evolução / Observações</div>
+                <div class="content">${consultData.anamnese}</div>
+            </div>` : ''}
+
+            <div class="signature-block">
+                <div class="signature-line"></div>
+                <div>Assinatura e Carimbo do Profissional</div>
+            </div>
+
+            <div class="clear"></div>
+
+            <div class="footer">
+                Gerado de forma segura por MedicalApp
+            </div>
+        </body>
+        </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    
+    setTimeout(() => {
+        printWindow.print();
+    }, 250);
+
+    onPrintModalClose();
   };
 
   const openCancelModal = (app) => { setCurrentAppointment(app); setActionReason(''); onCancelOpen(); };
@@ -241,8 +322,8 @@ export default function Agenda() {
   return (
     <Box p={8} bg={bgPage} minH="100vh">
       <Flex justify="space-between" align="center" mb={6}>
-        <Heading size="lg" color={headingColor}>Agenda</Heading>
-        <Button leftIcon={<FaPlus />} colorScheme="purple" size="sm" onClick={onOpen}>Agendar</Button>
+        <Heading size="lg" color={headingColor}>Agenda de Atendimentos</Heading>
+        <Button leftIcon={<FaPlus />} colorScheme="blue" size="sm" onClick={onOpen}>Agendar</Button>
       </Flex>
 
       <Flex gap={4} mb={6} direction={{ base: 'column', md: 'row' }}>
@@ -256,7 +337,7 @@ export default function Agenda() {
         </InputGroup>
       </Flex>
 
-      {loading ? <Spinner size="xl" color="purple.500" /> : (
+      {loading ? <Spinner size="xl" color="blue.500" /> : (
         <Box bg={bgCard} shadow="sm" borderRadius="lg" overflowX="auto" border="1px solid" borderColor={borderColor}>
             <Table variant="simple" size="sm">
                 <Thead bg={headerBg}><Tr>
@@ -276,7 +357,7 @@ export default function Agenda() {
                                     <>
                                         {app.status === 'agendado' && <IconButton icon={<FaTimes />} size="xs" colorScheme="red" variant="ghost" onClick={() => openCancelModal(app)} />}
                                         {app.status === 'agendado' && <IconButton icon={<FaRedo />} size="xs" colorScheme="blue" variant="ghost" onClick={() => openRescheduleModal(app)} />}
-                                        <Button leftIcon={app.status === 'em_andamento' ? <FaCheckDouble /> : <FaPlay />} size="xs" colorScheme={app.status === 'em_andamento' ? 'green' : 'purple'} onClick={() => handleStartConsultation(app)}>
+                                        <Button leftIcon={app.status === 'em_andamento' ? <FaCheckDouble /> : <FaPlay />} size="xs" colorScheme={app.status === 'em_andamento' ? 'green' : 'blue'} onClick={() => handleStartConsultation(app)}>
                                             {app.status === 'em_andamento' ? 'Retomar' : 'Iniciar'}
                                         </Button>
                                     </>
@@ -302,7 +383,7 @@ export default function Agenda() {
             <FormControl mb={4}><FormLabel>Paciente</FormLabel><Select bg={inputBg} size="sm" placeholder="Selecione..." value={newApp.patient_id} onChange={(e) => setNewApp({...newApp, patient_id: e.target.value})}>{patients.filter(p => p.ativo).map(p => <option key={p.id} value={p.id}>{p.nome_completo}</option>)}</Select></FormControl>
             <FormControl><FormLabel>Obs</FormLabel><Input bg={inputBg} size="sm" value={newApp.observacoes} onChange={(e) => setNewApp({...newApp, observacoes: e.target.value})} /></FormControl>
           </ModalBody>
-          <ModalFooter><Button colorScheme="purple" size="sm" mr={3} onClick={handleCreate}>Agendar</Button><Button size="sm" onClick={onClose}>Cancelar</Button></ModalFooter>
+          <ModalFooter><Button colorScheme="blue" size="sm" mr={3} onClick={handleCreate}>Agendar</Button><Button size="sm" onClick={onClose}>Cancelar</Button></ModalFooter>
         </ModalContent>
       </Modal>
 
@@ -310,14 +391,33 @@ export default function Agenda() {
       <Modal isOpen={isCancelOpen} onClose={onCancelClose}><ModalOverlay /><ModalContent bg={modalBg}><ModalHeader>Cancelar</ModalHeader><ModalBody><Textarea bg={inputBg} value={actionReason} onChange={(e) => setActionReason(e.target.value)} placeholder="Motivo..." /></ModalBody><ModalFooter><Button colorScheme="red" mr={3} onClick={handleConfirmCancel}>Confirmar</Button></ModalFooter></ModalContent></Modal>
       <Modal isOpen={isRescheduleOpen} onClose={onRescheduleClose}><ModalOverlay /><ModalContent bg={modalBg}><ModalHeader>Reagendar</ModalHeader><ModalBody><VStack spacing={3}><FormControl><FormLabel>Data</FormLabel><Input type="date" bg={inputBg} value={rescheduleData.data} onChange={(e) => setRescheduleData({...rescheduleData, data: e.target.value})}/></FormControl><FormControl><FormLabel>Hora</FormLabel><Input type="time" bg={inputBg} value={rescheduleData.hora} onChange={(e) => setRescheduleData({...rescheduleData, hora: e.target.value})}/></FormControl><FormControl><FormLabel>Motivo</FormLabel><Textarea bg={inputBg} value={actionReason} onChange={(e) => setActionReason(e.target.value)} /></FormControl></VStack></ModalBody><ModalFooter><Button colorScheme="blue" mr={3} onClick={handleConfirmReschedule}>Confirmar</Button></ModalFooter></ModalContent></Modal>
 
-      {/* --- MODAL DO PRONTUÁRIO ATUALIZADO --- */}
-      <Modal isOpen={isConsultOpen} onClose={onConsultClose} size="4xl" closeOnOverlayClick={false}>
+      {/* --- MODAL DE PERGUNTA: IMPRIMIR --- */}
+      <Modal isOpen={isPrintModalOpen} onClose={onPrintModalClose} isCentered>
+        <ModalOverlay />
+        <ModalContent bg={modalBg}>
+          <ModalHeader color="green.500" display="flex" alignItems="center" gap={2}>
+             <Icon as={FaCheckDouble} /> Salvo com Sucesso!
+          </ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <Text color={textColor}>O prontuário do paciente <strong>{currentAppointment?.patient_nome}</strong> foi salvo de forma segura no banco de dados.</Text>
+            <Text color={textColor} mt={4} fontWeight="bold">Deseja imprimir o receituário / resumo do atendimento agora?</Text>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" size="sm" mr={3} onClick={onPrintModalClose}>Agora não</Button>
+            <Button colorScheme="blue" size="sm" leftIcon={<FaPrint />} onClick={handlePrintRecord}>Imprimir Documento</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* --- MODAL DO PRONTUÁRIO --- */}
+      <Modal isOpen={isConsultOpen} onClose={onConsultClose} size="5xl" closeOnOverlayClick={false}>
         <ModalOverlay />
         <ModalContent h="90vh" bg={modalBg} display="flex" flexDirection="column">
           <ModalHeader bg={headerBg} borderBottom="1px solid" borderColor={borderColor}>
             <Flex justify="space-between" align="center">
                 <Flex align="center" gap={2}>
-                    <Icon as={FaStethoscope} color="teal.500" />
+                    <Icon as={FaStethoscope} color="blue.500" />
                     <Text>Atendimento: {currentAppointment?.patient_nome}</Text>
                 </Flex>
             </Flex>
@@ -325,7 +425,7 @@ export default function Agenda() {
           <ModalCloseButton />
           
           <ModalBody py={4} display="flex" flexDirection="column" overflowY="hidden">
-            <Tabs variant="enclosed" colorScheme="teal" h="100%" display="flex" flexDirection="column">
+            <Tabs variant="enclosed" colorScheme="blue" h="100%" display="flex" flexDirection="column">
                 <TabList>
                     <Tab fontWeight="bold" color={textColor}><Icon as={FaUserMd} mr={2}/> Anamnese</Tab>
                     <Tab fontWeight="bold" color={textColor}><Icon as={FaPrescriptionBottleAlt} mr={2}/> Prescrição</Tab>
@@ -345,7 +445,7 @@ export default function Agenda() {
                         {/* Texto livre com o botão de Macros */}
                         <FormControl mt={6} display="flex" flexDirection="column" flex="1">
                           <Flex justify="space-between" align="center" mb={2}>
-                            <FormLabel color={textColor} mb={0}>Evolução:</FormLabel>
+                            <FormLabel color={textColor} mb={0}>Evolução / Observações Livres:</FormLabel>
                             
                             {minhasMacros.length > 0 && (
                               <Menu>
@@ -381,7 +481,7 @@ export default function Agenda() {
                               bg={tabBg} 
                               borderColor={borderColor} 
                               placeholder="Evolução, observações adicionais..."
-                              _focus={{ borderColor: "teal.400", boxShadow: "0 0 0 1px teal.400" }}
+                              _focus={{ borderColor: "blue.400", boxShadow: "0 0 0 1px blue.400" }}
                           />
                       </FormControl>
                     </TabPanel>
@@ -408,7 +508,7 @@ export default function Agenda() {
                                 onChange={(e) => setConsultData({...consultData, prescricao: e.target.value})} 
                                 bg={tabBg} 
                                 borderColor={borderColor} 
-                                _focus={{ borderColor: "teal.400", boxShadow: "0 0 0 1px teal.400" }}
+                                _focus={{ borderColor: "blue.400", boxShadow: "0 0 0 1px blue.400" }}
                             />
                         </FormControl>
                     </TabPanel>
@@ -419,7 +519,7 @@ export default function Agenda() {
           
           <ModalFooter borderTop="1px solid" borderColor={borderColor}>
             <Button variant="ghost" size="sm" mr={3} onClick={onConsultClose}>Cancelar</Button>
-            <Button colorScheme="green" size="sm" leftIcon={<FaCheckDouble />} onClick={handleFinishConsultation}>Finalizar Prontuário</Button>
+            <Button colorScheme="green" size="sm" leftIcon={<FaCheckDouble />} onClick={handleFinishConsultation}>Salvar e Finalizar Prontuário</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
