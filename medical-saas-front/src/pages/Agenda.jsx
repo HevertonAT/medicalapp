@@ -228,7 +228,7 @@ export default function Agenda() {
         </head>
         <body>
             <div class="header">
-                <h1>Prontuario Médico</h1>
+                <h1>Evolução</h1>
                 <p>Resumo do Atendimento</p>
             </div>
             
@@ -251,7 +251,7 @@ export default function Agenda() {
 
             ${consultData.anamnese ? `
             <div class="section" style="margin-top: 40px;">
-                <div class="title">Evolução / Observações</div>
+                <div class="title">Evolução</div>
                 <div class="content">${consultData.anamnese}</div>
             </div>` : ''}
 

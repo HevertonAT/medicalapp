@@ -20,7 +20,10 @@ export default function Patients() {
   const { isOpen, onOpen, onClose } = useDisclosure(); 
   const { isOpen: isRecordOpen, onOpen: onRecordOpen, onClose: onRecordClose } = useDisclosure(); 
 
-  const [currentPatient, setCurrentPatient] = useState({ id: '', nome_completo: '', telefone: '', cpf: '', data_nascimento: '' });
+  // Adicionado 'email' ao estado inicial
+  const [currentPatient, setCurrentPatient] = useState({ 
+    id: '', nome_completo: '', telefone: '', cpf: '', data_nascimento: '', email: '' 
+  });
   const [isEditing, setIsEditing] = useState(false);
   const [records, setRecords] = useState([]);
   const [selectedRecord, setSelectedRecord] = useState(null);
@@ -40,76 +43,68 @@ export default function Patients() {
   const textColor = useColorModeValue('gray.600', 'gray.200');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
   
-  // Cores Status Vivas (Sem Fundo)
-  const activeColor = useColorModeValue('green.600', 'green.300'); // Verde Vivo
-  const inactiveColor = useColorModeValue('red.600', 'red.300');   // Vermelho Vivo
+  const activeColor = useColorModeValue('green.600', 'green.300'); 
+  const inactiveColor = useColorModeValue('red.600', 'red.300');   
   
-  // Cores específicas do prontuário
   const recordListBg = useColorModeValue('gray.50', 'gray.900');
   const recordDetailBg = useColorModeValue('white', 'gray.800');
   const anamneseBg = useColorModeValue('gray.50', 'gray.700');
   const prescricaoBg = useColorModeValue('orange.50', 'orange.900');
   const prescricaoText = useColorModeValue('orange.800', 'orange.100');
 
-  // --- FUNÇÕES DE MÁSCARA (FORMATAÇÃO) ---
-  
-  // Valida se o CPF é válido
+  // --- FUNÇÃO PARA CALCULAR IDADE ---
+  const calculateAge = (dataNascimento) => {
+    if (!dataNascimento) return '-';
+    const today = new Date();
+    const birthDate = new Date(dataNascimento);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+    return age + ' anos';
+  };
+
+  // --- FUNÇÕES DE MÁSCARA E VALIDAÇÃO ---
   const isValidCPF = (cpf) => {
     const numbers = cpf.replace(/\D/g, '');
-    
-    // Verifica se tem 11 dígitos
     if (numbers.length !== 11) return false;
-    
-    // Verifica CPFs conhecidamente inválidos (todos iguais)
     if (/^(\d)\1{10}$/.test(numbers)) return false;
-    
-    // Calcula primeiro dígito verificador
     let sum = 0;
     let remainder;
-    for (let i = 1; i <= 9; i++) {
-      sum += parseInt(numbers.substring(i - 1, i)) * (11 - i);
-    }
+    for (let i = 1; i <= 9; i++) sum += parseInt(numbers.substring(i - 1, i)) * (11 - i);
     remainder = (sum * 10) % 11;
     if (remainder === 10 || remainder === 11) remainder = 0;
     if (remainder !== parseInt(numbers.substring(9, 10))) return false;
-    
-    // Calcula segundo dígito verificador
     sum = 0;
-    for (let i = 1; i <= 10; i++) {
-      sum += parseInt(numbers.substring(i - 1, i)) * (12 - i);
-    }
+    for (let i = 1; i <= 10; i++) sum += parseInt(numbers.substring(i - 1, i)) * (12 - i);
     remainder = (sum * 10) % 11;
     if (remainder === 10 || remainder === 11) remainder = 0;
     if (remainder !== parseInt(numbers.substring(10, 11))) return false;
-    
     return true;
   };
   
   const formatCPF = (value) => {
     return value
-      .replace(/\D/g, '') // Remove tudo o que não é dígito
-      .replace(/(\d{3})(\d)/, '$1.$2') // Coloca um ponto entre o terceiro e o quarto dígitos
-      .replace(/(\d{3})(\d)/, '$1.$2') // Coloca um ponto entre o terceiro e o quarto dígitos de novo (para o segundo bloco de números)
-      .replace(/(\d{3})(\d{1,2})/, '$1-$2') // Coloca um hífen entre o terceiro e o quarto dígitos
-      .replace(/(-\d{2})\d+?$/, '$1'); // Impede de digitar mais de 11 dígitos
+      .replace(/\D/g, '')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})/, '$1-$2')
+      .replace(/(-\d{2})\d+?$/, '$1');
   };
 
   const formatPhone = (value) => {
     return value
-      .replace(/\D/g, '') // Remove tudo o que não é dígito
-      .replace(/^(\d{2})(\d)/g, '($1) $2') // Coloca parênteses em volta dos dois primeiros dígitos
-      .replace(/(\d)(\d{4})$/, '$1-$2') // Coloca hífen entre o quarto e o quinto dígitos
-      .substring(0, 15); // Limita o tamanho
+      .replace(/\D/g, '')
+      .replace(/^(\d{2})(\d)/g, '($1) $2')
+      .replace(/(\d)(\d{4})$/, '$1-$2')
+      .substring(0, 15);
   };
 
   const fetchPatients = async () => {
     try {
-      // 2. Simplificado: api.get já usa a URL base e insere o token sozinho
       const response = await api.get('/patients/');
       setPatients(response.data);
     } catch (error) { 
         console.error(error); 
-        // Se der erro de autenticação, redireciona (opcional, pois api.js pode tratar isso)
         if(error.response?.status === 401) navigate('/');
     } finally { 
         setLoading(false); 
@@ -125,7 +120,6 @@ export default function Patients() {
   });
 
   const handleSave = async () => {
-    // Valida CPF antes de salvar
     if (!currentPatient.cpf) {
         setCpfError('CPF é obrigatório.');
         return;
@@ -141,11 +135,11 @@ export default function Patients() {
             nome_completo: currentPatient.nome_completo,
             cpf: currentPatient.cpf, 
             telefone: currentPatient.telefone,
+            email: currentPatient.email, // Incluído no payload
             data_nascimento: currentPatient.data_nascimento || null
         };
 
         if (isEditing && currentPatient.id) {
-            // 3. URLs limpas
             await api.put(`/patients/${currentPatient.id}`, payload);
             toast({ title: 'Atualizado!', status: 'success' });
         } else {
@@ -156,7 +150,7 @@ export default function Patients() {
         setCpfError('');
         fetchPatients();
     } catch (error) {
-        toast({ title: 'Erro ao salvar.', description: 'Verifique se o CPF já existe.', status: 'error' });
+        toast({ title: 'Erro ao salvar.', description: 'Verifique se o CPF ou E-mail já existe.', status: 'error' });
     }
   };
 
@@ -182,10 +176,14 @@ export default function Patients() {
 
   const openModal = (patient = null) => {
       if (patient) {
-          setCurrentPatient(patient);
+          setCurrentPatient({
+            ...patient,
+            email: patient.email || '',
+            data_nascimento: patient.data_nascimento || ''
+          });
           setIsEditing(true);
       } else {
-          setCurrentPatient({ id: '', nome_completo: '', telefone: '', cpf: '', data_nascimento: '' });
+          setCurrentPatient({ id: '', nome_completo: '', telefone: '', cpf: '', data_nascimento: '', email: '' });
           setIsEditing(false);
       }
       onOpen();
@@ -203,7 +201,6 @@ export default function Patients() {
 
   const handleDownloadPDF = async (recordId) => {
     try {
-        // Para arquivos binários (PDF), ainda precisamos avisar o axios/api sobre o responseType
         const response = await api.get(`/medical-records/${recordId}/pdf`, {
             responseType: 'blob' 
         });
@@ -226,109 +223,174 @@ export default function Patients() {
         <Button leftIcon={<FaPlus />} colorScheme="blue" onClick={() => openModal()}>Novo Paciente</Button>
       </Flex>
 
-      {/* BARRA DE FILTROS */}
       <HStack mb={4} spacing={4}>
         <Button size="sm" variant={filter === 'todos' ? 'solid' : 'outline'} colorScheme="blue" onClick={() => setFilter('todos')}>Todos</Button>
         <Button size="sm" variant={filter === 'ativos' ? 'solid' : 'outline'} colorScheme="green" onClick={() => setFilter('ativos')}>Ativos</Button>
         <Button size="sm" variant={filter === 'inativos' ? 'solid' : 'outline'} colorScheme="red" onClick={() => setFilter('inativos')}>Inativos</Button>
       </HStack>
 
-      <Box bg={bgCard} shadow="sm" borderRadius="sm" overflow="hidden">
-        <Table variant="simple">
-          <Thead bg={bgHeader}>
-              <Tr>
-                  <Th color={textColor}>Nome</Th>
-                  <Th color={textColor}>CPF</Th> 
-                  <Th color={textColor}>Telefone</Th>
-                  <Th color={textColor}>Status</Th>
-                  <Th color={textColor}>Ações</Th>
-              </Tr>
-          </Thead>
-          <Tbody>
+      <Box bg={bgCard} shadow="sm" borderRadius="md" overflow="hidden" border="1px solid" borderColor={borderColor}>
+        <Table variant="simple" size="sm"> {/* Adicionado size="sm" para compactar */}
+            <Thead bg={bgHeader}>
+            <Tr>
+                <Th color={textColor} py={3}>Nome</Th>
+                <Th color={textColor} py={3}>Idade</Th>
+                <Th color={textColor} py={3}>CPF</Th>
+                <Th color={textColor} py={3}>E-mail</Th>
+                <Th color={textColor} py={3}>Telefone</Th>
+                <Th color={textColor} py={3}>Status</Th>
+                <Th color={textColor} py={3} textAlign="center">Ações</Th>
+            </Tr>
+            </Thead>
+            <Tbody>
             {filteredPatients.map((p) => (
-              <Tr key={p.id} opacity={p.ativo ? 1 : 0.6} _hover={{ bg: hoverTr }}>
-                <Td fontWeight="bold">{p.nome_completo}</Td>
-                <Td>{p.cpf}</Td> 
-                <Td>{p.telefone}</Td>
+                <Tr 
+                key={p.id} 
+                opacity={p.ativo ? 1 : 0.6} 
+                _hover={{ bg: hoverTr }}
+                transition="background 0.2s"
+                >
+                <Td py={2} fontWeight="bold" fontSize="xs">{p.nome_completo}</Td>
+                <Td py={2} fontSize="xs">{calculateAge(p.data_nascimento)}</Td>
+                <Td py={2} fontSize="xs">{p.cpf}</Td>
+                <Td py={2} fontSize="xs">{p.email || '-'}</Td>
+                <Td py={2} fontSize="xs">{p.telefone}</Td>
                 
-                {/* STATUS SEM CAIXA E COM CORES VIVAS */}
-                <Td>
+                <Td py={2}>
                     <Text 
-                        fontWeight="extrabold" 
-                        fontSize="sm" 
-                        letterSpacing="wide"
-                        color={p.ativo ? activeColor : inactiveColor}
+                    fontWeight="extrabold" 
+                    fontSize="2xs" 
+                    letterSpacing="wider"
+                    color={p.ativo ? activeColor : inactiveColor}
                     >
-                        {p.ativo ? 'ATIVO' : 'INATIVO'}
+                    {p.ativo ? 'ATIVO' : 'INATIVO'}
                     </Text>
                 </Td>
 
-                <Td>
-                  <Button size="sm" leftIcon={<FaFileMedical />} colorScheme="teal" mr={2} onClick={() => handleOpenRecord(p)}>Prontuário</Button>
-                  <IconButton icon={<FaEdit />} size="sm" colorScheme="yellow" mr={2} onClick={() => openModal(p)} isDisabled={!p.ativo} />
-                  
-                  {p.ativo ? (
-                      <Tooltip label="Inativar">
-                        <IconButton icon={<FaBan />} size="sm" colorScheme="red" onClick={() => handleInactivate(p.id)} />
-                      </Tooltip>
-                  ) : (
-                      <Tooltip label="Reativar">
-                        <IconButton icon={<FaCheck />} size="sm" colorScheme="green" onClick={() => handleReactivate(p.id)} />
-                      </Tooltip>
-                  )}
+                <Td py={2}>
+                    <HStack justify="center" spacing={1}>
+                    <Button 
+                        size="xs" // Reduzido para XS
+                        leftIcon={<FaFileMedical />} 
+                        colorScheme="teal" 
+                        onClick={() => handleOpenRecord(p)}
+                    >
+                        Prontuário
+                    </Button>
+                    
+                    <IconButton 
+                        icon={<FaEdit />} 
+                        size="xs" // Reduzido para XS
+                        colorScheme="yellow" 
+                        variant="ghost"
+                        onClick={() => openModal(p)} 
+                        isDisabled={!p.ativo} 
+                    />
+                    
+                    {p.ativo ? (
+                        <Tooltip label="Inativar">
+                        <IconButton 
+                            icon={<FaBan />} 
+                            size="xs" 
+                            colorScheme="red" 
+                            variant="ghost"
+                            onClick={() => handleInactivate(p.id)} 
+                        />
+                        </Tooltip>
+                    ) : (
+                        <Tooltip label="Reativar">
+                        <IconButton 
+                            icon={<FaCheck />} 
+                            size="xs" 
+                            colorScheme="green" 
+                            variant="ghost"
+                            onClick={() => handleReactivate(p.id)} 
+                        />
+                        </Tooltip>
+                    )}
+                    </HStack>
                 </Td>
-              </Tr>
+                </Tr>
             ))}
-          </Tbody>
+            </Tbody>
         </Table>
-      </Box>
+    </Box>
 
-      {/* MODAL CADASTRO */}
-      <Modal isOpen={isOpen} onClose={onClose}>
+      {/* MODAL CADASTRO / EDIÇÃO */}
+      <Modal isOpen={isOpen} onClose={onClose} size="xl">
         <ModalOverlay />
         <ModalContent bg={modalBg}>
           <ModalHeader>{isEditing ? 'Editar Paciente' : 'Novo Paciente'}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
-            <FormControl mb={4}>
-                <FormLabel>Nome Completo</FormLabel>
-                <Input 
-                    bg={inputBg} 
-                    borderColor={borderColor} 
-                    value={currentPatient.nome_completo} 
-                    onChange={(e) => setCurrentPatient({...currentPatient, nome_completo: e.target.value})} 
-                    placeholder="Digite o nome do Paciente"
-                />
-            </FormControl>
-            
-            <FormControl mb={4} isInvalid={cpfError !== ''}>
-                <FormLabel>CPF</FormLabel>
-                <Input 
-                    bg={inputBg} 
-                    borderColor={cpfError ? 'red.500' : borderColor}
-                    value={currentPatient.cpf} 
-                    onChange={(e) => {
-                        const newCpf = formatCPF(e.target.value);
-                        setCurrentPatient({...currentPatient, cpf: newCpf});
-                        if (!newCpf || isValidCPF(newCpf)) setCpfError('');
-                    }} 
-                    placeholder="000.000.000-00"
-                    maxLength={14}
-                />
-                {cpfError && <Text fontSize="sm" color="red.500" mt={1}>{cpfError}</Text>}
-            </FormControl>
+            <VStack spacing={4}>
+              <FormControl isRequired>
+                  <FormLabel>Nome Completo</FormLabel>
+                  <Input 
+                      bg={inputBg} 
+                      borderColor={borderColor} 
+                      value={currentPatient.nome_completo} 
+                      onChange={(e) => setCurrentPatient({...currentPatient, nome_completo: e.target.value})} 
+                      placeholder="Digite o nome do Paciente"
+                  />
+              </FormControl>
 
-            <FormControl mb={4}>
-                <FormLabel>Telefone</FormLabel>
-                <Input 
-                    bg={inputBg} 
-                    borderColor={borderColor} 
-                    value={currentPatient.telefone} 
-                    onChange={(e) => setCurrentPatient({...currentPatient, telefone: formatPhone(e.target.value)})} 
-                    placeholder="(00) 00000-0000"
-                    maxLength={15}
-                />
-            </FormControl>
+              <HStack w="full" spacing={4}>
+                <FormControl isRequired isInvalid={cpfError !== ''}>
+                    <FormLabel>CPF</FormLabel>
+                    <Input 
+                        bg={inputBg} 
+                        borderColor={cpfError ? 'red.500' : borderColor}
+                        value={currentPatient.cpf} 
+                        onChange={(e) => {
+                            const newCpf = formatCPF(e.target.value);
+                            setCurrentPatient({...currentPatient, cpf: newCpf});
+                            if (!newCpf || isValidCPF(newCpf)) setCpfError('');
+                        }} 
+                        placeholder="000.000.000-00"
+                        maxLength={14}
+                    />
+                    {cpfError && <Text fontSize="xs" color="red.500" mt={1}>{cpfError}</Text>}
+                </FormControl>
+
+                <FormControl>
+                    <FormLabel>Data de Nascimento</FormLabel>
+                    <Input 
+                        type="date"
+                        bg={inputBg} 
+                        borderColor={borderColor} 
+                        value={currentPatient.data_nascimento} 
+                        onChange={(e) => setCurrentPatient({...currentPatient, data_nascimento: e.target.value})} 
+                    />
+                </FormControl>
+              </HStack>
+
+              <HStack w="full" spacing={4}>
+                <FormControl>
+                    <FormLabel>E-mail</FormLabel>
+                    <Input 
+                        type="email"
+                        bg={inputBg} 
+                        borderColor={borderColor} 
+                        value={currentPatient.email} 
+                        onChange={(e) => setCurrentPatient({...currentPatient, email: e.target.value})} 
+                        placeholder="email@paciente.com"
+                    />
+                </FormControl>
+
+                <FormControl>
+                    <FormLabel>Telefone</FormLabel>
+                    <Input 
+                        bg={inputBg} 
+                        borderColor={borderColor} 
+                        value={currentPatient.telefone} 
+                        onChange={(e) => setCurrentPatient({...currentPatient, telefone: formatPhone(e.target.value)})} 
+                        placeholder="(00) 00000-0000"
+                        maxLength={15}
+                    />
+                </FormControl>
+              </HStack>
+            </VStack>
           </ModalBody>
           <ModalFooter>
             <Button colorScheme="blue" mr={3} onClick={handleSave}>Salvar</Button>
@@ -369,7 +431,7 @@ export default function Patients() {
                                 _hover={{ opacity: 0.8 }}
                             >
                                 <Text fontSize="xs" fontWeight="bold">{rec.created_at}</Text>
-                                <Text fontSize="sm" fontWeight="bold" mt={1}>Prof: {rec.doctor_nome}</Text>
+                                <Text fontSize="sm" fontWeight="bold" mt={1}>Dr(a) {rec.doctor_nome}</Text>
                             </Box>
                         ))}
                     </VStack>
@@ -394,7 +456,7 @@ export default function Patients() {
                         </Flex>
                         
                         <Box mb={6}>
-                            <Text fontWeight="bold" color={textColor} mb={2}>Anamnese / Evolução:</Text>
+                            <Text fontWeight="bold" color={textColor} mb={2}>Evolução:</Text>
                             <Box p={4} bg={anamneseBg} borderRadius="md" border="1px solid" borderColor={borderColor} minH="100px">
                                 <Text whiteSpace="pre-wrap" color={textColor}>{selectedRecord.anamnese}</Text>
                             </Box>
