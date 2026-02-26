@@ -4,7 +4,7 @@ import {
 import { 
   FaHome, FaUserInjured, FaUserMd, FaCalendarAlt, FaSignOutAlt, 
   FaChartPie, FaCode, FaBars, FaChevronLeft, FaChevronRight, 
-  FaHeartbeat, FaFileMedical, FaClock // FaClock adicionado para o menu do médico
+  FaHeartbeat, FaFileMedical, FaClock, FaBuilding // <-- FaBuilding adicionado aqui!
 } from 'react-icons/fa';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
@@ -46,8 +46,10 @@ export default function SidebarLayout() {
   }, []);
 
   const menuItems = [
-    // Menu Admin / Médico
+    // Menu Admin / Médico / SaaS
     { name: 'Painel', icon: FaHome, path: '/dashboard', roles: ['superuser', 'admin', 'doctor'] },
+    
+    { name: 'Cadastro de Clinicas', icon: FaBuilding, path: '/clinicas', roles: ['superuser'] },
     { name: 'Pacientes', icon: FaUserInjured, path: '/patients', roles: ['superuser', 'admin', 'doctor'] },
     { name: 'Configurações', icon: FaClock, path: '/minha-agenda', roles: ['doctor'] },
     { name: 'Profissionais', icon: FaUserMd, path: '/doctors', roles: ['superuser', 'admin'] },
@@ -55,6 +57,7 @@ export default function SidebarLayout() {
     { name: 'Agenda', icon: FaCalendarAlt, path: '/agenda', roles: ['superuser', 'admin', 'doctor'] }, 
     { name: 'Financeiro', icon: FaChartPie, path: '/financial', roles: ['superuser', 'admin'] },
     { name: 'Área Dev', icon: FaCode, path: '/dev-tools', roles: ['superuser'] },
+    
     // Menu Exclusivo Paciente
     { name: 'Minha Saúde', icon: FaHeartbeat, path: '/minha-saude', roles: ['patient', 'paciente'] },
     { name: 'Meus Exames', icon: FaFileMedical, path: '/meus-exames', roles: ['patient', 'paciente'] },
