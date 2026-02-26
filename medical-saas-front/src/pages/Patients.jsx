@@ -6,7 +6,8 @@ import {
   HStack, Icon, Badge, FormControl, FormLabel, Input, ModalFooter, Tooltip,
   useColorModeValue
 } from '@chakra-ui/react';
-import { FaPlus, FaFileMedical, FaHistory, FaPrescriptionBottleAlt, FaEdit, FaBan, FaCheck } from 'react-icons/fa';
+// Ícone FaPrint adicionado na linha abaixo:
+import { FaPlus, FaFileMedical, FaHistory, FaPrescriptionBottleAlt, FaEdit, FaBan, FaCheck, FaPrint } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 
 // 1. IMPORTANDO A INSTÂNCIA CONFIGURADA
@@ -199,6 +200,59 @@ export default function Patients() {
     } catch (error) { console.error("Erro prontuário"); }
   };
 
+  // --- NOVA FUNÇÃO DE IMPRESSÃO DA EVOLUÇÃO ---
+  const handlePrintEvolution = (record) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({ title: "Pop-up bloqueado", description: "Permita os pop-ups para imprimir.", status: "warning" });
+      return;
+    }
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+          <title>Evolução - ${currentPatient.nome_completo}</title>
+          <style>
+              body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #333; line-height: 1.6; }
+              .header { text-align: center; border-bottom: 2px solid #3182CE; padding-bottom: 20px; margin-bottom: 30px; }
+              .header h1 { margin: 0; color: #3182CE; font-size: 24px; text-transform: uppercase; }
+              .info-box { background: #F7FAFC; border: 1px solid #E2E8F0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; }
+              .content { white-space: pre-wrap; font-size: 14px; border: 1px solid #E2E8F0; padding: 20px; border-radius: 8px; min-height: 200px; }
+              .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #A0AEC0; border-top: 1px solid #E2E8F0; padding-top: 20px; }
+              .signature { margin-top: 80px; text-align: center; width: 300px; float: right; border-top: 1px solid #333; padding-top: 5px; }
+          </style>
+      </head>
+      <body>
+          <div class="header">
+              <h1>Evolução Clínica</h1>
+          </div>
+          
+          <div class="info-box">
+              <strong>Paciente:</strong> ${currentPatient.nome_completo}<br>
+              <strong>Data do Atendimento:</strong> ${record.created_at}<br>
+              <strong>Profissional:</strong> Dr(a) ${record.doctor_nome}
+          </div>
+
+          <h3 style="color: #2D3748; margin-bottom: 10px;">Descrição da Evolução</h3>
+          <div class="content">${record.anamnese || "Nenhuma evolução registrada."}</div>
+
+          <div class="signature">
+              <strong>Dr(a) ${record.doctor_nome}</strong><br>
+              Assinatura do Profissional
+          </div>
+
+          <div style="clear: both;"></div>
+          <div class="footer">Documento gerado eletronicamente.</div>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    setTimeout(() => { printWindow.print(); }, 250);
+  };
+
   const handleDownloadPDF = async (recordId) => {
     try {
         const response = await api.get(`/medical-records/${recordId}/pdf`, {
@@ -270,7 +324,7 @@ export default function Patients() {
                 <Td py={2}>
                     <HStack justify="center" spacing={1}>
                     <Button 
-                        size="xs" // Reduzido para XS
+                        size="xs" 
                         leftIcon={<FaFileMedical />} 
                         colorScheme="teal" 
                         onClick={() => handleOpenRecord(p)}
@@ -280,7 +334,7 @@ export default function Patients() {
                     
                     <IconButton 
                         icon={<FaEdit />} 
-                        size="xs" // Reduzido para XS
+                        size="xs" 
                         colorScheme="yellow" 
                         variant="ghost"
                         onClick={() => openModal(p)} 
@@ -314,7 +368,7 @@ export default function Patients() {
             ))}
             </Tbody>
         </Table>
-    </Box>
+      </Box>
 
       {/* MODAL CADASTRO / EDIÇÃO */}
       <Modal isOpen={isOpen} onClose={onClose} size="xl">
@@ -445,14 +499,27 @@ export default function Patients() {
                         <Flex justify="space-between" align="center" mb={6}>
                             <Badge colorScheme="teal" fontSize="0.9em" p={1}>REALIZADO EM {selectedRecord.created_at}</Badge>
                             
-                            <Button 
-                                size="sm" 
-                                leftIcon={<FaPrescriptionBottleAlt />} 
-                                variant="outline" 
-                                onClick={() => handleDownloadPDF(selectedRecord.id)}
-                            >
-                                Ver Receita
-                            </Button>
+                            <HStack spacing={3}>
+                                {/* NOVO BOTÃO DE IMPRESSÃO DA EVOLUÇÃO */}
+                                <Button 
+                                    size="sm" 
+                                    leftIcon={<FaPrint />} 
+                                    colorScheme="blue" 
+                                    variant="solid" 
+                                    onClick={() => handlePrintEvolution(selectedRecord)}
+                                >
+                                    Imprimir Evolução
+                                </Button>
+
+                                <Button 
+                                    size="sm" 
+                                    leftIcon={<FaPrescriptionBottleAlt />} 
+                                    variant="outline" 
+                                    onClick={() => handleDownloadPDF(selectedRecord.id)}
+                                >
+                                    Ver Receita
+                                </Button>
+                            </HStack>
                         </Flex>
                         
                         <Box mb={6}>
