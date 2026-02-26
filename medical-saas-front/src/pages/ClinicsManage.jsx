@@ -3,9 +3,9 @@ import {
   Box, Button, Flex, Heading, Table, Thead, Tbody, Tr, Th, Td,
   IconButton, useDisclosure, Modal, ModalOverlay, ModalContent,
   ModalHeader, ModalBody, ModalCloseButton, useToast, VStack, Text, 
-  HStack, FormControl, FormLabel, Input, ModalFooter, Divider, useColorModeValue, Select
+  HStack, FormControl, FormLabel, Input, ModalFooter, Divider, useColorModeValue, Select, Tooltip
 } from '@chakra-ui/react';
-import { FaPlus, FaBuilding, FaUserTie, FaEdit } from 'react-icons/fa';
+import { FaPlus, FaBuilding, FaUserTie, FaEdit, FaBan, FaCheck } from 'react-icons/fa';
 import api from '../services/api';
 
 export default function ClinicsManage() {
@@ -57,7 +57,7 @@ export default function ClinicsManage() {
 
   useEffect(() => { fetchClinics(); }, []);
 
-  // --- NOVA FUNÇÃO: ABRE O MODAL PARA CRIAR OU EDITAR ---
+  // --- ABRIR MODAL PARA CRIAR OU EDITAR ---
   const handleOpenModal = (clinic = null) => {
       if (clinic) {
           setIsEditing(true);
@@ -82,6 +82,22 @@ export default function ClinicsManage() {
       onOpen();
   };
 
+  // --- ATIVAR / INATIVAR CLÍNICA ---
+  const handleToggleStatus = async (clinic) => {
+      const actionText = clinic.is_active ? 'inativar' : 'reativar';
+      if (confirm(`Deseja realmente ${actionText} a clínica ${clinic.nome}?`)) {
+          try {
+              // Reutilizamos a rota de edição enviando apenas o status reverso
+              await api.put(`/clinics/${clinic.id}`, { is_active: !clinic.is_active });
+              toast({ title: `Clínica ${clinic.is_active ? 'inativada' : 'reativada'}!`, status: 'success' });
+              fetchClinics();
+          } catch (error) {
+              toast({ title: `Erro ao ${actionText} clínica.`, status: 'error' });
+          }
+      }
+  };
+
+  // --- SALVAR CRIAÇÃO OU EDIÇÃO ---
   const handleSave = async () => {
     try {
         if (isEditing) {
@@ -126,7 +142,6 @@ export default function ClinicsManage() {
     <Box p={8}>
       <Flex justify="space-between" align="center" mb={6}>
         <Heading size="lg" color={useColorModeValue("gray.700", "white")}>Gerenciar Clínicas</Heading>
-        {/* Atualizado para chamar handleOpenModal */}
         <Button leftIcon={<FaPlus />} colorScheme="blue" onClick={() => handleOpenModal()}>Nova Clínica</Button>
       </Flex>
 
@@ -144,7 +159,7 @@ export default function ClinicsManage() {
             </Thead>
             <Tbody>
             {clinics.map((c) => (
-                <Tr key={c.id} _hover={{ bg: hoverTr }}>
+                <Tr key={c.id} opacity={c.is_active ? 1 : 0.6} _hover={{ bg: hoverTr }} transition="background 0.2s">
                     <Td py={3} fontWeight="bold" fontSize="xs">#{c.id}</Td>
                     <Td py={3} fontWeight="bold" fontSize="xs" color="blue.500">{c.nome}</Td>
                     <Td py={3} fontSize="xs">{c.cnpj || '-'}</Td>
@@ -159,13 +174,39 @@ export default function ClinicsManage() {
                         </Text>
                     </Td>
                     <Td py={3} textAlign="center">
-                        <IconButton 
-                            icon={<FaEdit />} 
-                            size="sm" 
-                            colorScheme="yellow" 
-                            variant="ghost"
-                            onClick={() => handleOpenModal(c)} 
-                        />
+                        <HStack justify="center" spacing={2}>
+                            <Tooltip label="Editar">
+                                <IconButton 
+                                    icon={<FaEdit />} 
+                                    size="sm" 
+                                    colorScheme="yellow" 
+                                    variant="ghost"
+                                    onClick={() => handleOpenModal(c)} 
+                                />
+                            </Tooltip>
+                            
+                            {c.is_active ? (
+                                <Tooltip label="Inativar Clínica">
+                                    <IconButton 
+                                        icon={<FaBan />} 
+                                        size="sm" 
+                                        colorScheme="red" 
+                                        variant="ghost"
+                                        onClick={() => handleToggleStatus(c)} 
+                                    />
+                                </Tooltip>
+                            ) : (
+                                <Tooltip label="Reativar Clínica">
+                                    <IconButton 
+                                        icon={<FaCheck />} 
+                                        size="sm" 
+                                        colorScheme="green" 
+                                        variant="ghost"
+                                        onClick={() => handleToggleStatus(c)} 
+                                    />
+                                </Tooltip>
+                            )}
+                        </HStack>
                     </Td>
                 </Tr>
             ))}
