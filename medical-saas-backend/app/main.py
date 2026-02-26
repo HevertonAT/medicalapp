@@ -4,7 +4,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.base import engine
 from app.db.base import Base
-
 # --- IMPORTAÇÃO DOS MODELOS ---
 from app.models.arquivos_pacientes import PatientFile
 from app.models.documentos import Document
@@ -49,7 +48,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-Base.metadata.create_all(bind=engine)
+#Base.metadata.create_all(bind=engine)
 
 # --- CORREÇÃO DA CONFIGURAÇÃO DO CORS ---
 # As vírgulas que faltavam foram adicionadas e a URL exata do seu Front-end Vercel foi incluída
@@ -88,13 +87,8 @@ app.include_router(financeiro.router, prefix="/financial", tags=["Financeiro"])
 app.include_router(arquivos.router, prefix="/files", tags=["Arquivos"]) 
 app.include_router(relatorios.router, prefix="/reports", tags=["Relatórios"])  
 app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
-
-# CORREÇÃO: O prefixo aqui estava "/settings/specialties", o que quebrava a comunicação com o front! Ajustado para "/specialties"
 app.include_router(regras_especialidades.router, prefix="/specialties", tags=["Configuração Especialidades"])
-
 app.include_router(macros.router, prefix="/macros", tags=["Macros"])
-
-# A rota do CID está perfeitamente registrada aqui!
 app.include_router(cids.router, prefix="/cids", tags=["CIDs"])
 
 @app.get("/")

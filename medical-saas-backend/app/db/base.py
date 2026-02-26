@@ -3,22 +3,25 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 import os
 from dotenv import load_dotenv
 
-# Carrega as variáveis do arquivo .env
 load_dotenv()
 
-# Pega a string de conexão do .env
-# Se não achar, tenta um default (ajuste se necessário)
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
 
 if not SQLALCHEMY_DATABASE_URL:
     raise ValueError("A variável DATABASE_URL não foi encontrada no arquivo .env")
-# 1. Cria a Engine (O motor de conexão com o Banco)
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
-# 2. Cria a SessionLocal (Fábrica de sessões para usar no código)
+
+# --- AJUSTE MÁGICO PARA VERCEL + RENDER ---
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    pool_pre_ping=True, # Testa se a conexão está viva antes de usar (Evita quedas da Render)
+    pool_size=5,        # Limita o número de conexões para a Vercel não sobrecarregar o banco
+    max_overflow=10,
+    connect_args={"connect_timeout": 10} # Se demorar mais de 10s para conectar, ele avisa em vez de travar
+)
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-# 3. Cria a Base (Classe pai de todos os models)
 Base = declarative_base()
-# Função auxiliar para pegar o DB (Dependency Injection)
+
 def get_db():
     db = SessionLocal()
     try:
