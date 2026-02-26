@@ -60,7 +60,8 @@ export default function Doctors() {
     setLoading(true);
     try {
       const response = await api.get('/doctors/');
-      setDoctors(response.data);
+      // BLINDAGEM: Garante que só vai setar se for uma Array
+      setDoctors(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       toast({ title: 'Erro ao carregar profissionais.', status: 'error' });
     } finally {
@@ -71,8 +72,11 @@ export default function Doctors() {
   const fetchRules = async () => {
     try {
       const response = await api.get('/specialties/rules/');
-      setRules(response.data || []);
-    } catch (e) { console.log('Regras não carregadas'); }
+      // BLINDAGEM: Garante que só vai setar se for uma Array
+      setRules(Array.isArray(response.data) ? response.data : []);
+    } catch (e) { 
+      console.log('Regras não carregadas'); 
+    }
   };
 
   useEffect(() => { 
@@ -87,7 +91,6 @@ export default function Doctors() {
         nome: currentDoctor.nome,
         especialidade: currentDoctor.especialidade,
         crm: currentDoctor.crm,
-        // Envia a configuração da agenda no payload
         agenda_config: agendaConfig 
       };
 
@@ -122,7 +125,6 @@ export default function Doctors() {
     fetchRules();
     if (doctor) {
       setCurrentDoctor({ ...doctor, email: '', senha: '' });
-      // Se o médico já tiver agenda salva, carrega ela; senão, usa a padrão
       setAgendaConfig(doctor.agenda_config || initialAgendaConfig);
       setIsEditing(true);
     } else {
@@ -133,7 +135,9 @@ export default function Doctors() {
     onOpen();
   };
 
-  const filteredDoctors = doctors.filter(doc => {
+  // BLINDAGEM: Garante que filteredDoctors seja calculado sobre uma Array válida
+  const safeDoctors = Array.isArray(doctors) ? doctors : [];
+  const filteredDoctors = safeDoctors.filter(doc => {
     if (filter === 'ativos') return doc.ativo === true;
     if (filter === 'inativos') return doc.ativo === false;
     return true;
@@ -157,7 +161,8 @@ export default function Doctors() {
     } catch (error) { toast({ title: 'Erro ao reativar.', status: 'error' }); }
   };
 
-  const linkedRule = (rules || []).find(r => r.specialty === currentDoctor.especialidade);
+  // BLINDAGEM MÁXIMA: Só executa o .find se rules for definitivamente um Array
+  const linkedRule = Array.isArray(rules) ? rules.find(r => r.specialty === currentDoctor.especialidade) : null;
 
   return (
     <Box p={8}>
@@ -209,13 +214,15 @@ export default function Doctors() {
                   </Td>
                 </Tr>
               ))}
+              {filteredDoctors.length === 0 && (
+                 <Tr><Td colSpan={5} textAlign="center" py={4}>Nenhum profissional encontrado.</Td></Tr>
+              )}
             </Tbody>
           </Table>
         </Box>
       )}
 
       {/* --- MODAL DE CADASTRO/EDIÇÃO --- */}
-      {/* Aumentamos o tamanho para "xl" para acomodar a agenda confortavelmente */}
       <Modal isOpen={isOpen} onClose={onClose} size="xl" scrollBehavior="inside">
         <ModalOverlay />
         <ModalContent bg={modalBg}>
