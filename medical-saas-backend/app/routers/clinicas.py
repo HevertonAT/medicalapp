@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from typing import List # <--- IMPORTANTE: Adicionado para listar
 import bcrypt 
 
 from app.db.base import get_db
@@ -16,7 +17,7 @@ def get_password_hash(password: str) -> str:
     hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
     return hashed_password.decode('utf-8')
 
-# --- ROTA: CRIAR CLÍNICA + CRIAR ADMIN AUTOMATICAMENTE ---
+# --- ROTA 1: CRIAR CLÍNICA + CRIAR ADMIN AUTOMATICAMENTE ---
 @router.post("/", response_model=RespostaClinica, status_code=status.HTTP_201_CREATED)
 def create_clinic(
     clinicas_data: CriarClinica, 
@@ -69,3 +70,15 @@ def create_clinic(
     db.refresh(nova_clinica) 
 
     return nova_clinica
+
+# --- ROTA 2: LISTAR CLÍNICAS (Apenas Superuser) ---
+@router.get("/", response_model=List[RespostaClinica])
+def list_clinics(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Apenas o superusuário pode ver a lista de todos os seus clientes
+    if current_user.role != 'superuser':
+        raise HTTPException(status_code=403, detail="Acesso negado.")
+        
+    return db.query(Clinic).all()

@@ -11,6 +11,7 @@ import DevTools from './pages/DevTools';
 import PatientArea from './pages/PatientArea';
 import MeusExames from './pages/MeusExames';
 import ProfessionalProfile from './pages/ProfessionalProfile';
+import ClinicsManage from './pages/ClinicsManage';
 
 export default function App() {
   return (
@@ -26,7 +27,8 @@ export default function App() {
         <Route path="/agenda" element={<Agenda />} />
         <Route path="/financial" element={<Financial />} />
         <Route path="/dev-tools" element={<DevTools />} />
-        
+        <Route path="/clinicas" element={<ClinicsManage/>} />
+
         {/* Rota do Paciente */}
         <Route path="/minha-saude" element={<PatientArea />} />
         <Route path="/meus-exames" element={<MeusExames />} />
