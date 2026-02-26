@@ -44,7 +44,7 @@ export default function ClinicsManage() {
 
   const fetchClinics = async () => {
     try {
-      const response = await api.get('/clinicas/');
+      const response = await api.get('/clinics/');
       setClinics(response.data);
     } catch (error) { 
         console.error("Erro ao buscar clínicas", error); 
@@ -60,7 +60,7 @@ export default function ClinicsManage() {
     }
     
     try {
-        await api.post('/clinicas/', formData);
+        await api.post('/clinics/', formData);
         
         toast({ title: 'Clínica e Admin criados com sucesso!', status: 'success' });
         onClose();
@@ -83,7 +83,7 @@ export default function ClinicsManage() {
   return (
     <Box p={8}>
       <Flex justify="space-between" align="center" mb={6}>
-        <Heading size="lg" color={useColorModeValue("gray.700", "white")}>Gerenciar Clínicas (SaaS)</Heading>
+        <Heading size="lg" color={useColorModeValue("gray.700", "white")}>Gerenciar Clínicas</Heading>
         <Button leftIcon={<FaPlus />} colorScheme="blue" onClick={onOpen}>Nova Clínica</Button>
       </Flex>
 
@@ -123,7 +123,7 @@ export default function ClinicsManage() {
       <Modal isOpen={isOpen} onClose={onClose} size="2xl">
         <ModalOverlay />
         <ModalContent bg={modalBg}>
-          <ModalHeader>Cadastrar Novo Cliente (Clínica)</ModalHeader>
+          <ModalHeader>Cadastrar Novo Cliente</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <VStack spacing={6} align="stretch">
