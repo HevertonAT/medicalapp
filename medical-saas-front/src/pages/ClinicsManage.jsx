@@ -3,18 +3,22 @@ import {
   Box, Button, Flex, Heading, Table, Thead, Tbody, Tr, Th, Td,
   IconButton, useDisclosure, Modal, ModalOverlay, ModalContent,
   ModalHeader, ModalBody, ModalCloseButton, useToast, VStack, Text, 
-  HStack, FormControl, FormLabel, Input, ModalFooter, Divider, useColorModeValue
+  HStack, FormControl, FormLabel, Input, ModalFooter, Divider, useColorModeValue, Select
 } from '@chakra-ui/react';
-import { FaPlus, FaBuilding, FaUserTie } from 'react-icons/fa';
+import { FaPlus, FaBuilding, FaUserTie, FaEdit } from 'react-icons/fa';
 import api from '../services/api';
 
 export default function ClinicsManage() {
   const [clinics, setClinics] = useState([]);
   const { isOpen, onOpen, onClose } = useDisclosure(); 
   
-  // O Estado ÚNICO que guarda os dados da Clínica e do Admin
+  // Controle Inteligente de Edição
+  const [isEditing, setIsEditing] = useState(false);
+  const [editId, setEditId] = useState(null);
+
+  // O Estado ÚNICO atualizado com o plano_id
   const [formData, setFormData] = useState({
-      nome: '', cnpj: '', email_clinica: '', telefone: '', endereco: '',
+      nome: '', cnpj: '', email_clinica: '', telefone: '', endereco: '', plano_id: '',
       nome_admin: '', email_admin: '', senha_admin: ''
   });
 
@@ -53,28 +57,66 @@ export default function ClinicsManage() {
 
   useEffect(() => { fetchClinics(); }, []);
 
+  // --- NOVA FUNÇÃO: ABRE O MODAL PARA CRIAR OU EDITAR ---
+  const handleOpenModal = (clinic = null) => {
+      if (clinic) {
+          setIsEditing(true);
+          setEditId(clinic.id);
+          setFormData({
+              nome: clinic.nome || '', 
+              cnpj: clinic.cnpj || '', 
+              email_clinica: clinic.email || '', 
+              telefone: clinic.telefone || '', 
+              endereco: clinic.endereco || '', 
+              plano_id: clinic.plano_id || '',
+              nome_admin: '', email_admin: '', senha_admin: '' // Limpa campos de admin
+          });
+      } else {
+          setIsEditing(false);
+          setEditId(null);
+          setFormData({
+              nome: '', cnpj: '', email_clinica: '', telefone: '', endereco: '', plano_id: '',
+              nome_admin: '', email_admin: '', senha_admin: ''
+          });
+      }
+      onOpen();
+  };
+
   const handleSave = async () => {
-    if (!formData.nome || !formData.nome_admin || !formData.email_admin || !formData.senha_admin) {
-        toast({ title: 'Preencha os campos obrigatórios!', status: 'warning' });
-        return;
-    }
-    
     try {
-        await api.post('/clinics/', formData);
+        if (isEditing) {
+            // FLUXO DE EDIÇÃO (PUT)
+            const updatePayload = {
+                nome: formData.nome, 
+                cnpj: formData.cnpj, 
+                email_clinica: formData.email_clinica, 
+                telefone: formData.telefone, 
+                endereco: formData.endereco, 
+                plano_id: formData.plano_id || null
+            };
+            
+            await api.put(`/clinics/${editId}`, updatePayload);
+            toast({ title: 'Clínica atualizada com sucesso!', status: 'success' });
+            
+        } else {
+            // FLUXO DE CRIAÇÃO (POST)
+            if (!formData.nome || !formData.nome_admin || !formData.email_admin || !formData.senha_admin) {
+                toast({ title: 'Preencha os campos obrigatórios!', status: 'warning' });
+                return;
+            }
+            
+            const payload = { ...formData, plano_id: formData.plano_id || null };
+            await api.post('/clinics/', payload);
+            toast({ title: 'Clínica e Admin criados com sucesso!', status: 'success' });
+        }
         
-        toast({ title: 'Clínica e Admin criados com sucesso!', status: 'success' });
         onClose();
         fetchClinics();
         
-        // Limpa o formulário
-        setFormData({
-            nome: '', cnpj: '', email_clinica: '', telefone: '', endereco: '',
-            nome_admin: '', email_admin: '', senha_admin: ''
-        });
     } catch (error) {
         toast({ 
-            title: 'Erro ao cadastrar.', 
-            description: error.response?.data?.detail || 'Verifique se o CNPJ ou E-mail já existem.', 
+            title: isEditing ? 'Erro ao atualizar.' : 'Erro ao cadastrar.', 
+            description: error.response?.data?.detail || 'Verifique se os dados estão corretos.', 
             status: 'error' 
         });
     }
@@ -84,7 +126,8 @@ export default function ClinicsManage() {
     <Box p={8}>
       <Flex justify="space-between" align="center" mb={6}>
         <Heading size="lg" color={useColorModeValue("gray.700", "white")}>Gerenciar Clínicas</Heading>
-        <Button leftIcon={<FaPlus />} colorScheme="blue" onClick={onOpen}>Nova Clínica</Button>
+        {/* Atualizado para chamar handleOpenModal */}
+        <Button leftIcon={<FaPlus />} colorScheme="blue" onClick={() => handleOpenModal()}>Nova Clínica</Button>
       </Flex>
 
       <Box bg={bgCard} shadow="sm" borderRadius="md" overflow="hidden" border="1px solid" borderColor={borderColor}>
@@ -94,8 +137,9 @@ export default function ClinicsManage() {
                 <Th color={textColor} py={3}>ID</Th>
                 <Th color={textColor} py={3}>Nome da Clínica</Th>
                 <Th color={textColor} py={3}>CNPJ</Th>
-                <Th color={textColor} py={3}>E-mail</Th>
+                <Th color={textColor} py={3}>Plano</Th>
                 <Th color={textColor} py={3}>Status</Th>
+                <Th color={textColor} py={3} textAlign="center">Ações</Th>
             </Tr>
             </Thead>
             <Tbody>
@@ -104,26 +148,39 @@ export default function ClinicsManage() {
                     <Td py={3} fontWeight="bold" fontSize="xs">#{c.id}</Td>
                     <Td py={3} fontWeight="bold" fontSize="xs" color="blue.500">{c.nome}</Td>
                     <Td py={3} fontSize="xs">{c.cnpj || '-'}</Td>
-                    <Td py={3} fontSize="xs">{c.email || '-'}</Td>
+                    <Td py={3} fontSize="xs">
+                        <Text px={2} py={1} bg="purple.50" color="purple.700" borderRadius="md" display="inline-block" fontWeight="bold">
+                            {c.plano_id ? `Plano ${c.plano_id}` : 'Nenhum'}
+                        </Text>
+                    </Td>
                     <Td py={3}>
                         <Text fontWeight="extrabold" fontSize="2xs" letterSpacing="wider" color={c.is_active ? activeColor : inactiveColor}>
                             {c.is_active ? 'ATIVA' : 'INATIVA'}
                         </Text>
                     </Td>
+                    <Td py={3} textAlign="center">
+                        <IconButton 
+                            icon={<FaEdit />} 
+                            size="sm" 
+                            colorScheme="yellow" 
+                            variant="ghost"
+                            onClick={() => handleOpenModal(c)} 
+                        />
+                    </Td>
                 </Tr>
             ))}
             {clinics.length === 0 && (
-                <Tr><Td colSpan={5} textAlign="center" py={4}>Nenhuma clínica cadastrada.</Td></Tr>
+                <Tr><Td colSpan={6} textAlign="center" py={4}>Nenhuma clínica cadastrada.</Td></Tr>
             )}
             </Tbody>
         </Table>
       </Box>
 
-      {/* MODAL MÁGICO DE CADASTRO DUPLO */}
+      {/* MODAL MÁGICO DE CADASTRO DUPLO / EDIÇÃO */}
       <Modal isOpen={isOpen} onClose={onClose} size="2xl">
         <ModalOverlay />
         <ModalContent bg={modalBg}>
-          <ModalHeader>Cadastrar Novo Cliente</ModalHeader>
+          <ModalHeader>{isEditing ? 'Editar Clínica' : 'Cadastrar Novo Cliente'}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <VStack spacing={6} align="stretch">
@@ -154,41 +211,55 @@ export default function ClinicsManage() {
                             <Input bg={inputBg} borderColor={borderColor} value={formData.telefone} onChange={(e) => setFormData({...formData, telefone: e.target.value})} placeholder="(00) 0000-0000" />
                         </FormControl>
                       </HStack>
-                  </VStack>
-              </Box>
 
-              <Divider borderColor={borderColor} />
-
-              {/* SESSÃO 2: ADMIN */}
-              <Box>
-                  <Flex align="center" mb={3} color="teal.500">
-                      <FaUserTie /> <Text ml={2} fontWeight="bold">2. Acesso do Proprietário (Admin)</Text>
-                  </Flex>
-                  <Text fontSize="xs" color="gray.500" mb={3}>
-                      Este será o login principal entregue ao seu cliente. Ele poderá criar outros usuários depois.
-                  </Text>
-                  <VStack spacing={3}>
-                      <FormControl isRequired>
-                          <FormLabel fontSize="sm">Nome do Proprietário</FormLabel>
-                          <Input bg={inputBg} borderColor={borderColor} value={formData.nome_admin} onChange={(e) => setFormData({...formData, nome_admin: e.target.value})} placeholder="Ex: Dr. Carlos Silva" />
+                      {/* NOVO CAMPO: SELETOR DE PLANOS */}
+                      <FormControl>
+                          <FormLabel fontSize="sm">Plano de Assinatura</FormLabel>
+                          <Select bg={inputBg} borderColor={borderColor} value={formData.plano_id} onChange={(e) => setFormData({...formData, plano_id: parseInt(e.target.value) || ''})}>
+                              <option value="">Selecione um Plano</option>
+                              <option value="1">Plano Básico (ID: 1)</option>
+                              <option value="2">Plano Profissional (ID: 2)</option>
+                              <option value="3">Plano Premium (ID: 3)</option>
+                          </Select>
                       </FormControl>
-                      <HStack w="full" spacing={4}>
-                        <FormControl isRequired>
-                            <FormLabel fontSize="sm">E-mail de Login</FormLabel>
-                            <Input type="email" bg={inputBg} borderColor={borderColor} value={formData.email_admin} onChange={(e) => setFormData({...formData, email_admin: e.target.value})} placeholder="carlos@clinica.com" />
-                        </FormControl>
-                        <FormControl isRequired>
-                            <FormLabel fontSize="sm">Senha Inicial</FormLabel>
-                            <Input bg={inputBg} borderColor={borderColor} value={formData.senha_admin} onChange={(e) => setFormData({...formData, senha_admin: e.target.value})} placeholder="Senha forte" />
-                        </FormControl>
-                      </HStack>
                   </VStack>
               </Box>
+
+              {/* SESSÃO 2: ADMIN (SÓ APARECE SE FOR CRIAÇÃO) */}
+              {!isEditing && (
+                <>
+                  <Divider borderColor={borderColor} />
+                  <Box>
+                      <Flex align="center" mb={3} color="teal.500">
+                          <FaUserTie /> <Text ml={2} fontWeight="bold">2. Acesso do Proprietário (Admin)</Text>
+                      </Flex>
+                      <Text fontSize="xs" color="gray.500" mb={3}>
+                          Este será o login principal entregue ao seu cliente. Ele poderá criar outros usuários depois.
+                      </Text>
+                      <VStack spacing={3}>
+                          <FormControl isRequired>
+                              <FormLabel fontSize="sm">Nome do Proprietário</FormLabel>
+                              <Input bg={inputBg} borderColor={borderColor} value={formData.nome_admin} onChange={(e) => setFormData({...formData, nome_admin: e.target.value})} placeholder="Ex: Dr. Carlos Silva" />
+                          </FormControl>
+                          <HStack w="full" spacing={4}>
+                            <FormControl isRequired>
+                                <FormLabel fontSize="sm">E-mail de Login</FormLabel>
+                                <Input type="email" bg={inputBg} borderColor={borderColor} value={formData.email_admin} onChange={(e) => setFormData({...formData, email_admin: e.target.value})} placeholder="carlos@clinica.com" />
+                            </FormControl>
+                            <FormControl isRequired>
+                                <FormLabel fontSize="sm">Senha Inicial</FormLabel>
+                                <Input bg={inputBg} borderColor={borderColor} value={formData.senha_admin} onChange={(e) => setFormData({...formData, senha_admin: e.target.value})} placeholder="Senha forte" />
+                            </FormControl>
+                          </HStack>
+                      </VStack>
+                  </Box>
+                </>
+              )}
 
             </VStack>
           </ModalBody>
           <ModalFooter>
-            <Button colorScheme="blue" mr={3} onClick={handleSave}>Finalizar Cadastro</Button>
+            <Button colorScheme="blue" mr={3} onClick={handleSave}>{isEditing ? 'Salvar Alterações' : 'Finalizar Cadastro'}</Button>
             <Button onClick={onClose} variant="ghost">Cancelar</Button>
           </ModalFooter>
         </ModalContent>

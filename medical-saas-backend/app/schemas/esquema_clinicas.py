@@ -15,6 +15,15 @@ class CriarClinica(BaseModel):
     email_admin: str
     senha_admin: str
 
+class AtualizarClinica(BaseModel):
+    nome: Optional[str] = None
+    cnpj: Optional[str] = None
+    email_clinica: Optional[str] = None
+    endereco: Optional[str] = None
+    telefone: Optional[str] = None
+    plano: Optional[str] = None
+    is_active: Optional[bool] = None
+
 # Como o sistema responde após a criação com sucesso:
 class RespostaClinica(BaseModel):
     id: int
@@ -25,3 +34,4 @@ class RespostaClinica(BaseModel):
 
     class Config:
         from_attributes = True # Permite ler direto do objeto do banco (ORM)
+

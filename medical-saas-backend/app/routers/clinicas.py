@@ -7,7 +7,7 @@ from app.db.base import get_db
 from app.core.deps import get_current_user
 from app.models.clinicas import Clinic
 from app.models.usuarios import User
-from app.schemas.esquema_clinicas import CriarClinica, RespostaClinica
+from app.schemas.esquema_clinicas import CriarClinica, RespostaClinica, AtualizarClinica
 
 router = APIRouter()
 
@@ -82,3 +82,34 @@ def list_clinics(
         raise HTTPException(status_code=403, detail="Acesso negado.")
         
     return db.query(Clinic).all()
+
+@router.put("/{clinic_id}", response_model=RespostaClinica)
+def update_clinic(
+    clinic_id: int,
+    clinic_data: AtualizarClinica, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.role != 'superuser':
+        raise HTTPException(status_code=403, detail="Acesso negado.")
+
+    clinica = db.query(Clinic).filter(Clinic.id == clinic_id).first()
+    if not clinica:
+        raise HTTPException(status_code=404, detail="Clínica não encontrada.")
+
+    # Atualiza apenas os campos que foram enviados no formulário
+    update_data = clinic_data.dict(exclude_unset=True)
+    
+    # Se o front enviar email_clinica, salvamos na coluna email do banco
+    if 'email_clinica' in update_data:
+        update_data['email'] = update_data.pop('email_clinica')
+
+    for key, value in update_data.items():
+        # Verifica se a coluna existe no banco antes de salvar
+        if hasattr(clinica, key):
+            setattr(clinica, key, value)
+
+    db.commit()
+    db.refresh(clinica) 
+
+    return clinica
