@@ -14,8 +14,8 @@ import {
 } from 'react-icons/fa';
 import React from 'react'; 
 import { useNavigate } from 'react-router-dom';
+import { jwtDecode } from "jwt-decode"; // <-- IMPORTANTE: Adicionado para ler o token
 
-// IMPORTS CORRIGIDOS PARA A PASTA src/pages/
 import api from '../services/api';
 import SpecialtyFormRenderer from '../components/SpecialtyFormRenderer';
 import CidAutocomplete from '../components/profissionais/CidAutocomplete';
@@ -29,12 +29,16 @@ export default function Agenda() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
 
+  // --- NOVOS ESTADOS PARA CONTROLE DE AGENDA E PERMISSÕES ---
+  const [currentUserRole, setCurrentUserRole] = useState('');
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [rescheduleSlots, setRescheduleSlots] = useState([]);
+
   const { isOpen, onOpen, onClose } = useDisclosure(); 
   const { isOpen: isConsultOpen, onOpen: onConsultOpen, onClose: onConsultClose } = useDisclosure(); 
   const { isOpen: isCancelOpen, onOpen: onCancelOpen, onClose: onCancelClose } = useDisclosure();
   const { isOpen: isRescheduleOpen, onOpen: onRescheduleOpen, onClose: onRescheduleClose } = useDisclosure();
   
-  // Controle do Modal de Impressão
   const { isOpen: isPrintModalOpen, onOpen: onPrintModalOpen, onClose: onPrintModalClose } = useDisclosure();
 
   const toast = useToast();
@@ -93,7 +97,49 @@ export default function Agenda() {
     }
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  // --- EFEITO 1: DESCOBRE SE QUEM ESTÁ LOGADO É MÉDICO ---
+  useEffect(() => {
+    const token = localStorage.getItem('medical_token');
+    if (token) {
+        try {
+            const decoded = jwtDecode(token);
+            const role = decoded.role || localStorage.getItem('user_role');
+            setCurrentUserRole(role);
+            
+            // Se for médico, busca o ID dele e já preenche o formulário
+            if (role === 'doctor' || role === 'medico') {
+                api.get('/doctors/me').then(res => {
+                    if (res.data && res.data.id) {
+                        setNewApp(prev => ({...prev, doctor_id: res.data.id}));
+                    }
+                }).catch(e => console.error(e));
+            }
+        } catch(e) { console.error("Erro ao ler token", e); }
+    }
+    fetchData(); 
+  }, [fetchData]);
+
+  // --- EFEITO 2: BUSCA HORÁRIOS LIVRES PARA NOVO AGENDAMENTO ---
+  useEffect(() => {
+      if (newApp.doctor_id && newApp.data) {
+          api.get(`/appointments/available-slots?doctor_id=${newApp.doctor_id}&data=${newApp.data}`)
+             .then(res => setAvailableSlots(res.data))
+             .catch(e => setAvailableSlots([]));
+      } else {
+          setAvailableSlots([]);
+      }
+  }, [newApp.doctor_id, newApp.data]);
+
+  // --- EFEITO 3: BUSCA HORÁRIOS LIVRES PARA REAGENDAMENTO ---
+  useEffect(() => {
+      if (currentAppointment && rescheduleData.data) {
+          api.get(`/appointments/available-slots?doctor_id=${currentAppointment.doctor_id}&data=${rescheduleData.data}`)
+             .then(res => setRescheduleSlots(res.data))
+             .catch(e => setRescheduleSlots([]));
+      } else {
+          setRescheduleSlots([]);
+      }
+  }, [currentAppointment, rescheduleData.data]);
 
   const calculateAge = (patientId) => {
     const patient = patients.find(p => p.id === patientId);
@@ -111,7 +157,18 @@ export default function Agenda() {
     return `${date.toLocaleDateString('pt-BR')}, ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
   };
 
+  const resetNewAppForm = () => {
+      setNewApp(prev => ({ 
+          doctor_id: (currentUserRole === 'doctor' || currentUserRole === 'medico') ? prev.doctor_id : '', 
+          patient_id: '', data: '', hora: '', duracao: '40', observacoes: '' 
+      }));
+  };
+
   const handleCreate = async () => {
+    if (!newApp.doctor_id || !newApp.patient_id || !newApp.data || !newApp.hora) {
+        toast({ title: 'Preencha todos os campos obrigatórios!', status: 'warning' });
+        return;
+    }
     try {
       const dataHorario = `${newApp.data}T${newApp.hora}:00`;
       await api.post('/appointments/', {
@@ -123,7 +180,7 @@ export default function Agenda() {
       });
       toast({ title: 'Agendamento criado!', status: 'success' });
       onClose();
-      setNewApp({ doctor_id: '', patient_id: '', data: '', hora: '', duracao: '40', observacoes: '' });
+      resetNewAppForm();
       fetchData();
     } catch (error) { toast({ title: 'Erro ao agendar.', status: 'error' }); }
   };
@@ -162,7 +219,6 @@ export default function Agenda() {
     }
   };
 
-  // FUNÇÃO FINALIZAR: SALVA PRIMEIRO, ABRE IMPRESSÃO DEPOIS
   const handleFinishConsultation = async () => {
     if (!consultData.anamnese && Object.keys(specialtyData).length === 0 && !consultData.prescricao) {
         toast({ title: 'Preencha algum dado antes de finalizar.', status: 'warning' });
@@ -172,7 +228,6 @@ export default function Agenda() {
     try {
         const endTime = new Date(); 
 
-        // PASSO 1: Salva no Banco de Dados com Segurança Total
         await api.post('/medical-records/', {
             appointment_id: currentAppointment.id,
             patient_id: currentAppointment.patient_id,
@@ -185,12 +240,10 @@ export default function Agenda() {
             data_fim: endTime
         });
 
-        // PASSO 2: Se deu certo, atualiza a tela e fecha o prontuário
         toast({ title: 'Atendimento finalizado com sucesso! ✅', status: 'success' });
         onConsultClose();
         fetchData();
 
-        // PASSO 3: Abre a tela perguntando se deseja imprimir
         onPrintModalOpen();
 
     } catch (error) {
@@ -199,7 +252,6 @@ export default function Agenda() {
     }
   };
 
-  // GERA O RECEITUÁRIO PARA IMPRESSÃO
   const handlePrintRecord = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -295,7 +347,8 @@ export default function Agenda() {
       setCurrentAppointment(app);
       setActionReason('');
       const currentIso = app.data_horario.split('T');
-      setRescheduleData({ data: currentIso[0], hora: currentIso[1].slice(0, 5) });
+      // Limpamos a hora para forçar o usuário a escolher um horário válido na nova data
+      setRescheduleData({ data: currentIso[0], hora: '' });
       onRescheduleOpen();
   };
 
@@ -371,25 +424,87 @@ export default function Agenda() {
         </Box>
       )}
 
-      {/* MODAL NOVO AGENDAMENTO */}
-      <Modal isOpen={isOpen} onClose={onClose} size="lg">
+      {/* --- MODAL NOVO AGENDAMENTO INTELIGENTE --- */}
+      <Modal isOpen={isOpen} onClose={() => { onClose(); resetNewAppForm(); }} size="lg">
         <ModalOverlay /><ModalContent bg={modalBg}><ModalHeader>Novo Agendamento</ModalHeader><ModalCloseButton />
           <ModalBody>
+            {/* Reorganizado: Profissional primeiro, pois a hora depende dele */}
+            <FormControl mb={4}>
+                <FormLabel>Profissional</FormLabel>
+                <Select 
+                    bg={inputBg} size="sm" placeholder="Selecione o profissional..." 
+                    value={newApp.doctor_id} 
+                    onChange={(e) => setNewApp({...newApp, doctor_id: e.target.value, hora: ''})}
+                    isDisabled={currentUserRole === 'doctor' || currentUserRole === 'medico'}
+                >
+                    {doctors.filter(d => d.ativo).map(d => <option key={d.id} value={d.id}>{d.nome}</option>)}
+                </Select>
+            </FormControl>
+
+            <FormControl mb={4}>
+                <FormLabel>Paciente</FormLabel>
+                <Select bg={inputBg} size="sm" placeholder="Selecione o paciente..." value={newApp.patient_id} onChange={(e) => setNewApp({...newApp, patient_id: e.target.value})}>
+                    {patients.filter(p => p.ativo).map(p => <option key={p.id} value={p.id}>{p.nome_completo}</option>)}
+                </Select>
+            </FormControl>
+
             <SimpleGrid columns={2} spacing={4} mb={4}>
-                <FormControl><FormLabel>Data</FormLabel><Input type="date" bg={inputBg} size="sm" value={newApp.data} onChange={(e) => setNewApp({...newApp, data: e.target.value})} /></FormControl>
-                <FormControl><FormLabel>Hora</FormLabel><Input type="time" bg={inputBg} size="sm" value={newApp.hora} onChange={(e) => setNewApp({...newApp, hora: e.target.value})} /></FormControl>
+                <FormControl>
+                    <FormLabel>Data</FormLabel>
+                    <Input type="date" bg={inputBg} size="sm" value={newApp.data} onChange={(e) => setNewApp({...newApp, data: e.target.value, hora: ''})} />
+                </FormControl>
+                
+                {/* CAMPO DE HORA SUBSTITUÍDO PELO SELECT INTELIGENTE */}
+                <FormControl>
+                    <FormLabel>Horários</FormLabel>
+                    <Select 
+                        bg={inputBg} size="sm" 
+                        placeholder={availableSlots.length > 0 ? "Selecione o horário" : "Selecione a Data"} 
+                        value={newApp.hora} 
+                        onChange={(e) => setNewApp({...newApp, hora: e.target.value})}
+                        isDisabled={availableSlots.length === 0}
+                    >
+                        {availableSlots.map(slot => <option key={slot} value={slot}>{slot}</option>)}
+                    </Select>
+                </FormControl>
             </SimpleGrid>
-            <FormControl mb={4}><FormLabel>Profissional</FormLabel><Select bg={inputBg} size="sm" placeholder="Selecione..." value={newApp.doctor_id} onChange={(e) => setNewApp({...newApp, doctor_id: e.target.value})}>{doctors.filter(d => d.ativo).map(d => <option key={d.id} value={d.id}>{d.nome}</option>)}</Select></FormControl>
-            <FormControl mb={4}><FormLabel>Paciente</FormLabel><Select bg={inputBg} size="sm" placeholder="Selecione..." value={newApp.patient_id} onChange={(e) => setNewApp({...newApp, patient_id: e.target.value})}>{patients.filter(p => p.ativo).map(p => <option key={p.id} value={p.id}>{p.nome_completo}</option>)}</Select></FormControl>
-            <FormControl><FormLabel>Obs</FormLabel><Input bg={inputBg} size="sm" value={newApp.observacoes} onChange={(e) => setNewApp({...newApp, observacoes: e.target.value})} /></FormControl>
+
+            <FormControl><FormLabel>Observação</FormLabel><Input bg={inputBg} size="sm" value={newApp.observacoes} onChange={(e) => setNewApp({...newApp, observacoes: e.target.value})} /></FormControl>
           </ModalBody>
-          <ModalFooter><Button colorScheme="blue" size="sm" mr={3} onClick={handleCreate}>Agendar</Button><Button size="sm" onClick={onClose}>Cancelar</Button></ModalFooter>
+          <ModalFooter><Button colorScheme="blue" size="sm" mr={3} onClick={handleCreate}>Agendar</Button><Button size="sm" onClick={() => { onClose(); resetNewAppForm(); }}>Cancelar</Button></ModalFooter>
         </ModalContent>
       </Modal>
 
-      {/* MODAIS AUXILIARES */}
+      {/* --- MODAIS AUXILIARES --- */}
       <Modal isOpen={isCancelOpen} onClose={onCancelClose}><ModalOverlay /><ModalContent bg={modalBg}><ModalHeader>Cancelar</ModalHeader><ModalBody><Textarea bg={inputBg} value={actionReason} onChange={(e) => setActionReason(e.target.value)} placeholder="Motivo..." /></ModalBody><ModalFooter><Button colorScheme="red" mr={3} onClick={handleConfirmCancel}>Confirmar</Button></ModalFooter></ModalContent></Modal>
-      <Modal isOpen={isRescheduleOpen} onClose={onRescheduleClose}><ModalOverlay /><ModalContent bg={modalBg}><ModalHeader>Reagendar</ModalHeader><ModalBody><VStack spacing={3}><FormControl><FormLabel>Data</FormLabel><Input type="date" bg={inputBg} value={rescheduleData.data} onChange={(e) => setRescheduleData({...rescheduleData, data: e.target.value})}/></FormControl><FormControl><FormLabel>Hora</FormLabel><Input type="time" bg={inputBg} value={rescheduleData.hora} onChange={(e) => setRescheduleData({...rescheduleData, hora: e.target.value})}/></FormControl><FormControl><FormLabel>Motivo</FormLabel><Textarea bg={inputBg} value={actionReason} onChange={(e) => setActionReason(e.target.value)} /></FormControl></VStack></ModalBody><ModalFooter><Button colorScheme="blue" mr={3} onClick={handleConfirmReschedule}>Confirmar</Button></ModalFooter></ModalContent></Modal>
+      
+      {/* MODAL REAGENDAR (AGORA INTELIGENTE) */}
+      <Modal isOpen={isRescheduleOpen} onClose={onRescheduleClose}>
+          <ModalOverlay /><ModalContent bg={modalBg}><ModalHeader>Reagendar</ModalHeader>
+          <ModalBody>
+            <VStack spacing={3} align="stretch">
+              <FormControl>
+                  <FormLabel>Nova Data</FormLabel>
+                  <Input type="date" bg={inputBg} value={rescheduleData.data} onChange={(e) => setRescheduleData({...rescheduleData, data: e.target.value, hora: ''})}/>
+              </FormControl>
+              <FormControl>
+                  <FormLabel>Novo Horário</FormLabel>
+                  <Select 
+                      bg={inputBg} 
+                      value={rescheduleData.hora} 
+                      onChange={(e) => setRescheduleData({...rescheduleData, hora: e.target.value})}
+                      isDisabled={rescheduleSlots.length === 0}
+                      placeholder={rescheduleSlots.length > 0 ? "Selecione o horário" : "Selecione a data primeiro"}
+                  >
+                      {rescheduleSlots.map(slot => <option key={slot} value={slot}>{slot}</option>)}
+                  </Select>
+              </FormControl>
+              <FormControl><FormLabel>Motivo</FormLabel><Textarea bg={inputBg} value={actionReason} onChange={(e) => setActionReason(e.target.value)} /></FormControl>
+            </VStack>
+          </ModalBody>
+          <ModalFooter><Button colorScheme="blue" mr={3} onClick={handleConfirmReschedule}>Confirmar</Button></ModalFooter>
+        </ModalContent>
+      </Modal>
 
       {/* --- MODAL DE PERGUNTA: IMPRIMIR --- */}
       <Modal isOpen={isPrintModalOpen} onClose={onPrintModalClose} isCentered>
