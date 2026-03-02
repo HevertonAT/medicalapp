@@ -3,20 +3,23 @@ import {
   Box, Button, Flex, Heading, Table, Thead, Tbody, Tr, Th, Td,
   IconButton, useDisclosure, Modal, ModalOverlay, ModalContent,
   ModalHeader, ModalBody, ModalCloseButton, useToast, VStack, Text, 
-  HStack, FormControl, FormLabel, Input, ModalFooter, Divider, useColorModeValue, Select, Tooltip
+  HStack, FormControl, FormLabel, Input, ModalFooter, Divider, useColorModeValue, Select, Tooltip,
+  InputGroup, InputRightElement, Badge
 } from '@chakra-ui/react';
-import { FaPlus, FaBuilding, FaUserTie, FaEdit, FaBan, FaCheck } from 'react-icons/fa';
+import { FaPlus, FaBuilding, FaUserTie, FaEdit, FaBan, FaCheck, FaEye, FaEyeSlash } from 'react-icons/fa';
 import api from '../services/api';
 
 export default function ClinicsManage() {
   const [clinics, setClinics] = useState([]);
+  const [planos, setPlanos] = useState([]); 
   const { isOpen, onOpen, onClose } = useDisclosure(); 
   
-  // Controle Inteligente de Edição
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
 
-  // O Estado ÚNICO atualizado com o plano_id
+  const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'asc' });
+
   const [formData, setFormData] = useState({
       nome: '', cnpj: '', email_clinica: '', telefone: '', endereco: '', plano_id: '',
       nome_admin: '', email_admin: '', senha_admin: ''
@@ -24,7 +27,6 @@ export default function ClinicsManage() {
 
   const toast = useToast();
 
-  // Cores Dinâmicas
   const bgCard = useColorModeValue('white', 'gray.800');
   const bgHeader = useColorModeValue('gray.50', 'gray.700');
   const inputBg = useColorModeValue('gray.50', 'gray.700');
@@ -35,41 +37,79 @@ export default function ClinicsManage() {
   const activeColor = useColorModeValue('green.600', 'green.300'); 
   const inactiveColor = useColorModeValue('red.600', 'red.300');
 
-  // Máscara Simples de CNPJ
   const formatCNPJ = (value) => {
-    return value
-      .replace(/\D/g, '')
-      .replace(/^(\d{2})(\d)/, '$1.$2')
-      .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
-      .replace(/\.(\d{3})(\d)/, '.$1/$2')
-      .replace(/(\d{4})(\d)/, '$1-$2')
-      .substring(0, 18);
+    return value.replace(/\D/g, '').replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2').substring(0, 18);
+  };
+
+  const formatPhone = (value) => {
+    return value.replace(/\D/g, '').replace(/(\d{2})(\d)/, '($1) $2').replace(/(\d{4,5})(\d{4})/, '$1-$2').substring(0, 15);
   };
 
   const fetchClinics = async () => {
     try {
       const response = await api.get('/clinics/');
-      setClinics(response.data);
-    } catch (error) { 
-        console.error("Erro ao buscar clínicas", error); 
-    }
+      setClinics(Array.isArray(response.data) ? response.data : []);
+    } catch (error) { console.error("Erro ao buscar clínicas", error); }
   };
 
-  useEffect(() => { fetchClinics(); }, []);
+  const fetchPlanos = async () => {
+    try {
+      const response = await api.get('/planos/'); 
+      setPlanos(Array.isArray(response.data) ? response.data : []);
+    } catch (error) { console.error("Erro ao buscar planos", error); }
+  };
 
-  // --- ABRIR MODAL PARA CRIAR OU EDITAR ---
+  useEffect(() => { 
+    fetchClinics(); 
+    fetchPlanos(); 
+  }, []);
+
+  const getPlanoNome = (plano_id) => {
+    const plano = planos.find(p => p.id === plano_id);
+    return plano ? plano.nome : 'Nenhum';
+  };
+
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+        direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  // --- LÓGICA DE ORDENAÇÃO ATUALIZADA PARA ACEITAR "PAGAMENTO" ---
+  const sortedClinics = [...clinics].sort((a, b) => {
+    // Se a chave for pagamento, usamos o is_active como base de ordenação
+    let aValue = sortConfig.key === 'pagamento' ? a.is_active : a[sortConfig.key];
+    let bValue = sortConfig.key === 'pagamento' ? b.is_active : b[sortConfig.key];
+
+    if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+    if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+    
+    if (aValue === null || aValue === undefined) aValue = '';
+    if (bValue === null || bValue === undefined) bValue = '';
+
+    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const getSortIcon = (columnName) => {
+    if (sortConfig.key === columnName) {
+        return sortConfig.direction === 'asc' ? ' ↑' : ' ↓';
+    }
+    return '';
+  };
+
   const handleOpenModal = (clinic = null) => {
+      setShowPassword(false);
       if (clinic) {
           setIsEditing(true);
           setEditId(clinic.id);
           setFormData({
-              nome: clinic.nome || '', 
-              cnpj: clinic.cnpj || '', 
-              email_clinica: clinic.email || '', 
-              telefone: clinic.telefone || '', 
-              endereco: clinic.endereco || '', 
-              plano_id: clinic.plano_id || '',
-              nome_admin: '', email_admin: '', senha_admin: '' // Limpa campos de admin
+              nome: clinic.nome || '', cnpj: clinic.cnpj || '', email_clinica: clinic.email || '', 
+              telefone: clinic.telefone || '', endereco: clinic.endereco || '', plano_id: clinic.plano_id || '',
+              nome_admin: '', email_admin: '', senha_admin: '' 
           });
       } else {
           setIsEditing(false);
@@ -82,66 +122,46 @@ export default function ClinicsManage() {
       onOpen();
   };
 
-  // --- ATIVAR / INATIVAR CLÍNICA ---
   const handleToggleStatus = async (clinic) => {
       const actionText = clinic.is_active ? 'inativar' : 'reativar';
       if (confirm(`Deseja realmente ${actionText} a clínica ${clinic.nome}?`)) {
           try {
-              // Reutilizamos a rota de edição enviando apenas o status reverso
               await api.put(`/clinics/${clinic.id}`, { is_active: !clinic.is_active });
               toast({ title: `Clínica ${clinic.is_active ? 'inativada' : 'reativada'}!`, status: 'success' });
               fetchClinics();
-          } catch (error) {
-              toast({ title: `Erro ao ${actionText} clínica.`, status: 'error' });
-          }
+          } catch (error) { toast({ title: `Erro ao ${actionText} clínica.`, status: 'error' }); }
       }
   };
 
-  // --- SALVAR CRIAÇÃO OU EDIÇÃO ---
   const handleSave = async () => {
     try {
         if (isEditing) {
-            // FLUXO DE EDIÇÃO (PUT)
             const updatePayload = {
-                nome: formData.nome, 
-                cnpj: formData.cnpj, 
-                email_clinica: formData.email_clinica, 
-                telefone: formData.telefone, 
-                endereco: formData.endereco, 
-                plano_id: formData.plano_id || null
+                nome: formData.nome, cnpj: formData.cnpj, email_clinica: formData.email_clinica, 
+                telefone: formData.telefone, endereco: formData.endereco, plano_id: formData.plano_id || null
             };
-            
             await api.put(`/clinics/${editId}`, updatePayload);
             toast({ title: 'Clínica atualizada com sucesso!', status: 'success' });
-            
         } else {
-            // FLUXO DE CRIAÇÃO (POST)
-            if (!formData.nome || !formData.nome_admin || !formData.email_admin || !formData.senha_admin) {
-                toast({ title: 'Preencha os campos obrigatórios!', status: 'warning' });
+            if (!formData.nome || !formData.nome_admin || !formData.email_admin || !formData.senha_admin || !formData.plano_id) {
+                toast({ title: 'Preencha os campos obrigatórios e selecione o Plano!', status: 'warning' });
                 return;
             }
-            
             const payload = { ...formData, plano_id: formData.plano_id || null };
             await api.post('/clinics/', payload);
             toast({ title: 'Clínica e Admin criados com sucesso!', status: 'success' });
         }
-        
         onClose();
         fetchClinics();
-        
     } catch (error) {
-        toast({ 
-            title: isEditing ? 'Erro ao atualizar.' : 'Erro ao cadastrar.', 
-            description: error.response?.data?.detail || 'Verifique se os dados estão corretos.', 
-            status: 'error' 
-        });
+        toast({ title: isEditing ? 'Erro ao atualizar.' : 'Erro ao cadastrar.', description: error.response?.data?.detail, status: 'error' });
     }
   };
 
   return (
     <Box p={8}>
       <Flex justify="space-between" align="center" mb={6}>
-        <Heading size="lg" color={useColorModeValue("gray.700", "white")}>Gerenciar Clínicas</Heading>
+        <Heading size="lg" color={useColorModeValue("gray.700", "white")}>Gerenciar Clínicas (SaaS)</Heading>
         <Button leftIcon={<FaPlus />} colorScheme="blue" onClick={() => handleOpenModal()}>Nova Clínica</Button>
       </Flex>
 
@@ -149,24 +169,45 @@ export default function ClinicsManage() {
         <Table variant="simple" size="sm">
             <Thead bg={bgHeader}>
             <Tr>
-                <Th color={textColor} py={3}>ID</Th>
-                <Th color={textColor} py={3}>Nome da Clínica</Th>
-                <Th color={textColor} py={3}>CNPJ</Th>
-                <Th color={textColor} py={3}>Plano</Th>
-                <Th color={textColor} py={3}>Status</Th>
+                <Th cursor="pointer" onClick={() => handleSort('id')} color={textColor} py={3} _hover={{ bg: borderColor }}>
+                    ID{getSortIcon('id')}
+                </Th>
+                <Th cursor="pointer" onClick={() => handleSort('nome')} color={textColor} py={3} _hover={{ bg: borderColor }}>
+                    Nome da Clínica{getSortIcon('nome')}
+                </Th>
+                <Th cursor="pointer" onClick={() => handleSort('cnpj')} color={textColor} py={3} _hover={{ bg: borderColor }}>
+                    CNPJ{getSortIcon('cnpj')}
+                </Th>
+                <Th color={textColor} py={3}>Telefone</Th>
+                <Th cursor="pointer" onClick={() => handleSort('plano_id')} color={textColor} py={3} _hover={{ bg: borderColor }}>
+                    Plano{getSortIcon('plano_id')}
+                </Th>
+                {/* --- NOVO: PAGAMENTO AGORA É CLICÁVEL --- */}
+                <Th cursor="pointer" onClick={() => handleSort('pagamento')} color={textColor} py={3} _hover={{ bg: borderColor }}>
+                    Pagamento{getSortIcon('pagamento')}
+                </Th>
+                <Th cursor="pointer" onClick={() => handleSort('is_active')} color={textColor} py={3} _hover={{ bg: borderColor }}>
+                    Status{getSortIcon('is_active')}
+                </Th>
                 <Th color={textColor} py={3} textAlign="center">Ações</Th>
             </Tr>
             </Thead>
             <Tbody>
-            {clinics.map((c) => (
+            {sortedClinics.map((c) => (
                 <Tr key={c.id} opacity={c.is_active ? 1 : 0.6} _hover={{ bg: hoverTr }} transition="background 0.2s">
                     <Td py={3} fontWeight="bold" fontSize="xs">#{c.id}</Td>
                     <Td py={3} fontWeight="bold" fontSize="xs" color="blue.500">{c.nome}</Td>
                     <Td py={3} fontSize="xs">{c.cnpj || '-'}</Td>
+                    <Td py={3} fontSize="xs">{c.telefone || '-'}</Td>
                     <Td py={3} fontSize="xs">
                         <Text px={2} py={1} bg="purple.50" color="purple.700" borderRadius="md" display="inline-block" fontWeight="bold">
-                            {c.plano_id ? `Plano ${c.plano_id}` : 'Nenhum'}
+                            {getPlanoNome(c.plano_id)}
                         </Text>
+                    </Td>
+                    <Td py={3}>
+                        <Badge colorScheme={c.is_active ? "green" : "red"}>
+                            {c.is_active ? 'EM DIA' : 'PENDENTE'}
+                        </Badge>
                     </Td>
                     <Td py={3}>
                         <Text fontWeight="extrabold" fontSize="2xs" letterSpacing="wider" color={c.is_active ? activeColor : inactiveColor}>
@@ -176,34 +217,15 @@ export default function ClinicsManage() {
                     <Td py={3} textAlign="center">
                         <HStack justify="center" spacing={2}>
                             <Tooltip label="Editar">
-                                <IconButton 
-                                    icon={<FaEdit />} 
-                                    size="sm" 
-                                    colorScheme="yellow" 
-                                    variant="ghost"
-                                    onClick={() => handleOpenModal(c)} 
-                                />
+                                <IconButton icon={<FaEdit />} size="sm" colorScheme="yellow" variant="ghost" onClick={() => handleOpenModal(c)} />
                             </Tooltip>
-                            
                             {c.is_active ? (
-                                <Tooltip label="Inativar Clínica">
-                                    <IconButton 
-                                        icon={<FaBan />} 
-                                        size="sm" 
-                                        colorScheme="red" 
-                                        variant="ghost"
-                                        onClick={() => handleToggleStatus(c)} 
-                                    />
+                                <Tooltip label="Inativar Clínica (Bloqueia o acesso)">
+                                    <IconButton icon={<FaBan />} size="sm" colorScheme="red" variant="ghost" onClick={() => handleToggleStatus(c)} />
                                 </Tooltip>
                             ) : (
                                 <Tooltip label="Reativar Clínica">
-                                    <IconButton 
-                                        icon={<FaCheck />} 
-                                        size="sm" 
-                                        colorScheme="green" 
-                                        variant="ghost"
-                                        onClick={() => handleToggleStatus(c)} 
-                                    />
+                                    <IconButton icon={<FaCheck />} size="sm" colorScheme="green" variant="ghost" onClick={() => handleToggleStatus(c)} />
                                 </Tooltip>
                             )}
                         </HStack>
@@ -211,7 +233,7 @@ export default function ClinicsManage() {
                 </Tr>
             ))}
             {clinics.length === 0 && (
-                <Tr><Td colSpan={6} textAlign="center" py={4}>Nenhuma clínica cadastrada.</Td></Tr>
+                <Tr><Td colSpan={8} textAlign="center" py={4}>Nenhuma clínica cadastrada.</Td></Tr>
             )}
             </Tbody>
         </Table>
@@ -235,32 +257,34 @@ export default function ClinicsManage() {
                       <HStack w="full" spacing={4}>
                         <FormControl isRequired>
                             <FormLabel fontSize="sm">Nome da Clínica (Fantasia)</FormLabel>
-                            <Input bg={inputBg} borderColor={borderColor} value={formData.nome} onChange={(e) => setFormData({...formData, nome: e.target.value})} placeholder="Ex: Clínica Saúde & Cia" />
+                            <Input bg={inputBg} borderColor={borderColor} value={formData.nome} onChange={(e) => setFormData({...formData, nome: e.target.value})} />
                         </FormControl>
                         <FormControl>
                             <FormLabel fontSize="sm">CNPJ</FormLabel>
-                            <Input bg={inputBg} borderColor={borderColor} value={formData.cnpj} onChange={(e) => setFormData({...formData, cnpj: formatCNPJ(e.target.value)})} placeholder="00.000.000/0001-00" maxLength={18} />
+                            <Input bg={inputBg} borderColor={borderColor} value={formData.cnpj} onChange={(e) => setFormData({...formData, cnpj: formatCNPJ(e.target.value)})} maxLength={18} />
                         </FormControl>
                       </HStack>
                       <HStack w="full" spacing={4}>
                         <FormControl>
                             <FormLabel fontSize="sm">E-mail Comercial</FormLabel>
-                            <Input type="email" bg={inputBg} borderColor={borderColor} value={formData.email_clinica} onChange={(e) => setFormData({...formData, email_clinica: e.target.value})} placeholder="contato@clinica.com" />
+                            <Input type="email" bg={inputBg} borderColor={borderColor} value={formData.email_clinica} onChange={(e) => setFormData({...formData, email_clinica: e.target.value})} />
                         </FormControl>
                         <FormControl>
                             <FormLabel fontSize="sm">Telefone</FormLabel>
-                            <Input bg={inputBg} borderColor={borderColor} value={formData.telefone} onChange={(e) => setFormData({...formData, telefone: e.target.value})} placeholder="(00) 0000-0000" />
+                            <Input bg={inputBg} borderColor={borderColor} value={formData.telefone} onChange={(e) => setFormData({...formData, telefone: formatPhone(e.target.value)})} maxLength={15} placeholder="(00) 00000-0000" />
                         </FormControl>
                       </HStack>
 
-                      {/* NOVO CAMPO: SELETOR DE PLANOS */}
-                      <FormControl>
+                      {/* SELETOR DINÂMICO DE PLANOS */}
+                      <FormControl isRequired>
                           <FormLabel fontSize="sm">Plano de Assinatura</FormLabel>
                           <Select bg={inputBg} borderColor={borderColor} value={formData.plano_id} onChange={(e) => setFormData({...formData, plano_id: parseInt(e.target.value) || ''})}>
-                              <option value="">Selecione um Plano</option>
-                              <option value="1">Plano Básico (ID: 1)</option>
-                              <option value="2">Plano Profissional (ID: 2)</option>
-                              <option value="3">Plano Premium (ID: 3)</option>
+                              <option value="">Selecione o plano contratado</option>
+                              {planos.map(plano => (
+                                  <option key={plano.id} value={plano.id}>
+                                      {plano.nome} (R$ {plano.preco_mensal?.toFixed(2)}) - Até {plano.max_usuarios} Usuários
+                                  </option>
+                              ))}
                           </Select>
                       </FormControl>
                   </VStack>
@@ -289,7 +313,24 @@ export default function ClinicsManage() {
                             </FormControl>
                             <FormControl isRequired>
                                 <FormLabel fontSize="sm">Senha Inicial</FormLabel>
-                                <Input bg={inputBg} borderColor={borderColor} value={formData.senha_admin} onChange={(e) => setFormData({...formData, senha_admin: e.target.value})} placeholder="Senha forte" />
+                                <InputGroup>
+                                    <Input 
+                                        type={showPassword ? 'text' : 'password'} 
+                                        bg={inputBg} borderColor={borderColor} 
+                                        value={formData.senha_admin} 
+                                        onChange={(e) => setFormData({...formData, senha_admin: e.target.value})} 
+                                        placeholder="Senha" 
+                                    />
+                                    <InputRightElement>
+                                        <IconButton
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            icon={showPassword ? <FaEyeSlash /> : <FaEye />}
+                                            aria-label={showPassword ? 'Ocultar senha' : 'Exibir senha'}
+                                        />
+                                    </InputRightElement>
+                                </InputGroup>
                             </FormControl>
                           </HStack>
                       </VStack>

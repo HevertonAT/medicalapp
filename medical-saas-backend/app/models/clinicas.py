@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean # <--- Boolean adicionado aqui!
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.db.base import Base
@@ -12,6 +12,9 @@ class Clinic(Base):
     email = Column(String, unique=True, index=True, nullable=True) 
     endereco = Column(String, nullable=True)
     telefone = Column(String, nullable=True)
+    
+    # --- NOVO: VÍNCULO COM O PLANO DO SAAS ---
+    plano_id = Column(Integer, ForeignKey("planos.id"), nullable=True)
     
     # --- NOSSO BOTÃO DE LIGA/DESLIGA ---
     is_active = Column(Boolean, default=True) 
@@ -27,3 +30,5 @@ class Clinic(Base):
     documents = relationship("Document", back_populates="clinic")
     files = relationship("PatientFile", back_populates="clinic")
     procedure_prices = relationship("ProcedurePrice", back_populates="clinic")
+    # Se quiser, no futuro pode adicionar o relacionamento bidirecional com planos:
+    # plano = relationship("Plan")

@@ -1,16 +1,15 @@
 from pydantic import BaseModel
 from typing import Optional
 
-# O que precisamos receber do Front-end para criar uma clínica e um admin ao mesmo tempo?
 class CriarClinica(BaseModel):
-    # --- Dados da Clínica ---
-    nome: str  # Trocado de razao_social para 'nome' (bate com o banco de dados)
+    nome: str
     cnpj: Optional[str] = None
     email_clinica: Optional[str] = None
     endereco: Optional[str] = None
     telefone: Optional[str] = None
+    plano_id: Optional[int] = None
     
-    # --- Dados do Administrador (Dono da Clínica) ---
+    # Dados do Admin
     nome_admin: str
     email_admin: str
     senha_admin: str
@@ -20,18 +19,19 @@ class AtualizarClinica(BaseModel):
     cnpj: Optional[str] = None
     email_clinica: Optional[str] = None
     endereco: Optional[str] = None
-    telefone: Optional[str] = None
-    plano: Optional[str] = None
+    telefone: Optional[str] = None  # <-- Garantindo que a edição aceite o telefone
+    plano_id: Optional[int] = None
     is_active: Optional[bool] = None
 
-# Como o sistema responde após a criação com sucesso:
 class RespostaClinica(BaseModel):
     id: int
     nome: str 
     cnpj: Optional[str] = None
     email: Optional[str] = None
+    telefone: Optional[str] = None  # <-- Garantindo que a API devolva o telefone
+    endereco: Optional[str] = None
+    plano_id: Optional[int] = None
     is_active: bool
 
     class Config:
-        from_attributes = True # Permite ler direto do objeto do banco (ORM)
-
+        from_attributes = True
