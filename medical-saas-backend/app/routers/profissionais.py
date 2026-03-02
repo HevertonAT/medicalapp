@@ -29,7 +29,7 @@ def get_my_doctor_profile(
         raise HTTPException(status_code=404, detail="Perfil de profissional não encontrado.")
     return doctor
 
-# --- 2. LISTAGEM DE MÉDICOS ---
+# --- 2. LISTAGEM DE MÉDICOS (COM ISOLAMENTO SAAS) ---
 @router.get("/", response_model=List[DoctorResponse])
 def list_doctors(
     db: Session = Depends(get_db),
@@ -37,15 +37,20 @@ def list_doctors(
 ):
     query = db.query(Doctor)
 
-    # Pacientes veem todos os ativos para agendamento.
-    if current_user.role in ['patient', 'paciente']:
-        return query.filter(Doctor.ativo == True).all()
+    # 1. Superuser (Dono do SaaS) vê absolutamente todos os médicos do banco
+    if current_user.role == 'superuser':
+        return query.all()
 
-    # Admins e Médicos veem apenas os colegas da SUA própria clínica.
-    if current_user.role in ['admin', 'doctor']:
-        query = query.filter(Doctor.clinic_id == current_user.clinic_id)
-        
-    # Superuser (dono do sistema) vê absolutamente todos
+    # 2. O MURO DE CONCRETO: Se não for Superuser, NINGUÉM passa daqui 
+    # sem ter a busca filtrada pela sua própria clínica.
+    query = query.filter(Doctor.clinic_id == current_user.clinic_id)
+
+    # 3. Regra extra para Pacientes: Além de ver só os da sua clínica,
+    # eles só podem ver os médicos que estão com a agenda ATIVA.
+    if current_user.role in ['patient', 'paciente']:
+        query = query.filter(Doctor.ativo == True)
+
+    # Retorna o resultado já filtrado de forma segura
     return query.all()
 
 # --- 3. CRIAÇÃO DE MÉDICO ---

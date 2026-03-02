@@ -1,7 +1,6 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-# Removi a importação de UUID, pois agora usamos int
 from app.db.base import get_db
 from app.models.pacientes import Patient
 from app.models.usuarios import User
@@ -10,76 +9,78 @@ from app.core.deps import get_current_user
 
 router = APIRouter()
 
+# --- 1. LISTAGEM DE PACIENTES (COM MURO DE CONCRETO) ---
 @router.get("/", response_model=List[PatientResponse])
 def get_patients(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    print(f"🔍 Listando pacientes para usuário: {current_user.email} (Role: {current_user.role})")
-    
     query = db.query(Patient)
 
-    # LÓGICA DE FILTRO:
-    # Se NÃO for superuser e tiver clínica, filtra pela clínica.
-    # Se for superuser, vê tudo.
-    if current_user.role != 'superuser' and current_user.clinic_id:
-        query = query.filter(Patient.clinic_id == current_user.clinic_id)
+    # Superuser vê todos os pacientes do sistema
+    if current_user.role == 'superuser':
+        return query.all()
 
-    patients_db = query.all()
-
-    # --- PROTEÇÃO CONTRA ERRO 500 ---
-    # Validamos um por um. Se um estiver "quebrado", ele é ignorado e não quebra a tela.
-    valid_patients = []
-    for p in patients_db:
-        try:
-            # O simples fato de tentar acessar as propriedades aqui já testa se o objeto está íntegro
-            _ = p.id 
-            valid_patients.append(p)
-        except Exception as e:
-            print(f"⚠️ ERRO CRÍTICO: O paciente ID {p.id} está corrompido e foi ignorado na lista. Erro: {e}")
-            # Dica: Verifique se existem campos obrigatórios NULL no banco de dados para este ID
+    # MURO DE CONCRETO: Se não for Superuser, NINGUÉM passa daqui 
+    # sem ter a busca filtrada pela sua própria clínica.
+    query = query.filter(Patient.clinic_id == current_user.clinic_id)
     
-    return valid_patients
+    return query.all()
 
+# --- 2. CRIAÇÃO DE PACIENTE ---
 @router.post("/", response_model=PatientResponse, status_code=status.HTTP_201_CREATED)
 def create_patient(
     patient: PatientCreate, 
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Verifica se CPF já existe (se foi enviado)
+    # LÓGICA SAAS: Define a qual clínica o paciente vai pertencer
+    target_clinic_id = current_user.clinic_id
+    if current_user.role == "superuser" and hasattr(patient, "clinic_id") and patient.clinic_id:
+        target_clinic_id = patient.clinic_id
+
+    if not target_clinic_id:
+        raise HTTPException(status_code=400, detail="Não foi possível identificar a clínica para este cadastro.")
+
+    # MURO DE CONCRETO (CPF): Verifica se o CPF já existe APENAS nesta clínica.
+    # O mesmo paciente pode frequentar duas clínicas diferentes que usam o seu sistema.
     if patient.cpf:
-        existing_patient = db.query(Patient).filter(Patient.cpf == patient.cpf).first()
+        existing_patient = db.query(Patient).filter(
+            Patient.cpf == patient.cpf, 
+            Patient.clinic_id == target_clinic_id
+        ).first()
+        
         if existing_patient:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="CPF já cadastrado no sistema"
+                detail="Este CPF já está cadastrado nesta clínica."
             )
     
     try:
         new_patient = Patient(
-            clinic_id=current_user.clinic_id,
+            clinic_id=target_clinic_id,
             nome_completo=patient.nome_completo,
             cpf=patient.cpf,
             telefone=patient.telefone,
             data_nascimento=patient.data_nascimento,
-            endereco=patient.endereco, # Adicionado caso seu schema tenha endereço
-            genero=patient.genero,     # Adicionado caso seu schema tenha genero
+            endereco=patient.endereco, 
+            genero=patient.genero,    
             ativo=True
         )
         db.add(new_patient)
         db.commit()
         db.refresh(new_patient)
         return new_patient
+        
     except Exception as e:
         db.rollback()
         print(f"❌ Erro ao criar paciente: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Erro ao criar paciente. Verifique os dados."
+            detail="Erro ao salvar paciente. Verifique se os dados estão corretos."
         )
 
-# --- ROTA DE EDIÇÃO ---
+# --- 3. ATUALIZAÇÃO (PUT) ---
 @router.put("/{patient_id}", response_model=PatientResponse)
 def update_patient(
     patient_id: int, 
@@ -87,17 +88,16 @@ def update_patient(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Busca o paciente 
     query = db.query(Patient).filter(Patient.id == patient_id)
     
-    # Se não for superuser, restringe à clínica
-    if current_user.role != 'superuser' and current_user.clinic_id:
+    # MURO DE CONCRETO
+    if current_user.role != 'superuser':
         query = query.filter(Patient.clinic_id == current_user.clinic_id)
         
     db_patient = query.first()
     
     if not db_patient:
-        raise HTTPException(status_code=404, detail="Paciente não encontrado")
+        raise HTTPException(status_code=404, detail="Paciente não encontrado ou não pertence à sua clínica.")
     
     # Atualiza os campos dinamicamente
     update_data = patient_data.dict(exclude_unset=True)
@@ -108,7 +108,7 @@ def update_patient(
     db.refresh(db_patient)
     return db_patient
 
-# --- ROTA DE INATIVAÇÃO ---
+# --- 4. INATIVAÇÃO (DELETE) ---
 @router.delete("/{patient_id}")
 def inactivate_patient(
     patient_id: int, 
@@ -117,20 +117,21 @@ def inactivate_patient(
 ):
     query = db.query(Patient).filter(Patient.id == patient_id)
     
-    if current_user.role != 'superuser' and current_user.clinic_id:
+    # MURO DE CONCRETO
+    if current_user.role != 'superuser':
         query = query.filter(Patient.clinic_id == current_user.clinic_id)
 
     db_patient = query.first()
     
     if not db_patient:
-        raise HTTPException(status_code=404, detail="Paciente não encontrado")
+        raise HTTPException(status_code=404, detail="Paciente não encontrado ou não pertence à sua clínica.")
     
     db_patient.ativo = False 
     db.commit()
     
     return {"message": "Paciente inativado com sucesso"}
 
-# --- ROTA DE REATIVAÇÃO ---
+# --- 5. REATIVAÇÃO (PATCH) ---
 @router.patch("/{patient_id}/reactivate")
 def reactivate_patient(
     patient_id: int, 
@@ -139,13 +140,14 @@ def reactivate_patient(
 ):
     query = db.query(Patient).filter(Patient.id == patient_id)
     
-    if current_user.role != 'superuser' and current_user.clinic_id:
+    # MURO DE CONCRETO
+    if current_user.role != 'superuser':
         query = query.filter(Patient.clinic_id == current_user.clinic_id)
         
     db_patient = query.first()
     
     if not db_patient:
-        raise HTTPException(status_code=404, detail="Paciente não encontrado")
+        raise HTTPException(status_code=404, detail="Paciente não encontrado ou não pertence à sua clínica.")
     
     db_patient.ativo = True 
     db.commit()

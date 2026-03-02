@@ -15,15 +15,20 @@ from app.schemas.esquema_agendamentos import agendamentosCreate, agendamentosRes
 
 router = APIRouter()
 
-# --- 1. BUSCA DE HORÁRIOS DISPONÍVEIS (NOVO AGENDAMENTO) ---
+# --- 1. BUSCA DE HORÁRIOS DISPONÍVEIS ---
 @router.get("/available-slots")
 def get_available_slots(
     doctor_id: int,
     data: str,  # Formato esperado: YYYY-MM-DD
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     doctor = db.query(Doctor).filter(Doctor.id == doctor_id).first()
     if not doctor or not doctor.agenda_config:
+        return []
+
+    # MURO DE CONCRETO: Impede buscar horários de médicos de outras clínicas
+    if current_user.role != 'superuser' and doctor.clinic_id != current_user.clinic_id:
         return []
 
     try:
@@ -65,22 +70,20 @@ def get_available_slots(
 
         horas_ocupadas = [app.data_horario.strftime("%H:%M") for app in appointments_ocupados]
         
-        # --- TRAVA DE HORÁRIOS QUE JÁ PASSARAM (FUSO HORÁRIO DO BRASIL) ---
+        # --- TRAVA DE HORÁRIOS QUE JÁ PASSARAM ---
         fuso_brasil = timezone(timedelta(hours=-3))
         agora = datetime.now(fuso_brasil)
         data_hoje_str = agora.strftime("%Y-%m-%d")
 
         slots_livres = []
         for s in slots:
-            # 1. Se já tem consulta marcada, ignora
             if s in horas_ocupadas:
                 continue
             
-            # 2. Se a data selecionada for HOJE, verifica se o horário já passou
             if data == data_hoje_str:
                 hora_slot = datetime.strptime(s, "%H:%M").time()
                 if hora_slot <= agora.time():
-                    continue # Já passou, não adiciona na lista!
+                    continue 
             
             slots_livres.append(s)
 
@@ -91,10 +94,10 @@ def get_available_slots(
         return []
 
 
-# --- 2. LISTAR AGENDAMENTOS GERAIS (TELA DO MÉDICO / ADMIN) ---
+# --- 2. LISTAR AGENDAMENTOS GERAIS ---
 @router.get("/", response_model=List[agendamentosResponse])
 def list_all_appointments(
-    data: Optional[str] = None, # Parâmetro opcional para filtrar pelo calendário da tela
+    data: Optional[str] = None, 
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
 ):
@@ -103,14 +106,17 @@ def list_all_appointments(
         joinedload(Appointment.patient)
     )
 
+    # MURO DE CONCRETO SAAS
+    if current_user.role != 'superuser':
+        query = query.filter(Appointment.clinic_id == current_user.clinic_id)
+
+    # Se for médico, filtra ainda mais: vê APENAS as próprias consultas
     if current_user.role == 'doctor':
         doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
         if doctor:
             query = query.filter(Appointment.doctor_id == doctor.id)
         else:
-            return []
-    elif current_user.role in ['admin', 'superuser'] and current_user.clinic_id:
-        query = query.filter(Appointment.clinic_id == current_user.clinic_id)
+            return [] 
 
     if data:
         try:
@@ -126,7 +132,7 @@ def list_all_appointments(
     return query.order_by(Appointment.data_horario.asc()).all()
 
 
-# --- 3. LISTAR MEUS AGENDAMENTOS (TELA DO PACIENTE) ---
+# --- 3. LISTAR MEUS AGENDAMENTOS (PACIENTE) ---
 @router.get("/me", response_model=List[agendamentosResponse])
 def list_my_appointments(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
@@ -143,6 +149,10 @@ def create_agendamentos(agendamento: agendamentosCreate, db: Session = Depends(g
     doctor = db.query(Doctor).filter(Doctor.id == agendamento.doctor_id).first()
     if not doctor: raise HTTPException(status_code=404, detail="Médico não encontrado.")
     
+    # MURO DE CONCRETO
+    if current_user.role != 'superuser' and doctor.clinic_id != current_user.clinic_id:
+        raise HTTPException(status_code=403, detail="Acesso negado. Este profissional não pertence à sua clínica.")
+
     horario_conflito = db.query(Appointment).filter(
         Appointment.doctor_id == agendamento.doctor_id,
         Appointment.data_horario == agendamento.data_horario,
@@ -184,6 +194,10 @@ def cancel_appointment(appointment_id: int, body: dict = Body(default={}), db: S
     if not app:
         raise HTTPException(status_code=404, detail="Agendamento não encontrado.")
     
+    # MURO DE CONCRETO
+    if current_user.role != 'superuser' and app.clinic_id != current_user.clinic_id:
+        raise HTTPException(status_code=403, detail="Acesso negado a este agendamento.")
+    
     app.status = "cancelado"
     
     db.commit()
@@ -196,6 +210,10 @@ def reschedule_appointment(appointment_id: int, body: dict = Body(...), db: Sess
     app = db.query(Appointment).filter(Appointment.id == appointment_id).first()
     if not app:
         raise HTTPException(status_code=404, detail="Agendamento não encontrado.")
+    
+    # MURO DE CONCRETO
+    if current_user.role != 'superuser' and app.clinic_id != current_user.clinic_id:
+        raise HTTPException(status_code=403, detail="Acesso negado a este agendamento.")
     
     nova_data = body.get("data_horario")
     if nova_data:
@@ -211,12 +229,11 @@ def reschedule_appointment(appointment_id: int, body: dict = Body(...), db: Sess
 @router.patch("/{appointment_id}/status")
 def update_appointment_status(
     appointment_id: int, 
-    novo_status: Optional[str] = Query(None), # Tenta buscar da URL da requisição
-    body: Optional[dict] = Body(default=None), # Tenta buscar do corpo JSON da requisição
+    novo_status: Optional[str] = Query(None),
+    body: Optional[dict] = Body(default=None),
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
 ):
-    # Apenas médicos ou admins podem mudar status
     if current_user.role not in ['doctor', 'admin', 'superuser', 'medico']:
         raise HTTPException(status_code=403, detail="Sem permissão para alterar status.")
 
@@ -224,7 +241,10 @@ def update_appointment_status(
     if not app_db:
         raise HTTPException(status_code=404, detail="Agendamento não encontrado.")
     
-    # Lógica blindada: Pega o status seja pela URL ou pelo Body JSON
+    # MURO DE CONCRETO
+    if current_user.role != 'superuser' and app_db.clinic_id != current_user.clinic_id:
+        raise HTTPException(status_code=403, detail="Acesso negado a este agendamento.")
+    
     status_final = novo_status
     if not status_final and body and "novo_status" in body:
         status_final = body.get("novo_status")

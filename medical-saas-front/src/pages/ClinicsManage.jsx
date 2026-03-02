@@ -161,7 +161,7 @@ export default function ClinicsManage() {
   return (
     <Box p={8}>
       <Flex justify="space-between" align="center" mb={6}>
-        <Heading size="lg" color={useColorModeValue("gray.700", "white")}>Gerenciar Clínicas (SaaS)</Heading>
+        <Heading size="lg" color={useColorModeValue("gray.700", "white")}>Gerenciar Clínicas</Heading>
         <Button leftIcon={<FaPlus />} colorScheme="blue" onClick={() => handleOpenModal()}>Nova Clínica</Button>
       </Flex>
 
@@ -206,7 +206,7 @@ export default function ClinicsManage() {
                     </Td>
                     <Td py={3}>
                         <Badge colorScheme={c.is_active ? "green" : "red"}>
-                            {c.is_active ? 'EM DIA' : 'PENDENTE'}
+                            {c.is_active ? 'EM DIA' : 'ATRASADO'}
                         </Badge>
                     </Td>
                     <Td py={3}>
