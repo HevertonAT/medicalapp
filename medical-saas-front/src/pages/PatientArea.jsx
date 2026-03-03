@@ -4,17 +4,23 @@ import {
   Spinner, useColorModeValue, Tabs, TabList, TabPanels, Tab, TabPanel,
   Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter,
   ModalCloseButton, FormControl, FormLabel, Input, Textarea, useDisclosure,
-  Divider, SimpleGrid, Select, Container
+  SimpleGrid, Select, Container
 } from '@chakra-ui/react';
-import { FaCalendarAlt, FaUserMd, FaCalendarPlus, FaTimes, FaCheckCircle, FaClock } from 'react-icons/fa';
+import { FaCalendarAlt, FaUserMd, FaCalendarPlus, FaCheckCircle, FaClock } from 'react-icons/fa';
+
+// --- IMPORTAÇÕES DO CALENDÁRIO INTELIGENTE ---
+import DatePicker, { registerLocale } from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import ptBR from 'date-fns/locale/pt-BR';
+
 import api from '../services/api';
 
+// Configura o calendário para o idioma Português do Brasil
+registerLocale('pt-BR', ptBR);
+
 export default function PatientArea() {
-  // --- LÓGICA DE LIMITES DE DATA ---
-  const hoje = new Date().toISOString().split('T')[0];
   const dataLimiteObj = new Date();
   dataLimiteObj.setFullYear(dataLimiteObj.getFullYear() + 1);
-  const dataMaxima = dataLimiteObj.toISOString().split('T')[0];
 
   // --- ESTADOS EXISTENTES ---
   const [appointments, setAppointments] = useState([]);
@@ -27,10 +33,7 @@ export default function PatientArea() {
   const [fetchingSlots, setFetchingSlots] = useState(false); 
   const [selectedSpecialty, setSelectedSpecialty] = useState('');
   const [newAppointment, setNewAppointment] = useState({
-    doctor_id: '',
-    data: '',
-    hora: '',
-    observacoes: ''
+    doctor_id: '', data: '', hora: '', observacoes: ''
   });
 
   // --- ESTADOS PARA REAGENDAMENTO ---
@@ -56,65 +59,79 @@ export default function PatientArea() {
   const labelColor = useColorModeValue('gray.700', 'gray.300');
   const highlightColor = useColorModeValue('blue.600', 'blue.300');
 
-  // --- BUSCA DE HORÁRIOS DISPONÍVEIS (NOVO AGENDAMENTO) ---
+  // =========================================================================
+  // --- A MÁGICA DO CALENDÁRIO: VERIFICAR DIAS ATIVOS DO MÉDICO ---
+  // =========================================================================
+  const isWeekdayValid = (date, docId) => {
+    if (!docId) return false; // Se não escolheu médico, não clica em nada
+    
+    const day = date.getDay(); // 0 = Domingo, 1 = Segunda ... 6 = Sábado
+    const dayMap = { 0: 'dom', 1: 'seg', 2: 'ter', 3: 'qua', 4: 'qui', 5: 'sex', 6: 'sab' };
+
+    const doc = doctors.find(d => String(d.id) === String(docId));
+    if (!doc || !doc.agenda_config) return true; // Se o médico não tiver config, libera tudo por padrão
+
+    let config = doc.agenda_config;
+    if (typeof config === 'string') {
+      try { config = JSON.parse(config); } catch(e) {}
+    }
+
+    const dayConfig = config[dayMap[day]];
+    return dayConfig && dayConfig.ativo === true; // Só retorna true (clicável) se o dia estiver ativo
+  };
+
+  // Converte data Local para String (YYYY-MM-DD) sem bugar o Fuso Horário
+  const formatLocalDate = (date) => {
+    if (!date) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Converte String (YYYY-MM-DD) para Data Local para mostrar no Calendário
+  const parseLocalDate = (dateString) => {
+    if (!dateString) return null;
+    const [y, m, d] = dateString.split('-');
+    return new Date(y, m - 1, d);
+  };
+  // =========================================================================
+
   const fetchAvailableSlots = useCallback(async () => {
     if (!newAppointment.doctor_id || !newAppointment.data) {
       setAvailableSlots([]);
       return;
     }
-
     setFetchingSlots(true);
     try {
       const response = await api.get('/appointments/available-slots', {
-        params: {
-          doctor_id: newAppointment.doctor_id,
-          data: newAppointment.data
-        }
+        params: { doctor_id: newAppointment.doctor_id, data: newAppointment.data }
       });
       setAvailableSlots(response.data || []);
-    } catch (error) {
-      console.error(error);
-      setAvailableSlots([]);
-    } finally {
-      setFetchingSlots(false);
-    }
+    } catch (error) { setAvailableSlots([]); } 
+    finally { setFetchingSlots(false); }
   }, [newAppointment.doctor_id, newAppointment.data]);
 
-  useEffect(() => {
-    fetchAvailableSlots();
-  }, [fetchAvailableSlots]);
+  useEffect(() => { fetchAvailableSlots(); }, [fetchAvailableSlots]);
 
-  // --- BUSCA DE HORÁRIOS DISPONÍVEIS (REAGENDAMENTO) ---
   const fetchRescheduleSlots = useCallback(async () => {
     const doctorId = selectedApp?.doctor?.id || selectedApp?.doctor_id;
-
     if (!doctorId || !rescheduleData.data) {
       setRescheduleSlots([]);
       return;
     }
-
     setFetchingRescheduleSlots(true);
     try {
       const response = await api.get('/appointments/available-slots', {
-        params: {
-          doctor_id: doctorId,
-          data: rescheduleData.data
-        }
+        params: { doctor_id: doctorId, data: rescheduleData.data }
       });
       setRescheduleSlots(response.data || []);
-    } catch (error) {
-      console.error(error);
-      setRescheduleSlots([]);
-    } finally {
-      setFetchingRescheduleSlots(false);
-    }
+    } catch (error) { setRescheduleSlots([]); } 
+    finally { setFetchingRescheduleSlots(false); }
   }, [selectedApp, rescheduleData.data]);
 
-  useEffect(() => {
-    fetchRescheduleSlots();
-  }, [fetchRescheduleSlots]);
+  useEffect(() => { fetchRescheduleSlots(); }, [fetchRescheduleSlots]);
 
-  // --- CARREGAMENTO INICIAL DOS DADOS ---
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -136,7 +153,6 @@ export default function PatientArea() {
     ? doctors.filter(d => d.especialidade === selectedSpecialty)
     : doctors;
 
-  // --- FUNÇÕES DE AÇÃO (CRIAR, CANCELAR, REAGENDAR) ---
   const handleCreateAppointment = async () => {
     if (!newAppointment.doctor_id || !newAppointment.data || !newAppointment.hora) {
       toast({ title: 'Preencha todos os campos obrigatórios.', status: 'warning' });
@@ -171,11 +187,8 @@ export default function PatientArea() {
       fetchData();
       onCancelClose();
       setCancelReason('');
-    } catch (error) {
-      toast({ title: 'Erro ao cancelar consulta.', status: 'error' });
-    } finally {
-      setSubmitting(false);
-    }
+    } catch (error) { toast({ title: 'Erro ao cancelar consulta.', status: 'error' }); } 
+    finally { setSubmitting(false); }
   };
 
   const handleRescheduleAppointment = async () => {
@@ -193,11 +206,8 @@ export default function PatientArea() {
       fetchData();
       onRescheduleClose();
       setRescheduleData({ data: '', hora: '', motivo: '' });
-    } catch (error) {
-      toast({ title: 'Erro ao reagendar consulta.', status: 'error' });
-    } finally {
-      setSubmitting(false);
-    }
+    } catch (error) { toast({ title: 'Erro ao reagendar consulta.', status: 'error' }); } 
+    finally { setSubmitting(false); }
   };
 
   return (
@@ -234,16 +244,13 @@ export default function PatientArea() {
                         <Text color={subTextColor} display="flex" alignItems="center" gap={2} mt={2}>
                           <Icon as={FaClock} />
                           {app.data_horario ? new Date(app.data_horario).toLocaleString('pt-BR', {
-                            day: '2-digit', month: '2-digit', year: 'numeric',
-                            hour: '2-digit', minute: '2-digit'
+                            day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
                           }) : 'Data indefinida'}
                         </Text>
                         
-                        <Text 
-                          fontSize="sm" 
+                        <Text fontSize="sm" mt={1}
                           color={app.status?.toLowerCase() === 'cancelado' ? 'red.500' : subTextColor} 
                           fontWeight={app.status?.toLowerCase() === 'cancelado' ? 'bold' : 'normal'}
-                          mt={1}
                         >
                           Status: {
                             app.status?.toLowerCase() === 'cancelado' ? 'CANCELADO' : 
@@ -263,7 +270,6 @@ export default function PatientArea() {
                           }}>
                             Reagendar
                           </Button>
-                          
                           <Button size="sm" colorScheme="red" variant="outline" onClick={() => {
                             setSelectedApp(app);
                             onCancelOpen();
@@ -309,7 +315,7 @@ export default function PatientArea() {
                       bg={inputBg} color={textColor} border="1px solid" borderColor={inputBorder}
                       value={newAppointment.doctor_id}
                       onChange={(e) => {
-                        setNewAppointment({ ...newAppointment, doctor_id: e.target.value, hora: '' });
+                        setNewAppointment({ ...newAppointment, doctor_id: e.target.value, data: '', hora: '' });
                         setAvailableSlots([]);
                       }}
                     >
@@ -320,21 +326,33 @@ export default function PatientArea() {
                   </FormControl>
 
                   <SimpleGrid columns={{ base: 1, md: 2 }} spacing={5} w="full">
+                    
+                    {/* --- O NOVO CALENDÁRIO INTELIGENTE --- */}
                     <FormControl isRequired>
                       <FormLabel color={labelColor}>Data</FormLabel>
-                      <Input 
-                        type="date" bg={inputBg} color={textColor} border="1px solid" borderColor={inputBorder}
-                        min={hoje} max={dataMaxima}
-                        value={newAppointment.data}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          const year = val.split('-')[0];
-                          if (year.length > 4) return;
-                          
-                          setNewAppointment({ ...newAppointment, data: val, hora: '' });
-                          setAvailableSlots([]);
-                        }}
-                      />
+                      {/* Box com truque CSS para o calendário ocupar 100% da largura no Chakra UI */}
+                      <Box sx={{ '.react-datepicker-wrapper': { width: '100%' } }}>
+                        <DatePicker
+                          locale="pt-BR"
+                          dateFormat="dd/MM/yyyy"
+                          selected={parseLocalDate(newAppointment.data)}
+                          onChange={(date) => {
+                            setNewAppointment({ ...newAppointment, data: formatLocalDate(date), hora: '' });
+                            setAvailableSlots([]);
+                          }}
+                          filterDate={(date) => isWeekdayValid(date, newAppointment.doctor_id)}
+                          minDate={new Date()}
+                          maxDate={dataLimiteObj}
+                          disabled={!newAppointment.doctor_id}
+                          placeholderText={newAppointment.doctor_id ? "Selecione uma data disponível" : "Escolha o profissional primeiro"}
+                          customInput={
+                            <Input 
+                              bg={inputBg} color={textColor} border="1px solid" borderColor={inputBorder}
+                              _disabled={{ opacity: 0.6, cursor: 'not-allowed' }}
+                            />
+                          }
+                        />
+                      </Box>
                     </FormControl>
 
                     <FormControl isRequired isDisabled={!newAppointment.data || fetchingSlots}>
@@ -417,15 +435,24 @@ export default function PatientArea() {
             <VStack spacing={4}>
               <FormControl isRequired>
                 <FormLabel color={labelColor}>Nova Data</FormLabel>
-                <Input 
-                  type="date" bg={inputBg} color={textColor} border="1px solid" borderColor={inputBorder}
-                  min={hoje} max={dataMaxima}
-                  value={rescheduleData.data}
-                  onChange={(e) => {
-                    setRescheduleData({...rescheduleData, data: e.target.value, hora: ''});
-                    setRescheduleSlots([]);
-                  }}
-                />
+                <Box sx={{ '.react-datepicker-wrapper': { width: '100%' } }}>
+                  <DatePicker
+                    locale="pt-BR"
+                    dateFormat="dd/MM/yyyy"
+                    selected={parseLocalDate(rescheduleData.data)}
+                    onChange={(date) => {
+                      setRescheduleData({...rescheduleData, data: formatLocalDate(date), hora: ''});
+                      setRescheduleSlots([]);
+                    }}
+                    filterDate={(date) => isWeekdayValid(date, selectedApp?.doctor?.id || selectedApp?.doctor_id)}
+                    minDate={new Date()}
+                    maxDate={dataLimiteObj}
+                    placeholderText="Selecione uma data disponível"
+                    customInput={
+                      <Input bg={inputBg} color={textColor} border="1px solid" borderColor={inputBorder} />
+                    }
+                  />
+                </Box>
               </FormControl>
               
               <FormControl isRequired isDisabled={!rescheduleData.data || fetchingRescheduleSlots}>
