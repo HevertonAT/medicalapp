@@ -7,6 +7,7 @@ from app.db.base import get_db
 from app.core.deps import get_current_user
 from app.models.profissionais import Doctor
 from app.models.usuarios import User
+from app.models.pacientes import Patient  # <-- ADICIONADO: Necessário para a lógica do paciente órfão
 from app.schemas.esquema_profissionais import DoctorCreate, DoctorResponse, DoctorUpdate
 
 router = APIRouter()
@@ -41,16 +42,25 @@ def list_doctors(
     if current_user.role == 'superuser':
         return query.all()
 
-    # 2. O MURO DE CONCRETO: Se não for Superuser, NINGUÉM passa daqui 
-    # sem ter a busca filtrada pela sua própria clínica.
-    query = query.filter(Doctor.clinic_id == current_user.clinic_id)
-
-    # 3. Regra extra para Pacientes: Além de ver só os da sua clínica,
-    # eles só podem ver os médicos que estão com a agenda ATIVA.
+    # 2. LÓGICA DO PACIENTE ÓRFÃO vs PACIENTE VINCULADO
     if current_user.role in ['patient', 'paciente']:
+        # Pacientes só veem médicos ativos
         query = query.filter(Doctor.ativo == True)
+        
+        # Busca o perfil do paciente para saber se ele já tem clínica
+        patient_profile = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+        
+        # Se ele já tem clínica vinculada, o muro sobe e ele só vê os médicos de lá!
+        if patient_profile and patient_profile.clinic_id:
+            query = query.filter(Doctor.clinic_id == patient_profile.clinic_id)
+        # Se não tiver (None), a query passa direto sem filtro e ele vê os médicos 
+        # para poder escolher e ser "adotado".
+        
+    else:
+        # 3. O MURO DE CONCRETO PARA ADMINS E MÉDICOS:
+        query = query.filter(Doctor.clinic_id == current_user.clinic_id)
 
-    # Retorna o resultado já filtrado de forma segura
+    # Retorna o resultado
     return query.all()
 
 # --- 3. CRIAÇÃO DE MÉDICO ---

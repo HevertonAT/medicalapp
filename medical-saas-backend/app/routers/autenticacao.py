@@ -70,6 +70,7 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     # 2. Cria o Usuário (Login)
     try:
         new_user = User(
+            full_name=user.full_name,  # <--- AQUI ESTAVA O PROBLEMA! AGORA ELE SALVA O NOME
             email=user.email,
             hashed_password=get_password_hash(user.password),
             role=user.role, 

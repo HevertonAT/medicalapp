@@ -27,8 +27,13 @@ def get_available_slots(
     if not doctor or not doctor.agenda_config:
         return []
 
-    # MURO DE CONCRETO: Impede buscar horários de médicos de outras clínicas
-    if current_user.role != 'superuser' and doctor.clinic_id != current_user.clinic_id:
+    # MURO DE CONCRETO (INTELIGENTE PARA PACIENTES)
+    if current_user.role in ['patient', 'paciente']:
+        patient_profile = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+        # Se o paciente já tem clínica vinculada, ele só vê médicos daquela clínica
+        if patient_profile and patient_profile.clinic_id and doctor.clinic_id != patient_profile.clinic_id:
+            return []
+    elif current_user.role != 'superuser' and doctor.clinic_id != current_user.clinic_id:
         return []
 
     try:
@@ -70,7 +75,6 @@ def get_available_slots(
 
         horas_ocupadas = [app.data_horario.strftime("%H:%M") for app in appointments_ocupados]
         
-        # --- TRAVA DE HORÁRIOS QUE JÁ PASSARAM ---
         fuso_brasil = timezone(timedelta(hours=-3))
         agora = datetime.now(fuso_brasil)
         data_hoje_str = agora.strftime("%Y-%m-%d")
@@ -106,11 +110,9 @@ def list_all_appointments(
         joinedload(Appointment.patient)
     )
 
-    # MURO DE CONCRETO SAAS
     if current_user.role != 'superuser':
         query = query.filter(Appointment.clinic_id == current_user.clinic_id)
 
-    # Se for médico, filtra ainda mais: vê APENAS as próprias consultas
     if current_user.role == 'doctor':
         doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
         if doctor:
@@ -149,9 +151,27 @@ def create_agendamentos(agendamento: agendamentosCreate, db: Session = Depends(g
     doctor = db.query(Doctor).filter(Doctor.id == agendamento.doctor_id).first()
     if not doctor: raise HTTPException(status_code=404, detail="Médico não encontrado.")
     
-    # MURO DE CONCRETO
-    if current_user.role != 'superuser' and doctor.clinic_id != current_user.clinic_id:
-        raise HTTPException(status_code=403, detail="Acesso negado. Este profissional não pertence à sua clínica.")
+    # MURO DE CONCRETO: Separação de Regras
+    patient_id_real = agendamento.patient_id
+    
+    if current_user.role in ['patient', 'paciente']:
+        meu_perfil = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+        if not meu_perfil:
+            raise HTTPException(status_code=400, detail="Perfil de paciente não encontrado.")
+        patient_id_real = meu_perfil.id
+        
+        # Se o paciente já tem clínica vinculada, ele não pode agendar em outra
+        if meu_perfil.clinic_id and doctor.clinic_id != meu_perfil.clinic_id:
+            raise HTTPException(status_code=403, detail="Você não pode agendar com profissionais de outras clínicas.")
+            
+        # Se o paciente ainda não tinha clínica, vincula ele agora
+        if not meu_perfil.clinic_id:
+            meu_perfil.clinic_id = doctor.clinic_id
+            db.commit()
+    else:
+        # Se for Admin/Recepção/Médico, verifica a clínica
+        if current_user.role != 'superuser' and doctor.clinic_id != current_user.clinic_id:
+            raise HTTPException(status_code=403, detail="Acesso negado. Este profissional não pertence à sua clínica.")
 
     horario_conflito = db.query(Appointment).filter(
         Appointment.doctor_id == agendamento.doctor_id,
@@ -161,16 +181,6 @@ def create_agendamentos(agendamento: agendamentosCreate, db: Session = Depends(g
 
     if horario_conflito:
         raise HTTPException(status_code=400, detail="Este horário já foi preenchido. Por favor, escolha outro.")
-
-    patient_id_real = agendamento.patient_id
-    if current_user.role in ['patient', 'paciente']:
-        meu_perfil = db.query(Patient).filter(Patient.user_id == current_user.id).first()
-        if meu_perfil:
-            patient_id_real = meu_perfil.id
-            if meu_perfil.clinic_id is None:
-                meu_perfil.clinic_id = doctor.clinic_id
-                db.add(meu_perfil)
-        else: raise HTTPException(status_code=400, detail="Perfil de paciente não encontrado.")
 
     new_app = Appointment(
         clinic_id=doctor.clinic_id,
@@ -194,12 +204,15 @@ def cancel_appointment(appointment_id: int, body: dict = Body(default={}), db: S
     if not app:
         raise HTTPException(status_code=404, detail="Agendamento não encontrado.")
     
-    # MURO DE CONCRETO
-    if current_user.role != 'superuser' and app.clinic_id != current_user.clinic_id:
+    # MURO DE CONCRETO: Paciente só cancela a própria consulta
+    if current_user.role in ['patient', 'paciente']:
+        patient_profile = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+        if not patient_profile or app.patient_id != patient_profile.id:
+            raise HTTPException(status_code=403, detail="Você só tem permissão para cancelar suas próprias consultas.")
+    elif current_user.role != 'superuser' and app.clinic_id != current_user.clinic_id:
         raise HTTPException(status_code=403, detail="Acesso negado a este agendamento.")
     
     app.status = "cancelado"
-    
     db.commit()
     return {"message": "Consulta cancelada com sucesso"}
 
@@ -212,7 +225,11 @@ def reschedule_appointment(appointment_id: int, body: dict = Body(...), db: Sess
         raise HTTPException(status_code=404, detail="Agendamento não encontrado.")
     
     # MURO DE CONCRETO
-    if current_user.role != 'superuser' and app.clinic_id != current_user.clinic_id:
+    if current_user.role in ['patient', 'paciente']:
+        patient_profile = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+        if not patient_profile or app.patient_id != patient_profile.id:
+            raise HTTPException(status_code=403, detail="Você só tem permissão para reagendar suas próprias consultas.")
+    elif current_user.role != 'superuser' and app.clinic_id != current_user.clinic_id:
         raise HTTPException(status_code=403, detail="Acesso negado a este agendamento.")
     
     nova_data = body.get("data_horario")
@@ -220,7 +237,6 @@ def reschedule_appointment(appointment_id: int, body: dict = Body(...), db: Sess
         app.data_horario = datetime.strptime(nova_data, "%Y-%m-%dT%H:%M:%S")
     
     app.status = "agendado"
-    
     db.commit()
     return {"message": "Consulta reagendada com sucesso"}
 
@@ -241,7 +257,6 @@ def update_appointment_status(
     if not app_db:
         raise HTTPException(status_code=404, detail="Agendamento não encontrado.")
     
-    # MURO DE CONCRETO
     if current_user.role != 'superuser' and app_db.clinic_id != current_user.clinic_id:
         raise HTTPException(status_code=403, detail="Acesso negado a este agendamento.")
     
