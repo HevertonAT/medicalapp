@@ -103,8 +103,7 @@ export default function Financial() {
             tipo: "entrada" // Força o tipo para garantir a leitura do banco
         };
         
-        // 2. CORREÇÃO DA ROTA (Barra no final evita erros 307 de redirecionamento)
-        await api.post('/financial', payload);
+        await api.post('/financial/', payload);
         
         toast({ title: 'Faturamento lançado com sucesso!', status: 'success' });
         onClose();
