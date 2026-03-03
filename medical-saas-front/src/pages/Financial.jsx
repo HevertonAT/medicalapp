@@ -1,24 +1,35 @@
 import { useState, useEffect } from 'react';
 import {
   Box, Heading, SimpleGrid, Stat, StatLabel, StatNumber,
-  StatArrow, Flex, Icon, Select, FormControl, FormLabel, Input, Button,
-  useToast, Spinner, useColorModeValue, Text
+  Flex, Icon, Select, FormControl, FormLabel, Input, Button,
+  useToast, Spinner, useColorModeValue, Text, useDisclosure,
+  Modal, ModalOverlay, ModalContent, ModalHeader, ModalCloseButton,
+  ModalBody, ModalFooter, VStack
 } from '@chakra-ui/react';
 import { FaMoneyBillWave, FaWallet, FaFileInvoiceDollar, FaFilePdf } from 'react-icons/fa';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 
-// 1. IMPORTANDO API CENTRALIZADA
 import api from '../services/api';
 
 export default function Financial() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ 
-    income: 0, expense: 0, balance: 0, transactions: [], chart_data: [] 
+    period_revenue: 0, period_expense: 0, total_accumulated: 0, transactions: [], chart_data: [] 
   });
   
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   
+  // --- CONTROLE DO MODAL DE LANÇAMENTO ---
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [newTx, setNewTx] = useState({
+    valor_total: '',
+    metodo_pagamento: 'pix',
+    descricao: 'Receita Avulsa',
+    status_nfe: 'pendente'
+  });
+
   const toast = useToast();
   const navigate = useNavigate();
 
@@ -36,14 +47,14 @@ export default function Financial() {
       if (dateRange.start) query += `start_date=${dateRange.start}&`;
       if (dateRange.end) query += `end_date=${dateRange.end}`;
 
-      // 2. USANDO A INSTÂNCIA API (Sem URL fixa, sem header manual)
-      const response = await api.get(`/financial/stats${query}`);
-      
+      // Usa a nova rota /finance/ que configuramos no main.py do backend
+      const response = await api.get(`/finance/stats${query}`);
       setStats(response.data);
     } catch (error) {
       console.error(error);
+      // Se a API for /financial/ no seu backend, ajuste a URL acima
       if (error.response && error.response.status === 403) {
-          toast({ title: 'Acesso Negado', description: 'Você não tem permissão para ver isso.', status: 'error' });
+          toast({ title: 'Acesso Negado', description: 'Você não tem permissão.', status: 'error' });
           navigate('/dashboard');
       }
     } finally {
@@ -72,13 +83,45 @@ export default function Financial() {
     setDateRange({ start, end });
   };
 
+  // --- FUNÇÃO PARA LANÇAR NOVA RECEITA ---
+  const handleCreateTransaction = async () => {
+    if (!newTx.valor_total || !newTx.metodo_pagamento || !newTx.descricao) {
+        toast({ title: 'Preencha os campos obrigatórios!', status: 'warning' });
+        return;
+    }
+    setIsSubmitting(true);
+    try {
+        const payload = {
+            valor_total: parseFloat(newTx.valor_total),
+            metodo_pagamento: newTx.metodo_pagamento,
+            descricao: newTx.descricao,
+            status_nfe: newTx.status_nfe
+        };
+        
+        await api.post('/finance', payload);
+        toast({ title: 'Faturamento lançado com sucesso!', status: 'success' });
+        onClose();
+        setNewTx({ valor_total: '', metodo_pagamento: 'pix', descricao: 'Receita Avulsa', status_nfe: 'pendente' });
+        fetchFinancialData(); 
+    } catch (error) {
+        toast({ title: 'Erro ao lançar.', description: error.response?.data?.detail, status: 'error' });
+    } finally {
+        setIsSubmitting(false);
+    }
+  };
+
+  // --- FUNÇÃO TEMPORÁRIA PARA RELATÓRIO ---
+  const handlePrintPDF = () => {
+      window.print();
+  };
+
   return (
     <Box p={8}>
-      <Flex justify="space-between" align="center" mb={6}>
+      <Flex justify="space-between" align="center" mb={6} direction={{ base: 'column', md: 'row' }} gap={4}>
         <Heading size="lg" color={useColorModeValue("gray.700", "white")}>Gestão Financeira</Heading>
         <Flex gap={2}>
-            <Button leftIcon={<FaFileInvoiceDollar />} colorScheme="green">Lançar Faturamento</Button>
-            <Button leftIcon={<FaFilePdf />} colorScheme="blue" variant="outline">Relatório PDF</Button>
+            <Button leftIcon={<FaFileInvoiceDollar />} colorScheme="green" onClick={onOpen}>Lançar Faturamento</Button>
+            <Button leftIcon={<FaFilePdf />} colorScheme="blue" variant="outline" onClick={handlePrintPDF}>Relatório PDF</Button>
         </Flex>
       </Flex>
 
@@ -101,27 +144,21 @@ export default function Financial() {
             <FormControl>
                 <FormLabel>Data Inicial</FormLabel>
                 <Input 
-                    type="date" 
-                    bg={inputBg} 
-                    borderColor={borderColor}
-                    value={dateRange.start} 
-                    onChange={(e) => setDateRange({...dateRange, start: e.target.value})} 
+                    type="date" bg={inputBg} borderColor={borderColor}
+                    value={dateRange.start} onChange={(e) => setDateRange({...dateRange, start: e.target.value})} 
                 />
             </FormControl>
             <FormControl>
                 <FormLabel>Data Final</FormLabel>
                 <Input 
-                    type="date" 
-                    bg={inputBg} 
-                    borderColor={borderColor}
-                    value={dateRange.end} 
-                    onChange={(e) => setDateRange({...dateRange, end: e.target.value})} 
+                    type="date" bg={inputBg} borderColor={borderColor}
+                    value={dateRange.end} onChange={(e) => setDateRange({...dateRange, end: e.target.value})} 
                 />
             </FormControl>
         </SimpleGrid>
       </Box>
 
-      {loading ? <Spinner size="xl" /> : (
+      {loading ? <Flex justify="center" my={10}><Spinner size="xl" color="blue.500" /></Flex> : (
         <>
           <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6} mb={8}>
             <Stat bg={bgCard} p={5} shadow="sm" borderRadius="lg" borderLeft="4px solid" borderColor="green.400">
@@ -150,40 +187,52 @@ export default function Financial() {
           </SimpleGrid>
 
           <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
-            <Box bg={bgCard} p={5} shadow="sm" borderRadius="lg" h="400px">
+            {/* O SEGREDO DO GRÁFICO: Flex Column com flex="1" no Box do Gráfico */}
+            <Flex direction="column" bg={bgCard} p={5} shadow="sm" borderRadius="lg" h="400px" border="1px" borderColor={borderColor}>
                 <Heading size="md" mb={4} color={textColor}>Evolução Diária (Período)</Heading>
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={stats.chart_data}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={useColorModeValue("#eee", "#444")} />
-                        <XAxis dataKey="name" stroke={textColor} />
-                        <YAxis stroke={textColor} />
-                        <Tooltip 
-                            contentStyle={{ backgroundColor: chartTooltipBg, borderColor: borderColor }} 
-                            itemStyle={{ color: useColorModeValue('#000', '#fff') }}
-                        />
-                        <Legend />
-                        <Bar dataKey="valor" fill="#48BB78" name="Faturamento (R$)" />
-                    </BarChart>
-                </ResponsiveContainer>
-            </Box>
+                <Box flex="1" minH="0" w="100%">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={stats.chart_data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke={useColorModeValue("#eee", "#444")} />
+                            <XAxis dataKey="name" stroke={textColor} fontSize={12} />
+                            <YAxis stroke={textColor} fontSize={12} />
+                            <Tooltip 
+                                contentStyle={{ backgroundColor: chartTooltipBg, borderColor: borderColor, borderRadius: '8px' }} 
+                                itemStyle={{ color: useColorModeValue('#000', '#fff') }}
+                            />
+                            <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                            <Bar dataKey="valor" fill="#48BB78" name="Faturamento (R$)" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </Box>
+            </Flex>
 
-            <Box bg={bgCard} p={5} shadow="sm" borderRadius="lg">
+            <Box bg={bgCard} p={5} shadow="sm" borderRadius="lg" border="1px" borderColor={borderColor}>
                 <Heading size="md" mb={4} color={textColor}>Últimos Lançamentos</Heading>
                 <Flex direction="column" gap={3}>
                     <Flex justify="space-between" color="gray.500" fontSize="xs" fontWeight="bold" px={2}>
                         <Text flex="1">DATA</Text>
                         <Text flex="1">VALOR</Text>
-                        <Text flex="1">MÉTODO</Text>
+                        <Text flex="1" textAlign="right">MÉTODO</Text>
                     </Flex>
+                    
                     {stats.transactions && stats.transactions.map((t) => (
-                        <Flex key={t.id} justify="space-between" p={3} bg={inputBg} borderRadius="md" align="center">
-                             <Text fontSize="sm" flex="1">{new Date(t.created_at).toLocaleDateString()}</Text>
-                             <Text fontSize="sm" flex="1" fontWeight="bold" color="green.500">R$ {t.valor_total.toFixed(2)}</Text>
-                             <Text fontSize="xs" flex="1" fontWeight="bold" bg="gray.200" color="black" px={2} py={1} borderRadius="md" w="fit-content" textAlign="center">
-                                {t.metodo_pagamento.toUpperCase()}
+                        <Flex key={t.id} justify="space-between" p={3} bg={inputBg} borderRadius="md" align="center" border="1px" borderColor={borderColor}>
+                             {/* Ajuste: lendo as propriedades corretas do novo Backend (criado_em, valor, forma_pagamento) */}
+                             <Text fontSize="sm" flex="1">
+                                {t.criado_em ? new Date(t.criado_em).toLocaleDateString('pt-BR') : '-'}
                              </Text>
+                             <Text fontSize="sm" flex="1" fontWeight="bold" color="green.500">
+                                R$ {Number(t.valor).toFixed(2)}
+                             </Text>
+                             <Box flex="1" display="flex" justifyContent="flex-end">
+                                <Text fontSize="xs" fontWeight="bold" bg="gray.200" color="black" px={2} py={1} borderRadius="md" w="fit-content">
+                                    {t.forma_pagamento ? t.forma_pagamento.toUpperCase() : 'N/A'}
+                                </Text>
+                             </Box>
                         </Flex>
                     ))}
+                    
                     {(!stats.transactions || stats.transactions.length === 0) && (
                         <Text color="gray.500" textAlign="center" mt={4}>Nenhum lançamento no período.</Text>
                     )}
@@ -192,6 +241,69 @@ export default function Financial() {
           </SimpleGrid>
         </>
       )}
+
+      {/* --- MODAL PARA LANÇAR NOVO FATURAMENTO --- */}
+      <Modal isOpen={isOpen} onClose={onClose} isCentered>
+        <ModalOverlay />
+        <ModalContent bg={bgCard} border="1px solid" borderColor={borderColor}>
+          <ModalHeader color={textColor}>Lançar Receita Avulsa</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={4}>
+                <FormControl isRequired>
+                    <FormLabel color={textColor}>Valor (R$)</FormLabel>
+                    <Input 
+                        type="number" step="0.01" bg={inputBg} borderColor={borderColor}
+                        placeholder="Ex: 150.00"
+                        value={newTx.valor_total}
+                        onChange={(e) => setNewTx({...newTx, valor_total: e.target.value})}
+                    />
+                </FormControl>
+                <FormControl isRequired>
+                    <FormLabel color={textColor}>Descrição</FormLabel>
+                    <Input 
+                        type="text" bg={inputBg} borderColor={borderColor}
+                        placeholder="Ex: Consulta Particular"
+                        value={newTx.descricao}
+                        onChange={(e) => setNewTx({...newTx, descricao: e.target.value})}
+                    />
+                </FormControl>
+                <FormControl isRequired>
+                    <FormLabel color={textColor}>Método de Pagamento</FormLabel>
+                    <Select 
+                        bg={inputBg} borderColor={borderColor}
+                        value={newTx.metodo_pagamento}
+                        onChange={(e) => setNewTx({...newTx, metodo_pagamento: e.target.value})}
+                    >
+                        <option value="pix">PIX</option>
+                        <option value="cartao_credito">Cartão de Crédito</option>
+                        <option value="cartao_debito">Cartão de Débito</option>
+                        <option value="dinheiro">Dinheiro Físico</option>
+                        <option value="convenio">Convênio</option>
+                    </Select>
+                </FormControl>
+                <FormControl>
+                    <FormLabel color={textColor}>Status da NF-e / Recibo</FormLabel>
+                    <Select 
+                        bg={inputBg} borderColor={borderColor}
+                        value={newTx.status_nfe}
+                        onChange={(e) => setNewTx({...newTx, status_nfe: e.target.value})}
+                    >
+                        <option value="pendente">Pendente de Emissão</option>
+                        <option value="emitida">Já Emitida</option>
+                        <option value="dispensada">Dispensada</option>
+                    </Select>
+                </FormControl>
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onClose}>Cancelar</Button>
+            <Button colorScheme="green" onClick={handleCreateTransaction} isLoading={isSubmitting}>
+              Salvar Receita
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </Box>
   );
 }
