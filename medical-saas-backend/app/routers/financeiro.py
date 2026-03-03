@@ -28,11 +28,6 @@ router = APIRouter()
 # Apenas 'admin' e 'superuser' acessam.
 allow_only_admin = RoleChecker(["admin", "superuser"])
 
-
-# =========================================================================
-# 1. ROTAS DO DASHBOARD E LANÇAMENTO RÁPIDO (O que você já tinha)
-# =========================================================================
-
 @router.get("/stats")
 def get_financial_stats(
     start_date: Optional[str] = None, 
