@@ -15,7 +15,7 @@ import ClinicsManage from './pages/ClinicsManage';
 
 export default function App() {
   return (
-<Routes>
+    <Routes>
       <Route path="/" element={<Login />} />
 
       {/* Rotas com Menu Lateral */}
