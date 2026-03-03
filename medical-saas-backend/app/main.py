@@ -35,6 +35,7 @@ from app.routers import (
     usuarios, 
     profissionais, 
     pacientes, 
+    planos,
     prontuarios, 
     financeiro, 
     arquivos, 
@@ -90,6 +91,7 @@ app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
 app.include_router(regras_especialidades.router, prefix="/specialties", tags=["Configuração Especialidades"])
 app.include_router(macros.router, prefix="/macros", tags=["Macros"])
 app.include_router(cids.router, prefix="/cids", tags=["CIDs"])
+app.include_router(planos.router, prefix="/planos", tags=["Planos de Assinatura"])
 
 @app.get("/")
 def health_check():
