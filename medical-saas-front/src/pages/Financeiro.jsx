@@ -47,12 +47,10 @@ export default function Financial() {
       if (dateRange.start) query += `start_date=${dateRange.start}&`;
       if (dateRange.end) query += `end_date=${dateRange.end}`;
 
-      // Usa a nova rota /finance/ que configuramos no main.py do backend
-      const response = await api.get(`/finance/stats${query}`);
+      const response = await api.get(`/financial/stats${query}`);
       setStats(response.data);
     } catch (error) {
       console.error(error);
-      // Se a API for /financial/ no seu backend, ajuste a URL acima
       if (error.response && error.response.status === 403) {
           toast({ title: 'Acesso Negado', description: 'Você não tem permissão.', status: 'error' });
           navigate('/dashboard');
@@ -83,7 +81,6 @@ export default function Financial() {
     setDateRange({ start, end });
   };
 
-  // --- FUNÇÃO PARA LANÇAR NOVA RECEITA ---
   const handleCreateTransaction = async () => {
     if (!newTx.valor_total || !newTx.metodo_pagamento || !newTx.descricao) {
         toast({ title: 'Preencha os campos obrigatórios!', status: 'warning' });
@@ -98,7 +95,8 @@ export default function Financial() {
             status_nfe: newTx.status_nfe
         };
         
-        await api.post('/finance', payload);
+        await api.post('/financial', payload);
+        
         toast({ title: 'Faturamento lançado com sucesso!', status: 'success' });
         onClose();
         setNewTx({ valor_total: '', metodo_pagamento: 'pix', descricao: 'Receita Avulsa', status_nfe: 'pendente' });
@@ -110,9 +108,96 @@ export default function Financial() {
     }
   };
 
-  // --- FUNÇÃO TEMPORÁRIA PARA RELATÓRIO ---
+  // =========================================================================
+  // --- GERADOR DE RELATÓRIO PDF FORMATADO ---
+  // =========================================================================
   const handlePrintPDF = () => {
-      window.print();
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        toast({ title: "Pop-up bloqueado", description: "Permita pop-ups para imprimir.", status: "warning" });
+        return;
+    }
+
+    const dataInicio = dateRange.start ? new Date(dateRange.start).toLocaleDateString('pt-BR') : 'Início';
+    const dataFim = dateRange.end ? new Date(dateRange.end).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
+
+    const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Relatório Financeiro</title>
+            <style>
+                body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #333; line-height: 1.6; }
+                .header { text-align: center; border-bottom: 2px solid #48BB78; padding-bottom: 20px; margin-bottom: 30px; }
+                .header h1 { margin: 0; color: #2D3748; font-size: 28px; text-transform: uppercase; }
+                .header p { margin: 5px 0 0 0; color: #718096; font-size: 14px; }
+                .summary { display: flex; justify-content: space-between; margin-bottom: 40px; }
+                .summary-box { background: #F7FAFC; border: 1px solid #E2E8F0; padding: 20px; border-radius: 8px; width: 45%; text-align: center; }
+                .summary-box h3 { margin: 0 0 10px 0; color: #4A5568; font-size: 14px; text-transform: uppercase; }
+                .summary-box p { margin: 0; font-size: 28px; font-weight: bold; }
+                .val-green { color: #48BB78; }
+                .val-blue { color: #3182CE; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+                th, td { border-bottom: 1px solid #E2E8F0; padding: 12px 15px; text-align: left; }
+                th { background-color: #EDF2F7; color: #4A5568; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+                .method-badge { background: #E2E8F0; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; color: #4A5568; }
+                .amount { color: #48BB78; font-weight: bold; }
+                .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #A0AEC0; border-top: 1px solid #E2E8F0; padding-top: 20px; }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>Relatório Financeiro</h1>
+                <p>Período de apuração: <strong>${dataInicio}</strong> até <strong>${dataFim}</strong></p>
+            </div>
+
+            <div class="summary">
+                <div class="summary-box">
+                    <h3>Faturamento no Período</h3>
+                    <p class="val-green">R$ ${stats.period_revenue ? stats.period_revenue.toFixed(2) : "0.00"}</p>
+                </div>
+                <div class="summary-box">
+                    <h3>Total Acumulado (Geral)</h3>
+                    <p class="val-blue">R$ ${stats.total_accumulated ? stats.total_accumulated.toFixed(2) : "0.00"}</p>
+                </div>
+            </div>
+
+            <h2 style="color: #2D3748; font-size: 18px; border-left: 4px solid #48BB78; padding-left: 10px;">Lançamentos do Período</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Descrição</th>
+                        <th>Método</th>
+                        <th style="text-align: right;">Valor (R$)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${stats.transactions && stats.transactions.length > 0 ? stats.transactions.map(t => `
+                        <tr>
+                            <td>${t.criado_em ? new Date(t.criado_em).toLocaleDateString('pt-BR') : '-'}</td>
+                            <td>${t.descricao || 'Receita Avulsa'}</td>
+                            <td><span class="method-badge">${t.forma_pagamento ? t.forma_pagamento.toUpperCase() : '-'}</span></td>
+                            <td class="amount" style="text-align: right;">R$ ${Number(t.valor).toFixed(2)}</td>
+                        </tr>
+                    `).join('') : '<tr><td colspan="4" style="text-align: center; padding: 30px; color: #A0AEC0;">Nenhum lançamento encontrado neste período.</td></tr>'}
+                </tbody>
+            </table>
+
+            <div class="footer">
+                Documento gerado automaticamente pelo sistema de Gestão de Clínicas em ${new Date().toLocaleString('pt-BR')}
+            </div>
+        </body>
+        </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    
+    // Pequeno delay para garantir que o CSS carregou na nova janela
+    setTimeout(() => {
+        printWindow.print();
+    }, 250);
   };
 
   return (
@@ -187,7 +272,6 @@ export default function Financial() {
           </SimpleGrid>
 
           <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
-            {/* O SEGREDO DO GRÁFICO: Flex Column com flex="1" no Box do Gráfico */}
             <Flex direction="column" bg={bgCard} p={5} shadow="sm" borderRadius="lg" h="400px" border="1px" borderColor={borderColor}>
                 <Heading size="md" mb={4} color={textColor}>Evolução Diária (Período)</Heading>
                 <Box flex="1" minH="0" w="100%">
@@ -207,7 +291,7 @@ export default function Financial() {
                 </Box>
             </Flex>
 
-            <Box bg={bgCard} p={5} shadow="sm" borderRadius="lg" border="1px" borderColor={borderColor}>
+            <Box bg={bgCard} p={5} shadow="sm" borderRadius="lg" border="1px" borderColor={borderColor} overflowY="auto" maxH="400px">
                 <Heading size="md" mb={4} color={textColor}>Últimos Lançamentos</Heading>
                 <Flex direction="column" gap={3}>
                     <Flex justify="space-between" color="gray.500" fontSize="xs" fontWeight="bold" px={2}>
@@ -218,7 +302,6 @@ export default function Financial() {
                     
                     {stats.transactions && stats.transactions.map((t) => (
                         <Flex key={t.id} justify="space-between" p={3} bg={inputBg} borderRadius="md" align="center" border="1px" borderColor={borderColor}>
-                             {/* Ajuste: lendo as propriedades corretas do novo Backend (criado_em, valor, forma_pagamento) */}
                              <Text fontSize="sm" flex="1">
                                 {t.criado_em ? new Date(t.criado_em).toLocaleDateString('pt-BR') : '-'}
                              </Text>
