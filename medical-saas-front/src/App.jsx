@@ -4,7 +4,7 @@ import Dashboard from './pages/Dashboard';
 import Patients from './pages/Patients';
 import Doctors from './pages/Doctors';
 import Agenda from './pages/Agenda';
-import Financial from './pages/Financial';
+import Financial from './pages/Financeiro';
 import SpecialtySettings from './pages/SpecialtySettings';
 import SidebarLayout from './components/SidebarLayout';
 import DevTools from './pages/DevTools';
