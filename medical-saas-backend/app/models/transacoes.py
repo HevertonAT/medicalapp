@@ -5,12 +5,12 @@ from app.db.base import Base
 
 # NOME DA CLASSE: Transaction (Singular, Inglês)
 class Transaction(Base):
-    __tablename__ = "transacoes" # NOME DA TABELA: transacoes (Plural, Português)
+    __tablename__ = "transacoes" 
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     
     # FKs (Inteiros)
-    clinic_id = Column(Integer, ForeignKey("clinicas.id"), nullable=True)
+    clinic_id = Column(Integer, ForeignKey("clinicas.id"), nullable=False)
     patient_id = Column(Integer, ForeignKey("pacientes.id"), nullable=True)
     appointment_id = Column(Integer, ForeignKey("agendamentos.id"), nullable=True)
     

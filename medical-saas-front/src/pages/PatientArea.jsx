@@ -18,6 +18,7 @@ registerLocale('pt-BR', ptBR);
 
 export default function PatientArea() {
   const dataLimiteObj = new Date();
+  // Limita o agendamento para no máximo 1 ano a partir de hoje
   dataLimiteObj.setFullYear(dataLimiteObj.getFullYear() + 1);
 
   const [appointments, setAppointments] = useState([]);
@@ -53,9 +54,6 @@ export default function PatientArea() {
   const labelColor = useColorModeValue('gray.700', 'gray.300');
   const highlightColor = useColorModeValue('blue.600', 'blue.300');
 
-  // =========================================================================
-  // --- A MÁGICA BLINDADA DO CALENDÁRIO ---
-  // =========================================================================
   const isWeekdayValid = (date, docId) => {
     if (!docId) return false; 
     
@@ -67,19 +65,16 @@ export default function PatientArea() {
 
     try {
       let config = doc.agenda_config;
-      // Garante que se vier como string do banco, nós transformamos em objeto real
       if (typeof config === 'string') {
         config = JSON.parse(config);
       }
 
       const dayConfig = config[dayMap[day]];
-      
-      // Verifica se existe a config do dia E se está marcada como ativa (aceita boolean ou string)
       return dayConfig && (dayConfig.ativo === true || String(dayConfig.ativo) === "true");
       
     } catch (error) {
       console.error("Erro ao ler agenda do médico:", error);
-      return true; // Se der erro de leitura, não trava o paciente inteiro
+      return true; 
     }
   };
 
@@ -96,7 +91,6 @@ export default function PatientArea() {
     const [y, m, d] = dateString.split('-');
     return new Date(y, m - 1, d);
   };
-  // =========================================================================
 
   const fetchAvailableSlots = useCallback(async () => {
     if (!newAppointment.doctor_id || !newAppointment.data) {
@@ -347,9 +341,9 @@ export default function PatientArea() {
                           customInput={
                             <Input 
                               bg={inputBg} color={textColor} border="1px solid" borderColor={inputBorder}
+                              isReadOnly // <-- A MÁGICA FINAL: IMPEDE DIGITAÇÃO E AUTOCOMPLETAR
+                              cursor="pointer" // Mostra a "mãozinha" indicando que é clicável
                               _disabled={{ opacity: 0.6, cursor: 'not-allowed' }}
-                              onKeyDown={(e) => e.preventDefault()} // <-- BLOQUEIA A DIGITAÇÃO! SÓ PODE CLICAR.
-                              autoComplete="off"
                             />
                           }
                         />
@@ -429,7 +423,7 @@ export default function PatientArea() {
           <ModalCloseButton color={subTextColor} />
           <ModalBody>
             <Text mb={4} color={subTextColor}>
-              Escolha uma nova data e horário para a consulta com o(a) <b>{selectedApp?.doctor?.nome}</b>.
+              Escolha uma nova data e horário para a consulta com Dr(a) <b>{selectedApp?.doctor?.nome}</b>.
             </Text>
             <VStack spacing={4}>
               <FormControl isRequired>
@@ -450,8 +444,8 @@ export default function PatientArea() {
                     customInput={
                       <Input 
                         bg={inputBg} color={textColor} border="1px solid" borderColor={inputBorder} 
-                        onKeyDown={(e) => e.preventDefault()} // <-- BLOQUEIA A DIGITAÇÃO AQUI TAMBÉM
-                        autoComplete="off"
+                        isReadOnly // <-- BLOQUEIO DE DIGITAÇÃO NO REAGENDAR TAMBÉM
+                        cursor="pointer"
                       />
                     }
                   />
@@ -459,7 +453,7 @@ export default function PatientArea() {
               </FormControl>
               
               <FormControl isRequired isDisabled={!rescheduleData.data || fetchingRescheduleSlots}>
-                <FormLabel color={labelColor}>Horários Disponíveis</FormLabel>
+                <FormLabel color={labelColor}>Horários</FormLabel>
                 {fetchingRescheduleSlots ? (
                   <HStack bg={inputBg} p={2} borderRadius="md" justify="center" border="1px solid" borderColor={inputBorder}>
                     <Spinner size="xs" color={highlightColor} /><Text fontSize="xs" color={textColor}>Buscando vagas...</Text>
