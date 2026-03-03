@@ -47,7 +47,14 @@ export default function Financial() {
       if (dateRange.start) query += `start_date=${dateRange.start}&`;
       if (dateRange.end) query += `end_date=${dateRange.end}`;
 
-      const response = await api.get(`/financial/stats${query}`);
+      // 1. FURA-CACHE DA VERCEL: Obriga a buscar do banco e não do histórico
+      const response = await api.get(`/financial/stats${query}`, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
       setStats(response.data);
     } catch (error) {
       console.error(error);
@@ -92,14 +99,18 @@ export default function Financial() {
             valor_total: parseFloat(newTx.valor_total),
             metodo_pagamento: newTx.metodo_pagamento,
             descricao: newTx.descricao,
-            status_nfe: newTx.status_nfe
+            status_nfe: newTx.status_nfe,
+            tipo: "entrada" // Força o tipo para garantir a leitura do banco
         };
         
-        await api.post('/financial', payload);
+        // 2. CORREÇÃO DA ROTA (Barra no final evita erros 307 de redirecionamento)
+        await api.post('/financial/', payload);
         
         toast({ title: 'Faturamento lançado com sucesso!', status: 'success' });
         onClose();
         setNewTx({ valor_total: '', metodo_pagamento: 'pix', descricao: 'Receita Avulsa', status_nfe: 'pendente' });
+        
+        // Atualiza a tela imediatamente após salvar
         fetchFinancialData(); 
     } catch (error) {
         toast({ title: 'Erro ao lançar.', description: error.response?.data?.detail, status: 'error' });
@@ -109,17 +120,11 @@ export default function Financial() {
   };
 
   // =========================================================================
-  // --- GERADOR DE RELATÓRIO PDF FORMATADO ---
+  // --- 3. GERADOR DE RELATÓRIO PDF (O MODO INVISÍVEL E BONITO) ---
   // =========================================================================
   const handlePrintPDF = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-        toast({ title: "Pop-up bloqueado", description: "Permita pop-ups para imprimir.", status: "warning" });
-        return;
-    }
-
-    const dataInicio = dateRange.start ? new Date(dateRange.start).toLocaleDateString('pt-BR') : 'Início';
-    const dataFim = dateRange.end ? new Date(dateRange.end).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
+    const dataInicio = dateRange.start ? new Date(dateRange.start + 'T00:00:00').toLocaleDateString('pt-BR') : 'Início do Mês';
+    const dataFim = dateRange.end ? new Date(dateRange.end + 'T00:00:00').toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
 
     const html = `
         <!DOCTYPE html>
@@ -127,7 +132,7 @@ export default function Financial() {
         <head>
             <title>Relatório Financeiro</title>
             <style>
-                body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #333; line-height: 1.6; }
+                body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #333; line-height: 1.6; background: white; }
                 .header { text-align: center; border-bottom: 2px solid #48BB78; padding-bottom: 20px; margin-bottom: 30px; }
                 .header h1 { margin: 0; color: #2D3748; font-size: 28px; text-transform: uppercase; }
                 .header p { margin: 5px 0 0 0; color: #718096; font-size: 14px; }
@@ -147,7 +152,7 @@ export default function Financial() {
         </head>
         <body>
             <div class="header">
-                <h1>Relatório Financeiro</h1>
+                <h1>Relatório Financeiro da Clínica</h1>
                 <p>Período de apuração: <strong>${dataInicio}</strong> até <strong>${dataFim}</strong></p>
             </div>
 
@@ -185,19 +190,37 @@ export default function Financial() {
             </table>
 
             <div class="footer">
-                Documento gerado automaticamente pelo sistema de Gestão de Clínicas em ${new Date().toLocaleString('pt-BR')}
+                Documento gerado automaticamente pelo sistema em ${new Date().toLocaleString('pt-BR')}
             </div>
         </body>
         </html>
     `;
 
-    printWindow.document.write(html);
-    printWindow.document.close();
-    
-    // Pequeno delay para garantir que o CSS carregou na nova janela
-    setTimeout(() => {
-        printWindow.print();
-    }, 250);
+    // Cria um iframe invisível para imprimir o HTML perfeitamente sem abrir janelas chatas
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentWindow.document;
+    iframeDoc.open();
+    iframeDoc.write(html);
+    iframeDoc.close();
+
+    // Quando o HTML terminar de carregar invisivelmente, dispara a impressão
+    iframe.onload = function() {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+        
+        // Remove o iframe para não pesar o navegador depois de 2 segundos
+        setTimeout(() => {
+            document.body.removeChild(iframe);
+        }, 2000);
+    };
   };
 
   return (
