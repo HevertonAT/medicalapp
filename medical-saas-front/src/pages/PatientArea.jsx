@@ -8,27 +8,23 @@ import {
 } from '@chakra-ui/react';
 import { FaCalendarAlt, FaUserMd, FaCalendarPlus, FaCheckCircle, FaClock } from 'react-icons/fa';
 
-// --- IMPORTAÇÕES DO CALENDÁRIO INTELIGENTE ---
 import DatePicker, { registerLocale } from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import ptBR from 'date-fns/locale/pt-BR';
 
 import api from '../services/api';
 
-// Configura o calendário para o idioma Português do Brasil
 registerLocale('pt-BR', ptBR);
 
 export default function PatientArea() {
   const dataLimiteObj = new Date();
   dataLimiteObj.setFullYear(dataLimiteObj.getFullYear() + 1);
 
-  // --- ESTADOS EXISTENTES ---
   const [appointments, setAppointments] = useState([]);
   const [doctors, setDoctors] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [tabIndex, setTabIndex] = useState(0); 
 
-  // --- ESTADOS PARA NOVO AGENDAMENTO ---
   const [availableSlots, setAvailableSlots] = useState([]); 
   const [fetchingSlots, setFetchingSlots] = useState(false); 
   const [selectedSpecialty, setSelectedSpecialty] = useState('');
@@ -36,7 +32,6 @@ export default function PatientArea() {
     doctor_id: '', data: '', hora: '', observacoes: ''
   });
 
-  // --- ESTADOS PARA REAGENDAMENTO ---
   const [rescheduleSlots, setRescheduleSlots] = useState([]);
   const [fetchingRescheduleSlots, setFetchingRescheduleSlots] = useState(false);
 
@@ -49,7 +44,6 @@ export default function PatientArea() {
   const [submitting, setSubmitting] = useState(false);
   const toast = useToast();
 
-  // --- DEFINIÇÃO DINÂMICA DE CORES (CLARO / ESCURO) ---
   const bgCard = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   const inputBg = useColorModeValue('gray.50', 'gray.700'); 
@@ -60,27 +54,35 @@ export default function PatientArea() {
   const highlightColor = useColorModeValue('blue.600', 'blue.300');
 
   // =========================================================================
-  // --- A MÁGICA DO CALENDÁRIO: VERIFICAR DIAS ATIVOS DO MÉDICO ---
+  // --- A MÁGICA BLINDADA DO CALENDÁRIO ---
   // =========================================================================
   const isWeekdayValid = (date, docId) => {
-    if (!docId) return false; // Se não escolheu médico, não clica em nada
+    if (!docId) return false; 
     
-    const day = date.getDay(); // 0 = Domingo, 1 = Segunda ... 6 = Sábado
+    const day = date.getDay(); 
     const dayMap = { 0: 'dom', 1: 'seg', 2: 'ter', 3: 'qua', 4: 'qui', 5: 'sex', 6: 'sab' };
-
     const doc = doctors.find(d => String(d.id) === String(docId));
-    if (!doc || !doc.agenda_config) return true; // Se o médico não tiver config, libera tudo por padrão
 
-    let config = doc.agenda_config;
-    if (typeof config === 'string') {
-      try { config = JSON.parse(config); } catch(e) {}
+    if (!doc || !doc.agenda_config) return true; 
+
+    try {
+      let config = doc.agenda_config;
+      // Garante que se vier como string do banco, nós transformamos em objeto real
+      if (typeof config === 'string') {
+        config = JSON.parse(config);
+      }
+
+      const dayConfig = config[dayMap[day]];
+      
+      // Verifica se existe a config do dia E se está marcada como ativa (aceita boolean ou string)
+      return dayConfig && (dayConfig.ativo === true || String(dayConfig.ativo) === "true");
+      
+    } catch (error) {
+      console.error("Erro ao ler agenda do médico:", error);
+      return true; // Se der erro de leitura, não trava o paciente inteiro
     }
-
-    const dayConfig = config[dayMap[day]];
-    return dayConfig && dayConfig.ativo === true; // Só retorna true (clicável) se o dia estiver ativo
   };
 
-  // Converte data Local para String (YYYY-MM-DD) sem bugar o Fuso Horário
   const formatLocalDate = (date) => {
     if (!date) return '';
     const year = date.getFullYear();
@@ -89,7 +91,6 @@ export default function PatientArea() {
     return `${year}-${month}-${day}`;
   };
 
-  // Converte String (YYYY-MM-DD) para Data Local para mostrar no Calendário
   const parseLocalDate = (dateString) => {
     if (!dateString) return null;
     const [y, m, d] = dateString.split('-');
@@ -327,10 +328,8 @@ export default function PatientArea() {
 
                   <SimpleGrid columns={{ base: 1, md: 2 }} spacing={5} w="full">
                     
-                    {/* --- O NOVO CALENDÁRIO INTELIGENTE --- */}
                     <FormControl isRequired>
                       <FormLabel color={labelColor}>Data</FormLabel>
-                      {/* Box com truque CSS para o calendário ocupar 100% da largura no Chakra UI */}
                       <Box sx={{ '.react-datepicker-wrapper': { width: '100%' } }}>
                         <DatePicker
                           locale="pt-BR"
@@ -344,11 +343,13 @@ export default function PatientArea() {
                           minDate={new Date()}
                           maxDate={dataLimiteObj}
                           disabled={!newAppointment.doctor_id}
-                          placeholderText={newAppointment.doctor_id ? "Selecione uma data disponível" : "Escolha o profissional primeiro"}
+                          placeholderText={newAppointment.doctor_id ? "Selecione uma data" : "Escolha o profissional"}
                           customInput={
                             <Input 
                               bg={inputBg} color={textColor} border="1px solid" borderColor={inputBorder}
                               _disabled={{ opacity: 0.6, cursor: 'not-allowed' }}
+                              onKeyDown={(e) => e.preventDefault()} // <-- BLOQUEIA A DIGITAÇÃO! SÓ PODE CLICAR.
+                              autoComplete="off"
                             />
                           }
                         />
@@ -390,8 +391,6 @@ export default function PatientArea() {
           </TabPanel>
         </TabPanels>
       </Tabs>
-
-      {/* --- MODAIS DE AÇÃO --- */}
 
       {/* MODAL DE CANCELAMENTO */}
       <Modal isOpen={isCancelOpen} onClose={onCancelClose} isCentered>
@@ -449,7 +448,11 @@ export default function PatientArea() {
                     maxDate={dataLimiteObj}
                     placeholderText="Selecione uma data disponível"
                     customInput={
-                      <Input bg={inputBg} color={textColor} border="1px solid" borderColor={inputBorder} />
+                      <Input 
+                        bg={inputBg} color={textColor} border="1px solid" borderColor={inputBorder} 
+                        onKeyDown={(e) => e.preventDefault()} // <-- BLOQUEIA A DIGITAÇÃO AQUI TAMBÉM
+                        autoComplete="off"
+                      />
                     }
                   />
                 </Box>
