@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Float
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.db.base import Base
@@ -12,7 +12,10 @@ class Clinic(Base):
     email = Column(String, unique=True, index=True, nullable=True) 
     endereco = Column(String, nullable=True)
     telefone = Column(String, nullable=True)
-    
+    plano = Column(String, default="Pro") # Ex: Starter, Pro, Premium
+    valor_mensalidade = Column(Float, default=199.90)
+    dia_vencimento = Column(Integer, default=10)
+    status_assinatura = Column(String, default="ativa") # ativa, inadimplente, bloqueada
     # --- NOVO: VÍNCULO COM O PLANO DO SAAS ---
     plano_id = Column(Integer, ForeignKey("planos.id"), nullable=True)
     

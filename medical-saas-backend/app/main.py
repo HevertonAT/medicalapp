@@ -27,20 +27,22 @@ from app.models.regras_especialidades import SpecialtyRule
 # --- IMPORTAÇÃO DAS ROTAS ---
 from app.routers import (
     agendamentos,
+    arquivos,
     autenticacao, 
-    clinicas,
     cids,
+    clinicas,
+    dashboard,
+    financeiro,
     macros,
-    regras_especialidades, 
-    usuarios, 
-    profissionais, 
     pacientes, 
     planos,
-    prontuarios, 
-    financeiro, 
-    arquivos, 
-    relatorios, 
-    dashboard
+    profissionais, 
+    prontuarios,
+    regras_especialidades, 
+    relatorios,
+    saas,
+    usuarios 
+    
 )
 
 app = FastAPI(
@@ -92,6 +94,7 @@ app.include_router(regras_especialidades.router, prefix="/specialties", tags=["C
 app.include_router(macros.router, prefix="/macros", tags=["Macros"])
 app.include_router(cids.router, prefix="/cids", tags=["CIDs"])
 app.include_router(planos.router, prefix="/planos", tags=["Planos de Assinatura"])
+app.include_router(saas.router, prefix="/saas", tags=["SaaS"])
 
 @app.get("/")
 def health_check():

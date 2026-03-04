@@ -59,7 +59,7 @@ export default function SidebarLayout() {
     // --- MÓDULO FINANCEIRO ---
     { name: 'Dashboard Caixa', icon: FaChartPie, path: '/financial', roles: ['superuser', 'admin'] },
     { name: 'Contas (Pagar/Receber)', icon: FaFileInvoiceDollar, path: '/contas', roles: ['superuser', 'admin'] }, 
-    
+    { name: 'Painel SaaS', icon: FaBuilding, path: '/saas', roles: ['superuser'] },
     { name: 'Área Dev', icon: FaCode, path: '/dev-tools', roles: ['superuser'] },
     
     // Menu Exclusivo Paciente

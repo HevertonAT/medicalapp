@@ -30,7 +30,7 @@ export default function App() {
         <Route path="/dev-tools" element={<DevTools />} />
         <Route path="/clinicas" element={<ClinicsManage/>} />
         <Route path="/contas" element={<ContasPagarReceber />} />
-
+        <Route path="/saas" element={<PainelSaaS />} />
         {/* Rota do Paciente */}
         <Route path="/minha-saude" element={<PatientArea />} />
         <Route path="/meus-exames" element={<MeusExames />} />
