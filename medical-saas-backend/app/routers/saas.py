@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from pydantic import BaseModel
 from app.db.base import get_db
 from app.models.usuarios import User
 from app.models.clinicas import Clinic 
@@ -10,6 +11,15 @@ router = APIRouter()
 
 # Trava de Segurança Máxima: Só você (superuser) entra aqui.
 allow_only_superuser = RoleChecker(["superuser"])
+
+# ==========================================
+# SCHEMA: Validação dos dados que vêm do Front-end
+# ==========================================
+class SaasUpdate(BaseModel):
+    plano: str
+    valor_mensalidade: float
+    dia_vencimento: int
+    status_assinatura: str
 
 @router.get("/dashboard")
 def get_saas_dashboard(
@@ -41,10 +51,13 @@ def get_saas_dashboard(
         "clinics": clinics_list
     }
 
-@router.put("/clinica/{clinic_id}/status")
-def update_clinic_subscription(
+# ==========================================
+# ROTA: Atualizar todos os dados da Assinatura
+# ==========================================
+@router.put("/clinica/{clinic_id}")
+def update_clinic_saas_info(
     clinic_id: int, 
-    status: str, # "ativa", "inadimplente" ou "bloqueada"
+    data: SaasUpdate,
     db: Session = Depends(get_db), 
     current_user: User = Depends(allow_only_superuser)
 ):
@@ -52,6 +65,11 @@ def update_clinic_subscription(
     if not clinic:
         raise HTTPException(status_code=404, detail="Clínica não encontrada")
     
-    clinic.status_assinatura = status
+    # Atualiza todos os campos de uma vez
+    clinic.plano = data.plano
+    clinic.valor_mensalidade = data.valor_mensalidade
+    clinic.dia_vencimento = data.dia_vencimento
+    clinic.status_assinatura = data.status_assinatura
+    
     db.commit()
-    return {"message": f"Status atualizado para {status}"}
+    return {"message": "Assinatura atualizada com sucesso"}

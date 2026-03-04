@@ -13,6 +13,7 @@ import MeusExames from './pages/MeusExames';
 import ProfessionalProfile from './pages/ProfessionalProfile';
 import ClinicsManage from './pages/ClinicsManage';
 import ContasPagarReceber from './pages/ContasPagarReceber';
+import PainelSaaS from './pages/PainelSaaS';
 
 export default function App() {
   return (
