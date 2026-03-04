@@ -4,7 +4,7 @@ import {
 import { 
   FaHome, FaUserInjured, FaUserMd, FaCalendarAlt, FaSignOutAlt, 
   FaChartPie, FaCode, FaBars, FaChevronLeft, FaChevronRight, 
-  FaHeartbeat, FaFileMedical, FaClock, FaBuilding // <-- FaBuilding adicionado aqui!
+  FaHeartbeat, FaFileMedical, FaClock, FaBuilding, FaFileInvoiceDollar // <-- Ícone do Contas adicionado
 } from 'react-icons/fa';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
@@ -55,7 +55,11 @@ export default function SidebarLayout() {
     { name: 'Profissionais', icon: FaUserMd, path: '/doctors', roles: ['superuser', 'admin'] },
     { name: 'Especialidades', icon: FaCode, path: '/specialties', roles: ['superuser', 'admin'] },
     { name: 'Agenda', icon: FaCalendarAlt, path: '/agenda', roles: ['superuser', 'admin', 'doctor'] }, 
-    { name: 'Financeiro', icon: FaChartPie, path: '/financial', roles: ['superuser', 'admin'] },
+    
+    // --- MÓDULO FINANCEIRO ---
+    { name: 'Dashboard Caixa', icon: FaChartPie, path: '/financial', roles: ['superuser', 'admin'] },
+    { name: 'Contas (Pagar/Receber)', icon: FaFileInvoiceDollar, path: '/contas', roles: ['superuser', 'admin'] }, 
+    
     { name: 'Área Dev', icon: FaCode, path: '/dev-tools', roles: ['superuser'] },
     
     // Menu Exclusivo Paciente
@@ -141,7 +145,7 @@ export default function SidebarLayout() {
                     >
                       <Icon as={item.icon} boxSize={5} mr={isSidebarOpen ? 3 : 0} />
                       {isSidebarOpen && (
-                          <Text fontWeight={isActive ? 'bold' : 'normal'}>{item.name}</Text>
+                          <Text fontWeight={isActive ? 'bold' : 'normal'} fontSize="sm">{item.name}</Text>
                       )}
                     </Flex>
                   </Link>

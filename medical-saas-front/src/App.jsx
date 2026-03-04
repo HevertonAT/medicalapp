@@ -12,6 +12,7 @@ import PatientArea from './pages/PatientArea';
 import MeusExames from './pages/MeusExames';
 import ProfessionalProfile from './pages/ProfessionalProfile';
 import ClinicsManage from './pages/ClinicsManage';
+import ContasPagarReceber from './pages/ContasPagarReceber';
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="/financial" element={<Financial />} />
         <Route path="/dev-tools" element={<DevTools />} />
         <Route path="/clinicas" element={<ClinicsManage/>} />
+        <Route path="/contas" element={<ContasPagarReceber />} />
 
         {/* Rota do Paciente */}
         <Route path="/minha-saude" element={<PatientArea />} />

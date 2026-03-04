@@ -24,6 +24,7 @@ class Transaction(Base):
     forma_pagamento = Column(String, nullable=True) # pix, cartao, dinheiro
     
     status_nfe = Column(String, default="pendente")
+    link_nfe = Column(String, nullable=True)
     criado_em = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relacionamentos

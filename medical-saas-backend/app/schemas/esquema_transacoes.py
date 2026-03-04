@@ -35,6 +35,7 @@ class TransactionCompleteBase(BaseModel):
     status: Optional[str] = "pendente"
     forma_pagamento: Optional[str] = None
     status_nfe: Optional[str] = "pendente"
+    link_nfe: Optional[str] = None
 
 class TransactionCompleteCreate(TransactionCompleteBase):
     pass
@@ -49,3 +50,4 @@ class TransactionCompleteUpdate(BaseModel):
     status: Optional[str] = None
     forma_pagamento: Optional[str] = None
     status_nfe: Optional[str] = None
+    link_nfe: Optional[str] = None
