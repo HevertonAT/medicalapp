@@ -47,18 +47,18 @@ export default function SidebarLayout() {
 
   const menuItems = [
     // Menu Admin / Médico / SaaS
-    { name: 'Painel', icon: FaHome, path: '/dashboard', roles: ['superuser', 'admin', 'doctor'] },
+    { name: 'Painel', icon: FaHome, path: '/dashboard', roles: ['admin', 'doctor'] },
     
     { name: 'Cadastro de Clinicas', icon: FaBuilding, path: '/clinicas', roles: ['superuser'] },
-    { name: 'Pacientes', icon: FaUserInjured, path: '/patients', roles: ['superuser', 'admin', 'doctor'] },
+    { name: 'Pacientes', icon: FaUserInjured, path: '/patients', roles: ['admin', 'doctor'] },
     { name: 'Configurações', icon: FaClock, path: '/minha-agenda', roles: ['doctor'] },
     { name: 'Profissionais', icon: FaUserMd, path: '/doctors', roles: ['superuser', 'admin'] },
     { name: 'Especialidades', icon: FaCode, path: '/specialties', roles: ['superuser', 'admin'] },
     { name: 'Agenda', icon: FaCalendarAlt, path: '/agenda', roles: ['superuser', 'admin', 'doctor'] }, 
     
     // --- MÓDULO FINANCEIRO ---
-    { name: 'Dashboard Caixa', icon: FaChartPie, path: '/financial', roles: ['superuser', 'admin'] },
-    { name: 'Contas (Pagar/Receber)', icon: FaFileInvoiceDollar, path: '/contas', roles: ['superuser', 'admin'] }, 
+    { name: 'Dashboard Caixa', icon: FaChartPie, path: '/financial', roles: ['admin'] },
+    { name: 'Contas (Pagar/Receber)', icon: FaFileInvoiceDollar, path: '/contas', roles: ['admin'] }, 
     { name: 'Painel SaaS', icon: FaBuilding, path: '/saas', roles: ['superuser'] },
     { name: 'Área Dev', icon: FaCode, path: '/dev-tools', roles: ['superuser'] },
     

@@ -17,14 +17,10 @@ def get_patients(
 ):
     query = db.query(Patient)
 
-    # Superuser vê todos os pacientes do sistema
     if current_user.role == 'superuser':
         return query.all()
 
-    # MURO DE CONCRETO: Se não for Superuser, NINGUÉM passa daqui 
-    # sem ter a busca filtrada pela sua própria clínica.
     query = query.filter(Patient.clinic_id == current_user.clinic_id)
-    
     return query.all()
 
 # --- 2. CRIAÇÃO DE PACIENTE ---
@@ -34,7 +30,6 @@ def create_patient(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # LÓGICA SAAS: Define a qual clínica o paciente vai pertencer
     target_clinic_id = current_user.clinic_id
     if current_user.role == "superuser" and hasattr(patient, "clinic_id") and patient.clinic_id:
         target_clinic_id = patient.clinic_id
@@ -43,7 +38,6 @@ def create_patient(
         raise HTTPException(status_code=400, detail="Não foi possível identificar a clínica para este cadastro.")
 
     # MURO DE CONCRETO (CPF): Verifica se o CPF já existe APENAS nesta clínica.
-    # O mesmo paciente pode frequentar duas clínicas diferentes que usam o seu sistema.
     if patient.cpf:
         existing_patient = db.query(Patient).filter(
             Patient.cpf == patient.cpf, 
@@ -90,7 +84,6 @@ def update_patient(
 ):
     query = db.query(Patient).filter(Patient.id == patient_id)
     
-    # MURO DE CONCRETO
     if current_user.role != 'superuser':
         query = query.filter(Patient.clinic_id == current_user.clinic_id)
         
@@ -99,7 +92,6 @@ def update_patient(
     if not db_patient:
         raise HTTPException(status_code=404, detail="Paciente não encontrado ou não pertence à sua clínica.")
     
-    # Atualiza os campos dinamicamente
     update_data = patient_data.dict(exclude_unset=True)
     for key, value in update_data.items():
         setattr(db_patient, key, value)
@@ -117,7 +109,6 @@ def inactivate_patient(
 ):
     query = db.query(Patient).filter(Patient.id == patient_id)
     
-    # MURO DE CONCRETO
     if current_user.role != 'superuser':
         query = query.filter(Patient.clinic_id == current_user.clinic_id)
 
@@ -128,7 +119,6 @@ def inactivate_patient(
     
     db_patient.ativo = False 
     db.commit()
-    
     return {"message": "Paciente inativado com sucesso"}
 
 # --- 5. REATIVAÇÃO (PATCH) ---
@@ -140,7 +130,6 @@ def reactivate_patient(
 ):
     query = db.query(Patient).filter(Patient.id == patient_id)
     
-    # MURO DE CONCRETO
     if current_user.role != 'superuser':
         query = query.filter(Patient.clinic_id == current_user.clinic_id)
         
@@ -151,5 +140,4 @@ def reactivate_patient(
     
     db_patient.ativo = True 
     db.commit()
-    
     return {"message": "Paciente reativado com sucesso"}

@@ -9,7 +9,10 @@ class Patient(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     
     nome_completo = Column(String, nullable=False)
-    cpf = Column(String, unique=True, index=True, nullable=True)
+    
+    # ATENÇÃO: Removido o unique=True para permitir o mesmo CPF em clínicas diferentes
+    cpf = Column(String, index=True, nullable=True) 
+    
     telefone = Column(String, nullable=True)
     data_nascimento = Column(Date, nullable=True)
     genero = Column(String, nullable=True)
@@ -28,7 +31,6 @@ class Patient(Base):
     user = relationship("User", back_populates="patient_profile")
     clinic = relationship("Clinic", back_populates="patients")
     
-    # --- ALTERAÇÃO AQUI ---
     # Relacionamento simples (sem back_populates)
     insurance = relationship("Insurance")
 
