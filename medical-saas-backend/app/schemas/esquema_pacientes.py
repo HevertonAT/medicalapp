@@ -10,7 +10,16 @@ class PatientBase(BaseModel):
     
     data_nascimento: Optional[date] = None
     genero: Optional[str] = None      # Adicionado caso queira usar futuramente
-    endereco: Optional[str] = None    # Adicionado caso queira usar futuramente
+    
+    # --- NOVO: ENDEREÇO ESTRUTURADO ---
+    cep: Optional[str] = None
+    logradouro: Optional[str] = None
+    numero: Optional[str] = None
+    complemento: Optional[str] = None
+    bairro: Optional[str] = None
+    cidade: Optional[str] = None
+    estado: Optional[str] = None
+    
     ativo: Optional[bool] = True 
 
 class PatientCreate(PatientBase):
@@ -22,7 +31,16 @@ class PatientUpdate(BaseModel):
     telefone: Optional[str] = None
     data_nascimento: Optional[date] = None
     genero: Optional[str] = None
-    endereco: Optional[str] = None
+    
+    # --- NOVO: ENDEREÇO ESTRUTURADO ---
+    cep: Optional[str] = None
+    logradouro: Optional[str] = None
+    numero: Optional[str] = None
+    complemento: Optional[str] = None
+    bairro: Optional[str] = None
+    cidade: Optional[str] = None
+    estado: Optional[str] = None
+    
     ativo: Optional[bool] = None
 
 class PatientResponse(PatientBase):

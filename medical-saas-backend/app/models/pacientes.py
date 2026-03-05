@@ -9,19 +9,23 @@ class Patient(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     
     nome_completo = Column(String, nullable=False)
-    
-    # ATENÇÃO: Removido o unique=True para permitir o mesmo CPF em clínicas diferentes
     cpf = Column(String, index=True, nullable=True) 
-    
     telefone = Column(String, nullable=True)
     data_nascimento = Column(Date, nullable=True)
     genero = Column(String, nullable=True)
     
+    # --- ENDEREÇO ESTRUTURADO ---
+    cep = Column(String, nullable=True)
+    logradouro = Column(String, nullable=True) # Rua, Avenida, etc.
+    numero = Column(String, nullable=True)
+    complemento = Column(String, nullable=True)
+    bairro = Column(String, nullable=True)
+    cidade = Column(String, nullable=True)
+    estado = Column(String, nullable=True) # Sigla UF (SP, RJ, MG...)
+    
     # FKs
     user_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
     clinic_id = Column(Integer, ForeignKey("clinicas.id"), nullable=True)
-    
-    # --- GARANTIR QUE ESTA LINHA EXISTA ---
     insurance_id = Column(Integer, ForeignKey("convenios.id"), nullable=True)
     
     ativo = Column(Boolean, default=True)
@@ -30,8 +34,6 @@ class Patient(Base):
     # Relacionamentos
     user = relationship("User", back_populates="patient_profile")
     clinic = relationship("Clinic", back_populates="patients")
-    
-    # Relacionamento simples (sem back_populates)
     insurance = relationship("Insurance")
 
     appointments = relationship("Appointment", back_populates="patient")

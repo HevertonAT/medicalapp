@@ -9,7 +9,6 @@ from app.core.deps import get_current_user
 
 router = APIRouter()
 
-# --- 1. LISTAGEM DE PACIENTES (COM MURO DE CONCRETO) ---
 @router.get("/", response_model=List[PatientResponse])
 def get_patients(
     db: Session = Depends(get_db),
@@ -23,7 +22,6 @@ def get_patients(
     query = query.filter(Patient.clinic_id == current_user.clinic_id)
     return query.all()
 
-# --- 2. CRIAÇÃO DE PACIENTE ---
 @router.post("/", response_model=PatientResponse, status_code=status.HTTP_201_CREATED)
 def create_patient(
     patient: PatientCreate, 
@@ -37,7 +35,6 @@ def create_patient(
     if not target_clinic_id:
         raise HTTPException(status_code=400, detail="Não foi possível identificar a clínica para este cadastro.")
 
-    # MURO DE CONCRETO (CPF): Verifica se o CPF já existe APENAS nesta clínica.
     if patient.cpf:
         existing_patient = db.query(Patient).filter(
             Patient.cpf == patient.cpf, 
@@ -56,9 +53,18 @@ def create_patient(
             nome_completo=patient.nome_completo,
             cpf=patient.cpf,
             telefone=patient.telefone,
-            data_nascimento=patient.data_nascimento,
-            endereco=patient.endereco, 
-            genero=patient.genero,    
+            data_nascimento=getattr(patient, 'data_nascimento', None),
+            genero=getattr(patient, 'genero', None),
+            
+            # Endereço Estruturado
+            cep=getattr(patient, 'cep', None),
+            logradouro=getattr(patient, 'logradouro', None),
+            numero=getattr(patient, 'numero', None),
+            complemento=getattr(patient, 'complemento', None),
+            bairro=getattr(patient, 'bairro', None),
+            cidade=getattr(patient, 'cidade', None),
+            estado=getattr(patient, 'estado', None),
+            
             ativo=True
         )
         db.add(new_patient)
@@ -71,10 +77,9 @@ def create_patient(
         print(f"❌ Erro ao criar paciente: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Erro ao salvar paciente. Verifique se os dados estão corretos."
+            detail=f"Erro interno ao salvar paciente: {str(e)}"
         )
 
-# --- 3. ATUALIZAÇÃO (PUT) ---
 @router.put("/{patient_id}", response_model=PatientResponse)
 def update_patient(
     patient_id: int, 
@@ -93,14 +98,15 @@ def update_patient(
         raise HTTPException(status_code=404, detail="Paciente não encontrado ou não pertence à sua clínica.")
     
     update_data = patient_data.dict(exclude_unset=True)
+    valid_keys = [c.name for c in Patient.__table__.columns]
     for key, value in update_data.items():
-        setattr(db_patient, key, value)
+        if key in valid_keys:
+            setattr(db_patient, key, value)
     
     db.commit()
     db.refresh(db_patient)
     return db_patient
 
-# --- 4. INATIVAÇÃO (DELETE) ---
 @router.delete("/{patient_id}")
 def inactivate_patient(
     patient_id: int, 
@@ -119,9 +125,9 @@ def inactivate_patient(
     
     db_patient.ativo = False 
     db.commit()
+    
     return {"message": "Paciente inativado com sucesso"}
 
-# --- 5. REATIVAÇÃO (PATCH) ---
 @router.patch("/{patient_id}/reactivate")
 def reactivate_patient(
     patient_id: int, 
@@ -140,4 +146,5 @@ def reactivate_patient(
     
     db_patient.ativo = True 
     db.commit()
+    
     return {"message": "Paciente reativado com sucesso"}

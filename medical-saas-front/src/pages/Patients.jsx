@@ -4,13 +4,11 @@ import {
   IconButton, useDisclosure, Modal, ModalOverlay, ModalContent,
   ModalHeader, ModalBody, ModalCloseButton, useToast, Spinner, VStack, Text, 
   HStack, Icon, Badge, FormControl, FormLabel, Input, ModalFooter, Tooltip,
-  useColorModeValue
+  useColorModeValue, Divider, InputGroup, InputRightElement // <- Adicionados novos componentes
 } from '@chakra-ui/react';
-// Ícone FaPrint adicionado na linha abaixo:
-import { FaPlus, FaFileMedical, FaHistory, FaPrescriptionBottleAlt, FaEdit, FaBan, FaCheck, FaPrint } from 'react-icons/fa';
+import { FaPlus, FaFileMedical, FaHistory, FaPrescriptionBottleAlt, FaEdit, FaBan, FaCheck, FaPrint, FaSearch } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 
-// 1. IMPORTANDO A INSTÂNCIA CONFIGURADA
 import api from '../services/api';
 
 export default function Patients() {
@@ -21,14 +19,17 @@ export default function Patients() {
   const { isOpen, onOpen, onClose } = useDisclosure(); 
   const { isOpen: isRecordOpen, onOpen: onRecordOpen, onClose: onRecordClose } = useDisclosure(); 
 
-  // Adicionado 'email' ao estado inicial
+  // --- ESTADO DO PACIENTE ATUALIZADO COM OS CAMPOS DE ENDEREÇO ---
   const [currentPatient, setCurrentPatient] = useState({ 
-    id: '', nome_completo: '', telefone: '', cpf: '', data_nascimento: '', email: '' 
+    id: '', nome_completo: '', telefone: '', cpf: '', data_nascimento: '', email: '',
+    cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: ''
   });
+  
   const [isEditing, setIsEditing] = useState(false);
   const [records, setRecords] = useState([]);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [cpfError, setCpfError] = useState('');
+  const [isFetchingCep, setIsFetchingCep] = useState(false); // Loading do CEP
   
   const [filter, setFilter] = useState('ativos'); 
 
@@ -69,8 +70,7 @@ export default function Patients() {
     const numbers = cpf.replace(/\D/g, '');
     if (numbers.length !== 11) return false;
     if (/^(\d)\1{10}$/.test(numbers)) return false;
-    let sum = 0;
-    let remainder;
+    let sum = 0; let remainder;
     for (let i = 1; i <= 9; i++) sum += parseInt(numbers.substring(i - 1, i)) * (11 - i);
     remainder = (sum * 10) % 11;
     if (remainder === 10 || remainder === 11) remainder = 0;
@@ -84,20 +84,43 @@ export default function Patients() {
   };
   
   const formatCPF = (value) => {
-    return value
-      .replace(/\D/g, '')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d{1,2})/, '$1-$2')
-      .replace(/(-\d{2})\d+?$/, '$1');
+    return value.replace(/\D/g, '').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})/, '$1-$2').replace(/(-\d{2})\d+?$/, '$1');
   };
 
   const formatPhone = (value) => {
-    return value
-      .replace(/\D/g, '')
-      .replace(/^(\d{2})(\d)/g, '($1) $2')
-      .replace(/(\d)(\d{4})$/, '$1-$2')
-      .substring(0, 15);
+    return value.replace(/\D/g, '').replace(/^(\d{2})(\d)/g, '($1) $2').replace(/(\d)(\d{4})$/, '$1-$2').substring(0, 15);
+  };
+
+  const formatCEP = (value) => {
+    return value.replace(/\D/g, '').replace(/(\d{5})(\d)/, '$1-$2').substring(0, 9);
+  };
+
+  // --- BUSCA AUTOMÁTICA DE CEP (VIACEP) ---
+  const handleCepBlur = async () => {
+    const rawCep = currentPatient.cep.replace(/\D/g, '');
+    if (rawCep.length === 8) {
+      setIsFetchingCep(true);
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${rawCep}/json/`);
+        const data = await res.json();
+        if (!data.erro) {
+          setCurrentPatient(prev => ({
+            ...prev,
+            logradouro: data.logradouro || '',
+            bairro: data.bairro || '',
+            cidade: data.localidade || '',
+            estado: data.uf || '',
+          }));
+          toast({ title: "Endereço encontrado!", status: "success", duration: 2000, position: "top" });
+        } else {
+          toast({ title: "CEP não encontrado.", status: "warning", position: "top" });
+        }
+      } catch (error) {
+        toast({ title: "Erro ao buscar CEP.", status: "error", position: "top" });
+      } finally {
+        setIsFetchingCep(false);
+      }
+    }
   };
 
   const fetchPatients = async () => {
@@ -121,12 +144,7 @@ export default function Patients() {
   });
 
   const handleSave = async () => {
-    if (!currentPatient.cpf) {
-        setCpfError('CPF é obrigatório.');
-        return;
-    }
-    
-    if (!isValidCPF(currentPatient.cpf)) {
+    if (currentPatient.cpf && !isValidCPF(currentPatient.cpf)) {
         setCpfError('CPF inválido. Insira um CPF válido.');
         return;
     }
@@ -134,10 +152,18 @@ export default function Patients() {
     try {
         const payload = {
             nome_completo: currentPatient.nome_completo,
-            cpf: currentPatient.cpf, 
+            cpf: currentPatient.cpf || null, 
             telefone: currentPatient.telefone,
-            email: currentPatient.email, // Incluído no payload
-            data_nascimento: currentPatient.data_nascimento || null
+            email: currentPatient.email,
+            data_nascimento: currentPatient.data_nascimento || null,
+            // Adicionando os dados de endereço no Payload
+            cep: currentPatient.cep || null,
+            logradouro: currentPatient.logradouro || null,
+            numero: currentPatient.numero || null,
+            complemento: currentPatient.complemento || null,
+            bairro: currentPatient.bairro || null,
+            cidade: currentPatient.cidade || null,
+            estado: currentPatient.estado || null
         };
 
         if (isEditing && currentPatient.id) {
@@ -151,7 +177,7 @@ export default function Patients() {
         setCpfError('');
         fetchPatients();
     } catch (error) {
-        toast({ title: 'Erro ao salvar.', description: 'Verifique se o CPF ou E-mail já existe.', status: 'error' });
+        toast({ title: 'Erro ao salvar.', description: error.response?.data?.detail || 'Verifique os dados informados.', status: 'error' });
     }
   };
 
@@ -178,13 +204,26 @@ export default function Patients() {
   const openModal = (patient = null) => {
       if (patient) {
           setCurrentPatient({
-            ...patient,
+            id: patient.id,
+            nome_completo: patient.nome_completo || '',
+            telefone: patient.telefone || '',
+            cpf: patient.cpf || '',
+            data_nascimento: patient.data_nascimento || '',
             email: patient.email || '',
-            data_nascimento: patient.data_nascimento || ''
+            cep: patient.cep || '',
+            logradouro: patient.logradouro || '',
+            numero: patient.numero || '',
+            complemento: patient.complemento || '',
+            bairro: patient.bairro || '',
+            cidade: patient.cidade || '',
+            estado: patient.estado || ''
           });
           setIsEditing(true);
       } else {
-          setCurrentPatient({ id: '', nome_completo: '', telefone: '', cpf: '', data_nascimento: '', email: '' });
+          setCurrentPatient({ 
+            id: '', nome_completo: '', telefone: '', cpf: '', data_nascimento: '', email: '',
+            cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '' 
+          });
           setIsEditing(false);
       }
       onOpen();
@@ -200,7 +239,6 @@ export default function Patients() {
     } catch (error) { console.error("Erro prontuário"); }
   };
 
-  // --- NOVA FUNÇÃO DE IMPRESSÃO DA EVOLUÇÃO ---
   const handlePrintEvolution = (record) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -255,9 +293,7 @@ export default function Patients() {
 
   const handleDownloadPDF = async (recordId) => {
     try {
-        const response = await api.get(`/medical-records/${recordId}/pdf`, {
-            responseType: 'blob' 
-        });
+        const response = await api.get(`/medical-records/${recordId}/pdf`, { responseType: 'blob' });
         const url = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement('a');
         link.href = url;
@@ -283,14 +319,14 @@ export default function Patients() {
         <Button size="sm" variant={filter === 'inativos' ? 'solid' : 'outline'} colorScheme="red" onClick={() => setFilter('inativos')}>Inativos</Button>
       </HStack>
 
+      {/* TABELA PRINCIPAL */}
       <Box bg={bgCard} shadow="sm" borderRadius="md" overflow="hidden" border="1px solid" borderColor={borderColor}>
-        <Table variant="simple" size="sm"> {/* Adicionado size="sm" para compactar */}
+        <Table variant="simple" size="sm"> 
             <Thead bg={bgHeader}>
             <Tr>
                 <Th color={textColor} py={3}>Nome</Th>
                 <Th color={textColor} py={3}>Idade</Th>
                 <Th color={textColor} py={3}>CPF</Th>
-                <Th color={textColor} py={3}>E-mail</Th>
                 <Th color={textColor} py={3}>Telefone</Th>
                 <Th color={textColor} py={3}>Status</Th>
                 <Th color={textColor} py={3} textAlign="center">Ações</Th>
@@ -306,15 +342,12 @@ export default function Patients() {
                 >
                 <Td py={2} fontWeight="bold" fontSize="xs">{p.nome_completo}</Td>
                 <Td py={2} fontSize="xs">{calculateAge(p.data_nascimento)}</Td>
-                <Td py={2} fontSize="xs">{p.cpf}</Td>
-                <Td py={2} fontSize="xs">{p.email || '-'}</Td>
-                <Td py={2} fontSize="xs">{p.telefone}</Td>
+                <Td py={2} fontSize="xs">{p.cpf || '-'}</Td>
+                <Td py={2} fontSize="xs">{p.telefone || '-'}</Td>
                 
                 <Td py={2}>
                     <Text 
-                    fontWeight="extrabold" 
-                    fontSize="2xs" 
-                    letterSpacing="wider"
+                    fontWeight="extrabold" fontSize="2xs" letterSpacing="wider"
                     color={p.ativo ? activeColor : inactiveColor}
                     >
                     {p.ativo ? 'ATIVO' : 'INATIVO'}
@@ -324,40 +357,28 @@ export default function Patients() {
                 <Td py={2}>
                     <HStack justify="center" spacing={1}>
                     <Button 
-                        size="xs" 
-                        leftIcon={<FaFileMedical />} 
-                        colorScheme="teal" 
+                        size="xs" leftIcon={<FaFileMedical />} colorScheme="teal" 
                         onClick={() => handleOpenRecord(p)}
                     >
                         Prontuário
                     </Button>
                     
                     <IconButton 
-                        icon={<FaEdit />} 
-                        size="xs" 
-                        colorScheme="yellow" 
-                        variant="ghost"
-                        onClick={() => openModal(p)} 
-                        isDisabled={!p.ativo} 
+                        icon={<FaEdit />} size="xs" colorScheme="yellow" variant="ghost"
+                        onClick={() => openModal(p)} isDisabled={!p.ativo} 
                     />
                     
                     {p.ativo ? (
                         <Tooltip label="Inativar">
                         <IconButton 
-                            icon={<FaBan />} 
-                            size="xs" 
-                            colorScheme="red" 
-                            variant="ghost"
+                            icon={<FaBan />} size="xs" colorScheme="red" variant="ghost"
                             onClick={() => handleInactivate(p.id)} 
                         />
                         </Tooltip>
                     ) : (
                         <Tooltip label="Reativar">
                         <IconButton 
-                            icon={<FaCheck />} 
-                            size="xs" 
-                            colorScheme="green" 
-                            variant="ghost"
+                            icon={<FaCheck />} size="xs" colorScheme="green" variant="ghost"
                             onClick={() => handleReactivate(p.id)} 
                         />
                         </Tooltip>
@@ -371,18 +392,21 @@ export default function Patients() {
       </Box>
 
       {/* MODAL CADASTRO / EDIÇÃO */}
-      <Modal isOpen={isOpen} onClose={onClose} size="xl">
+      <Modal isOpen={isOpen} onClose={onClose} size="2xl"> {/* Alterado para 2xl para caber o endereço confortavelmente */}
         <ModalOverlay />
         <ModalContent bg={modalBg}>
           <ModalHeader>{isEditing ? 'Editar Paciente' : 'Novo Paciente'}</ModalHeader>
           <ModalCloseButton />
-          <ModalBody>
-            <VStack spacing={4}>
+          <ModalBody pb={4}>
+            <VStack spacing={4} align="stretch">
+              
+              {/* SEÇÃO 1: DADOS PESSOAIS */}
+              <Text fontWeight="bold" color={textColor} fontSize="sm" textTransform="uppercase">Dados Pessoais</Text>
+              
               <FormControl isRequired>
-                  <FormLabel>Nome Completo</FormLabel>
+                  <FormLabel fontSize="sm">Nome Completo</FormLabel>
                   <Input 
-                      bg={inputBg} 
-                      borderColor={borderColor} 
+                      size="sm" bg={inputBg} borderColor={borderColor} 
                       value={currentPatient.nome_completo} 
                       onChange={(e) => setCurrentPatient({...currentPatient, nome_completo: e.target.value})} 
                       placeholder="Digite o nome do Paciente"
@@ -390,29 +414,25 @@ export default function Patients() {
               </FormControl>
 
               <HStack w="full" spacing={4}>
-                <FormControl isRequired isInvalid={cpfError !== ''}>
-                    <FormLabel>CPF</FormLabel>
+                <FormControl isInvalid={cpfError !== ''}>
+                    <FormLabel fontSize="sm">CPF</FormLabel>
                     <Input 
-                        bg={inputBg} 
-                        borderColor={cpfError ? 'red.500' : borderColor}
+                        size="sm" bg={inputBg} borderColor={cpfError ? 'red.500' : borderColor}
                         value={currentPatient.cpf} 
                         onChange={(e) => {
                             const newCpf = formatCPF(e.target.value);
                             setCurrentPatient({...currentPatient, cpf: newCpf});
                             if (!newCpf || isValidCPF(newCpf)) setCpfError('');
                         }} 
-                        placeholder="000.000.000-00"
-                        maxLength={14}
+                        placeholder="000.000.000-00" maxLength={14}
                     />
                     {cpfError && <Text fontSize="xs" color="red.500" mt={1}>{cpfError}</Text>}
                 </FormControl>
 
                 <FormControl>
-                    <FormLabel>Data de Nascimento</FormLabel>
+                    <FormLabel fontSize="sm">Data de Nascimento</FormLabel>
                     <Input 
-                        type="date"
-                        bg={inputBg} 
-                        borderColor={borderColor} 
+                        size="sm" type="date" bg={inputBg} borderColor={borderColor} 
                         value={currentPatient.data_nascimento} 
                         onChange={(e) => setCurrentPatient({...currentPatient, data_nascimento: e.target.value})} 
                     />
@@ -421,11 +441,9 @@ export default function Patients() {
 
               <HStack w="full" spacing={4}>
                 <FormControl>
-                    <FormLabel>E-mail</FormLabel>
+                    <FormLabel fontSize="sm">E-mail</FormLabel>
                     <Input 
-                        type="email"
-                        bg={inputBg} 
-                        borderColor={borderColor} 
+                        size="sm" type="email" bg={inputBg} borderColor={borderColor} 
                         value={currentPatient.email} 
                         onChange={(e) => setCurrentPatient({...currentPatient, email: e.target.value})} 
                         placeholder="email@paciente.com"
@@ -433,22 +451,104 @@ export default function Patients() {
                 </FormControl>
 
                 <FormControl>
-                    <FormLabel>Telefone</FormLabel>
+                    <FormLabel fontSize="sm">Telefone</FormLabel>
                     <Input 
-                        bg={inputBg} 
-                        borderColor={borderColor} 
+                        size="sm" bg={inputBg} borderColor={borderColor} 
                         value={currentPatient.telefone} 
                         onChange={(e) => setCurrentPatient({...currentPatient, telefone: formatPhone(e.target.value)})} 
-                        placeholder="(00) 00000-0000"
-                        maxLength={15}
+                        placeholder="(00) 00000-0000" maxLength={15}
                     />
                 </FormControl>
               </HStack>
+
+              <Divider my={2} />
+
+              {/* SEÇÃO 2: ENDEREÇO COM BUSCA DE CEP */}
+              <Text fontWeight="bold" color={textColor} fontSize="sm" textTransform="uppercase">Endereço</Text>
+              
+              <HStack w="full" spacing={4} align="flex-end">
+                <FormControl w={{ base: "100%", md: "35%" }}>
+                    <FormLabel fontSize="sm">CEP</FormLabel>
+                    <InputGroup size="sm">
+                        <Input 
+                            bg={inputBg} borderColor={borderColor} 
+                            value={currentPatient.cep} 
+                            onChange={(e) => setCurrentPatient({...currentPatient, cep: formatCEP(e.target.value)})} 
+                            onBlur={handleCepBlur}
+                            placeholder="00000-000" maxLength={9}
+                        />
+                        <InputRightElement>
+                            {isFetchingCep ? <Spinner size="xs" color="blue.500" /> : <Icon as={FaSearch} color="gray.400" />}
+                        </InputRightElement>
+                    </InputGroup>
+                </FormControl>
+
+                <FormControl w={{ base: "100%", md: "65%" }}>
+                    <FormLabel fontSize="sm">Logradouro / Rua</FormLabel>
+                    <Input 
+                        size="sm" bg={inputBg} borderColor={borderColor} 
+                        value={currentPatient.logradouro} 
+                        onChange={(e) => setCurrentPatient({...currentPatient, logradouro: e.target.value})} 
+                    />
+                </FormControl>
+              </HStack>
+
+              <HStack w="full" spacing={4}>
+                <FormControl w="30%">
+                    <FormLabel fontSize="sm">Número</FormLabel>
+                    <Input 
+                        size="sm" bg={inputBg} borderColor={borderColor} 
+                        value={currentPatient.numero} 
+                        onChange={(e) => setCurrentPatient({...currentPatient, numero: e.target.value})} 
+                    />
+                </FormControl>
+
+                <FormControl w="70%">
+                    <FormLabel fontSize="sm">Complemento</FormLabel>
+                    <Input 
+                        size="sm" bg={inputBg} borderColor={borderColor} 
+                        value={currentPatient.complemento} 
+                        onChange={(e) => setCurrentPatient({...currentPatient, complemento: e.target.value})} 
+                        placeholder="Apto, Bloco, etc."
+                    />
+                </FormControl>
+              </HStack>
+
+              <HStack w="full" spacing={4}>
+                <FormControl w="40%">
+                    <FormLabel fontSize="sm">Bairro</FormLabel>
+                    <Input 
+                        size="sm" bg={inputBg} borderColor={borderColor} 
+                        value={currentPatient.bairro} 
+                        onChange={(e) => setCurrentPatient({...currentPatient, bairro: e.target.value})} 
+                    />
+                </FormControl>
+
+                <FormControl w="45%">
+                    <FormLabel fontSize="sm">Cidade</FormLabel>
+                    <Input 
+                        size="sm" bg={inputBg} borderColor={borderColor} 
+                        value={currentPatient.cidade} 
+                        onChange={(e) => setCurrentPatient({...currentPatient, cidade: e.target.value})} 
+                    />
+                </FormControl>
+
+                <FormControl w="15%">
+                    <FormLabel fontSize="sm">UF</FormLabel>
+                    <Input 
+                        size="sm" bg={inputBg} borderColor={borderColor} 
+                        value={currentPatient.estado} 
+                        onChange={(e) => setCurrentPatient({...currentPatient, estado: e.target.value.toUpperCase()})} 
+                        maxLength={2} placeholder="SP"
+                    />
+                </FormControl>
+              </HStack>
+
             </VStack>
           </ModalBody>
-          <ModalFooter>
-            <Button colorScheme="blue" mr={3} onClick={handleSave}>Salvar</Button>
-            <Button onClick={onClose} variant="ghost">Cancelar</Button>
+          <ModalFooter borderTop="1px solid" borderColor={borderColor}>
+            <Button variant="ghost" onClick={onClose} mr={3}>Cancelar</Button>
+            <Button colorScheme="blue" onClick={handleSave}>Salvar Paciente</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
@@ -500,21 +600,15 @@ export default function Patients() {
                             <Badge colorScheme="teal" fontSize="0.9em" p={1}>REALIZADO EM {selectedRecord.created_at}</Badge>
                             
                             <HStack spacing={3}>
-                                {/* NOVO BOTÃO DE IMPRESSÃO DA EVOLUÇÃO */}
                                 <Button 
-                                    size="sm" 
-                                    leftIcon={<FaPrint />} 
-                                    colorScheme="blue" 
-                                    variant="solid" 
+                                    size="sm" leftIcon={<FaPrint />} colorScheme="blue" variant="solid" 
                                     onClick={() => handlePrintEvolution(selectedRecord)}
                                 >
                                     Imprimir Evolução
                                 </Button>
 
                                 <Button 
-                                    size="sm" 
-                                    leftIcon={<FaPrescriptionBottleAlt />} 
-                                    variant="outline" 
+                                    size="sm" leftIcon={<FaPrescriptionBottleAlt />} variant="outline" 
                                     onClick={() => handleDownloadPDF(selectedRecord.id)}
                                 >
                                     Ver Receita
