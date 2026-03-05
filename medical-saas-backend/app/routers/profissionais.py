@@ -7,76 +7,46 @@ from app.db.base import get_db
 from app.core.deps import get_current_user
 from app.models.profissionais import Doctor
 from app.models.usuarios import User
-from app.models.pacientes import Patient  # <-- ADICIONADO: Necessário para a lógica do paciente órfão
+from app.models.pacientes import Patient 
 from app.schemas.esquema_profissionais import DoctorCreate, DoctorResponse, DoctorUpdate
 
 router = APIRouter()
 
-# --- FUNÇÃO AUXILIAR PARA CRIPTOGRAFIA ---
 def get_password_hash(password: str) -> str:
     salt = bcrypt.gensalt()
     hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
     return hashed_password.decode('utf-8')
 
-# --- 1. ROTA /ME (ORDEM PRIORITÁRIA) ---
 @router.get("/me", response_model=DoctorResponse)
-def get_my_doctor_profile(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    # Busca o médico vinculado ao usuário logado
+def get_my_doctor_profile(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
     if not doctor:
         raise HTTPException(status_code=404, detail="Perfil de profissional não encontrado.")
     return doctor
 
-# --- 2. LISTAGEM DE MÉDICOS (COM ISOLAMENTO SAAS) ---
 @router.get("/", response_model=List[DoctorResponse])
-def list_doctors(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+def list_doctors(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     query = db.query(Doctor)
-
-    # 1. Superuser (Dono do SaaS) vê absolutamente todos os médicos do banco
     if current_user.role == 'superuser':
         return query.all()
 
-    # 2. LÓGICA DO PACIENTE ÓRFÃO vs PACIENTE VINCULADO
     if current_user.role in ['patient', 'paciente']:
-        # Pacientes só veem médicos ativos
         query = query.filter(Doctor.ativo == True)
-        
-        # Busca o perfil do paciente para saber se ele já tem clínica
         patient_profile = db.query(Patient).filter(Patient.user_id == current_user.id).first()
-        
-        # Se ele já tem clínica vinculada, o muro sobe e ele só vê os médicos de lá!
         if patient_profile and patient_profile.clinic_id:
             query = query.filter(Doctor.clinic_id == patient_profile.clinic_id)
-        # Se não tiver (None), a query passa direto sem filtro e ele vê os médicos 
-        # para poder escolher e ser "adotado".
-        
     else:
-        # 3. O MURO DE CONCRETO PARA ADMINS E MÉDICOS:
         query = query.filter(Doctor.clinic_id == current_user.clinic_id)
 
-    # Retorna o resultado
     return query.all()
 
-# --- 3. CRIAÇÃO DE MÉDICO ---
 @router.post("/", response_model=DoctorResponse, status_code=status.HTTP_201_CREATED)
-def create_doctor(
-    doctor: DoctorCreate, 
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+def create_doctor(doctor: DoctorCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if current_user.role not in ['admin', 'superuser']:
         raise HTTPException(status_code=403, detail="Sem permissão para criar profissionais.")
 
-    # LÓGICA SAAS: Define a qual clínica o médico vai pertencer
     target_clinic_id = current_user.clinic_id
     if current_user.role == "superuser" and hasattr(doctor, "clinic_id") and doctor.clinic_id:
-        # Se for o dono do sistema criando, permite passar o ID da clínica na requisição
         target_clinic_id = doctor.clinic_id
         
     if not target_clinic_id:
@@ -86,7 +56,6 @@ def create_doctor(
     if user_exists:
         raise HTTPException(status_code=400, detail="Este email já está em uso.")
 
-    # Cria o acesso (usuário)
     new_user = User(
         full_name=doctor.nome,
         email=doctor.email,
@@ -98,14 +67,14 @@ def create_doctor(
     db.add(new_user)
     db.flush() 
 
-    # Cria o perfil médico com suporte à agenda_config
     db_doctor = Doctor(
         nome=doctor.nome,
         crm=doctor.crm,
         especialidade=doctor.especialidade,
+        genero=getattr(doctor, 'genero', None), # <-- SALVANDO O GÊNERO
         clinic_id=target_clinic_id,
         user_id=new_user.id,
-        agenda_config=doctor.agenda_config, # Salva a agenda inicial se enviada
+        agenda_config=doctor.agenda_config, 
         ativo=True
     )
     db.add(db_doctor)
@@ -113,19 +82,12 @@ def create_doctor(
     db.refresh(db_doctor)
     return db_doctor
 
-# --- 4. ATUALIZAÇÃO (PUT) ---
 @router.put("/{doctor_id}", response_model=DoctorResponse)
-def update_doctor(
-    doctor_id: int, 
-    doctor_data: DoctorUpdate, 
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+def update_doctor(doctor_id: int, doctor_data: DoctorUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     db_doctor = db.query(Doctor).filter(Doctor.id == doctor_id).first()
     if not db_doctor:
         raise HTTPException(status_code=404, detail="Médico não encontrado")
 
-    # PERMISSÕES ISOLADAS:
     is_owner = db_doctor.user_id == current_user.id
     is_admin_of_same_clinic = current_user.role == 'admin' and db_doctor.clinic_id == current_user.clinic_id
     is_superuser = current_user.role == 'superuser'
@@ -133,12 +95,14 @@ def update_doctor(
     if not (is_owner or is_admin_of_same_clinic or is_superuser):
         raise HTTPException(status_code=403, detail="Você não tem permissão para editar este perfil de outra clínica.")
 
-    # Atualiza campos básicos
     if doctor_data.nome: db_doctor.nome = doctor_data.nome
     if doctor_data.crm: db_doctor.crm = doctor_data.crm
     if doctor_data.especialidade: db_doctor.especialidade = doctor_data.especialidade
     
-    # ATUALIZA A AGENDA: Fundamental para tirar o "null" do banco.
+    # <-- ATUALIZANDO O GÊNERO
+    if hasattr(doctor_data, 'genero') and doctor_data.genero: 
+        db_doctor.genero = doctor_data.genero
+    
     if doctor_data.agenda_config is not None:
         db_doctor.agenda_config = doctor_data.agenda_config
     
@@ -146,13 +110,8 @@ def update_doctor(
     db.refresh(db_doctor)
     return db_doctor
 
-# --- 5. INATIVAÇÃO (DELETE) ---
 @router.delete("/{doctor_id}")
-def inactivate_doctor(
-    doctor_id: int, 
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+def inactivate_doctor(doctor_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     db_doctor = db.query(Doctor).filter(Doctor.id == doctor_id).first()
     if not db_doctor:
         raise HTTPException(status_code=404, detail="Médico não encontrado")
@@ -167,13 +126,8 @@ def inactivate_doctor(
     db.commit()
     return {"message": "Médico inativado com sucesso"}
 
-# --- 6. REATIVAÇÃO (PATCH) ---
 @router.patch("/{doctor_id}/reactivate")
-def reactivate_doctor(
-    doctor_id: int, 
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+def reactivate_doctor(doctor_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     db_doctor = db.query(Doctor).filter(Doctor.id == doctor_id).first()
     if not db_doctor:
         raise HTTPException(status_code=404, detail="Médico não encontrado")

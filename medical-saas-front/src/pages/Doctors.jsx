@@ -11,23 +11,22 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { MASTER_SPECIALTIES } from '../services/specialtyService';
 
-// IMPORTAÇÃO JÁ PRESENTE NO SEU ARQUIVO
 import AgendaConfigFields from '../components/profissionais/AgendaConfigFields';
 
 export default function Doctors() {
-  // --- ESTADOS EXISTENTES ---
   const [doctors, setDoctors] = useState([]);
   const [rules, setRules] = useState([]); 
   const [loading, setLoading] = useState(true);
   const { isOpen, onOpen, onClose } = useDisclosure();
   
+  // <-- ESTADO ATUALIZADO COM O GÊNERO -->
   const [currentDoctor, setCurrentDoctor] = useState({ 
-    id: '', nome: '', especialidade: '', crm: '', email: '', senha: '' 
+    id: '', nome: '', especialidade: '', crm: '', email: '', senha: '', genero: '' 
   });
+  
   const [isEditing, setIsEditing] = useState(false);
   const [filter, setFilter] = useState('ativos');
 
-  // --- 1. NOVO ESTADO: CONFIGURAÇÃO DE AGENDA ---
   const initialAgendaConfig = {
     seg: { ativo: true, inicio: "08:00", fim: "18:00" },
     ter: { ativo: true, inicio: "08:00", fim: "18:00" },
@@ -42,7 +41,6 @@ export default function Doctors() {
 
   const toast = useToast();
 
-  // CORES DO TEMA
   const bgCard = useColorModeValue('white', 'gray.800');
   const bgHeader = useColorModeValue('gray.50', 'gray.700');
   const inputBg = useColorModeValue('gray.50', 'gray.700');
@@ -53,14 +51,11 @@ export default function Doctors() {
   const headingColor = useColorModeValue('gray.700', 'white');
   const activeColor = useColorModeValue('green.600', 'green.300');
   const inactiveColor = useColorModeValue('red.600', 'red.300');
-  const jsonBg = useColorModeValue('gray.100', 'gray.900'); 
 
-  // --- FUNÇÕES DE BUSCA ---
   const fetchDoctors = async () => {
     setLoading(true);
     try {
       const response = await api.get('/doctors/');
-      // BLINDAGEM: Garante que só vai setar se for uma Array
       setDoctors(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       toast({ title: 'Erro ao carregar profissionais.', status: 'error' });
@@ -72,7 +67,6 @@ export default function Doctors() {
   const fetchRules = async () => {
     try {
       const response = await api.get('/specialties/rules/');
-      // BLINDAGEM: Garante que só vai setar se for uma Array
       setRules(Array.isArray(response.data) ? response.data : []);
     } catch (e) { 
       console.log('Regras não carregadas'); 
@@ -84,13 +78,13 @@ export default function Doctors() {
     fetchRules();
   }, []);
 
-  // --- 2. AJUSTE: SALVAR COM CONFIGURAÇÃO DE AGENDA ---
   const handleSave = async () => {
     try {
       const payload = {
         nome: currentDoctor.nome,
         especialidade: currentDoctor.especialidade,
         crm: currentDoctor.crm,
+        genero: currentDoctor.genero, // <-- ENVIANDO O GÊNERO PARA O BACK-END
         agenda_config: agendaConfig 
       };
 
@@ -120,22 +114,20 @@ export default function Doctors() {
     }
   };
 
-  // --- 3. AJUSTE: ABRIR MODAL CARREGANDO A AGENDA ---
   const openModal = (doctor = null) => {
     fetchRules();
     if (doctor) {
-      setCurrentDoctor({ ...doctor, email: '', senha: '' });
+      setCurrentDoctor({ ...doctor, email: '', senha: '', genero: doctor.genero || '' });
       setAgendaConfig(doctor.agenda_config || initialAgendaConfig);
       setIsEditing(true);
     } else {
-      setCurrentDoctor({ id: '', nome: '', especialidade: '', crm: '', email: '', senha: '' });
+      setCurrentDoctor({ id: '', nome: '', especialidade: '', crm: '', email: '', senha: '', genero: '' });
       setAgendaConfig(initialAgendaConfig);
       setIsEditing(false);
     }
     onOpen();
   };
 
-  // BLINDAGEM: Garante que filteredDoctors seja calculado sobre uma Array válida
   const safeDoctors = Array.isArray(doctors) ? doctors : [];
   const filteredDoctors = safeDoctors.filter(doc => {
     if (filter === 'ativos') return doc.ativo === true;
@@ -160,9 +152,6 @@ export default function Doctors() {
       fetchDoctors();
     } catch (error) { toast({ title: 'Erro ao reativar.', status: 'error' }); }
   };
-
-  // BLINDAGEM MÁXIMA: Só executa o .find se rules for definitivamente um Array
-  const linkedRule = Array.isArray(rules) ? rules.find(r => r.specialty === currentDoctor.especialidade) : null;
 
   return (
     <Box p={8}>
@@ -234,16 +223,34 @@ export default function Doctors() {
           <ModalBody>
             <VStack spacing={6} align="stretch">
               <VStack spacing={4}>
-                <FormControl isRequired>
-                  <FormLabel color={textColor}>Nome Completo</FormLabel>
-                  <Input 
-                    bg={inputBg} 
-                    borderColor={borderColor} 
-                    value={currentDoctor.nome} 
-                    onChange={(e) => setCurrentDoctor({...currentDoctor, nome: e.target.value})} 
-                    placeholder="Ex: Dr. Silva" 
-                  />
-                </FormControl>
+                
+                <SimpleGrid columns={2} spacing={4} w="full">
+                    <FormControl isRequired>
+                        <FormLabel color={textColor}>Nome Completo</FormLabel>
+                        <Input 
+                            bg={inputBg} 
+                            borderColor={borderColor} 
+                            value={currentDoctor.nome} 
+                            onChange={(e) => setCurrentDoctor({...currentDoctor, nome: e.target.value})} 
+                            placeholder="Ex: Dr. Silva" 
+                        />
+                    </FormControl>
+
+                    {/* CAIXA DE SELEÇÃO DE GÊNERO */}
+                    <FormControl isRequired>
+                        <FormLabel color={textColor}>Gênero</FormLabel>
+                        <Select 
+                            bg={inputBg} 
+                            borderColor={borderColor} 
+                            value={currentDoctor.genero} 
+                            onChange={(e) => setCurrentDoctor({...currentDoctor, genero: e.target.value})} 
+                            placeholder="Selecione"
+                        >
+                            <option value="Masculino">Masculino (Dr.)</option>
+                            <option value="Feminino">Feminino (Dra.)</option>
+                        </Select>
+                    </FormControl>
+                </SimpleGrid>
 
                 {!isEditing && (
                   <SimpleGrid columns={2} spacing={4} w="full">
@@ -290,12 +297,13 @@ export default function Doctors() {
                   </FormControl>
 
                   <FormControl isRequired>
-                    <FormLabel color={textColor}>Registro Profissional</FormLabel>
+                    <FormLabel color={textColor}>Registro Profissional (CR)</FormLabel>
                     <Input 
                       bg={inputBg} 
                       borderColor={borderColor} 
                       value={currentDoctor.crm} 
                       onChange={(e) => setCurrentDoctor({...currentDoctor, crm: e.target.value})} 
+                      placeholder="Ex: CRFa-12345"
                     />
                   </FormControl>
                 </SimpleGrid>
@@ -303,7 +311,6 @@ export default function Doctors() {
 
               <Divider />
 
-              {/* --- 4. INJEÇÃO DO COMPONENTE DE AGENDA --- */}
               <AgendaConfigFields 
                 config={agendaConfig} 
                 setConfig={setAgendaConfig} 

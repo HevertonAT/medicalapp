@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, JSON # <-- ADICIONADO JSON
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, JSON 
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.db.base import Base
@@ -12,9 +12,10 @@ class Doctor(Base):
     especialidade = Column(String, nullable=True)
     crm = Column(String, unique=True, nullable=True)
     
-    # NOVA COLUNA: Armazena a configuração da agenda vinda do React
-    # Ex: {"seg": {"ativo": true, "inicio": "08:00", "fim": "18:00"}, "intervalo": 30}
-    agenda_config = Column(JSON, nullable=True) # <-- ADICIONADO AQUI
+    # NOVA COLUNA: Gênero do profissional (Para a assinatura inteligente)
+    genero = Column(String, nullable=True) # <-- ADICIONADO AQUI
+    
+    agenda_config = Column(JSON, nullable=True)
     
     user_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
     clinic_id = Column(Integer, ForeignKey("clinicas.id"), nullable=True)
