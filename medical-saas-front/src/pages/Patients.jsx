@@ -4,7 +4,7 @@ import {
   IconButton, useDisclosure, Modal, ModalOverlay, ModalContent,
   ModalHeader, ModalBody, ModalCloseButton, useToast, Spinner, VStack, Text, 
   HStack, Icon, Badge, FormControl, FormLabel, Input, ModalFooter, Tooltip,
-  useColorModeValue, Divider, InputGroup, InputRightElement // <- Adicionados novos componentes
+  useColorModeValue, Divider, InputGroup, InputRightElement 
 } from '@chakra-ui/react';
 import { FaPlus, FaFileMedical, FaHistory, FaPrescriptionBottleAlt, FaEdit, FaBan, FaCheck, FaPrint, FaSearch } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
@@ -15,11 +15,9 @@ export default function Patients() {
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Modais
   const { isOpen, onOpen, onClose } = useDisclosure(); 
   const { isOpen: isRecordOpen, onOpen: onRecordOpen, onClose: onRecordClose } = useDisclosure(); 
 
-  // --- ESTADO DO PACIENTE ATUALIZADO COM OS CAMPOS DE ENDEREÇO ---
   const [currentPatient, setCurrentPatient] = useState({ 
     id: '', nome_completo: '', telefone: '', cpf: '', data_nascimento: '', email: '',
     cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: ''
@@ -29,14 +27,13 @@ export default function Patients() {
   const [records, setRecords] = useState([]);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [cpfError, setCpfError] = useState('');
-  const [isFetchingCep, setIsFetchingCep] = useState(false); // Loading do CEP
+  const [isFetchingCep, setIsFetchingCep] = useState(false); 
   
   const [filter, setFilter] = useState('ativos'); 
 
   const toast = useToast();
   const navigate = useNavigate();
 
-  // --- CORES DINÂMICAS PARA DARK MODE ---
   const bgCard = useColorModeValue('white', 'gray.800');
   const bgHeader = useColorModeValue('gray.50', 'gray.700');
   const inputBg = useColorModeValue('gray.50', 'gray.700');
@@ -54,7 +51,6 @@ export default function Patients() {
   const prescricaoBg = useColorModeValue('orange.50', 'orange.900');
   const prescricaoText = useColorModeValue('orange.800', 'orange.100');
 
-  // --- FUNÇÃO PARA CALCULAR IDADE ---
   const calculateAge = (dataNascimento) => {
     if (!dataNascimento) return '-';
     const today = new Date();
@@ -65,7 +61,6 @@ export default function Patients() {
     return age + ' anos';
   };
 
-  // --- FUNÇÕES DE MÁSCARA E VALIDAÇÃO ---
   const isValidCPF = (cpf) => {
     const numbers = cpf.replace(/\D/g, '');
     if (numbers.length !== 11) return false;
@@ -95,7 +90,6 @@ export default function Patients() {
     return value.replace(/\D/g, '').replace(/(\d{5})(\d)/, '$1-$2').substring(0, 9);
   };
 
-  // --- BUSCA AUTOMÁTICA DE CEP (VIACEP) ---
   const handleCepBlur = async () => {
     const rawCep = currentPatient.cep.replace(/\D/g, '');
     if (rawCep.length === 8) {
@@ -156,7 +150,6 @@ export default function Patients() {
             telefone: currentPatient.telefone,
             email: currentPatient.email,
             data_nascimento: currentPatient.data_nascimento || null,
-            // Adicionando os dados de endereço no Payload
             cep: currentPatient.cep || null,
             logradouro: currentPatient.logradouro || null,
             numero: currentPatient.numero || null,
@@ -239,6 +232,40 @@ export default function Patients() {
     } catch (error) { console.error("Erro prontuário"); }
   };
 
+  // --- O TRADUTOR INTELIGENTE DE ESPECIALIDADE POR GÊNERO ---
+  const formatDoctorInfo = (name, specialtyArea, gender) => {
+    const isMale = gender === 'Masculino' || gender === 'M' || gender === 'masculino' || gender === 'm';
+    const isFemale = gender === 'Feminino' || gender === 'F' || gender === 'feminino' || gender === 'f';
+    const prefix = isMale ? "Dr." : isFemale ? "Dra." : "Dr(a).";
+    let title = specialtyArea || "Clínico Geral";
+    const area = title.toLowerCase().trim();
+
+    const genderMap = {
+        'fonoaudiologia': { m: 'Fonoaudiólogo', f: 'Fonoaudióloga', d: 'Fonoaudiólogo(a)' },
+        'nutrologia': { m: 'Nutrólogo', f: 'Nutróloga', d: 'Nutrólogo(a)' },
+        'psicologia': { m: 'Psicólogo', f: 'Psicóloga', d: 'Psicólogo(a)' },
+        'clínico geral': { m: 'Clínico Geral', f: 'Clínica Geral', d: 'Clínico(a) Geral' },
+        'clínica médica': { m: 'Clínico Geral', f: 'Clínica Geral', d: 'Clínico(a) Geral' },
+        'fisioterapia': { m: 'Fisioterapeuta', f: 'Fisioterapeuta', d: 'Fisioterapeuta' },
+        'nutrição': { m: 'Nutricionista', f: 'Nutricionista', d: 'Nutricionista' },
+        'enfermagem': { m: 'Enfermeiro', f: 'Enfermeira', d: 'Enfermeiro(a)' },
+        'biomedicina': { m: 'Biomédico', f: 'Biomédica', d: 'Biomédico(a)' },
+        'odontologia': { m: 'Dentista', f: 'Dentista', d: 'Dentista' }
+    };
+
+    if (genderMap[area]) {
+        title = isMale ? genderMap[area].m : isFemale ? genderMap[area].f : genderMap[area].d;
+    } else {
+        if (area.endsWith('logia')) title = title.replace(/logia$/i, 'logista');
+        else if (area.endsWith('iatria') && area !== 'pediatria') title = title.replace(/iatria$/i, 'iatra');
+        else if (area === 'pediatria') title = 'Pediatra';
+        else if (area === 'ortopedia') title = 'Ortopedista';
+    }
+
+    title = title.charAt(0).toUpperCase() + title.slice(1);
+    return { prefix, title, fullName: `${prefix} ${name}` };
+  };
+
   const handlePrintEvolution = (record) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -246,44 +273,79 @@ export default function Patients() {
       return;
     }
 
+    const patientAge = calculateAge(currentPatient.data_nascimento);
+    const docReg = record.doctor_document || "CR não informado";
+    
+    // Mágica acontecendo aqui:
+    const docInfo = formatDoctorInfo(record.doctor_nome, record.doctor_specialty, record.doctor_gender);
+    
+    // Formata o ID do Prontuário para 9 dígitos ex: 000000152
+    const recordIdFormatted = record.id ? String(record.id).padStart(9, '0') : "000000000";
+
     const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-          <title>Evolução - ${currentPatient.nome_completo}</title>
-          <style>
-              body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #333; line-height: 1.6; }
-              .header { text-align: center; border-bottom: 2px solid #3182CE; padding-bottom: 20px; margin-bottom: 30px; }
-              .header h1 { margin: 0; color: #3182CE; font-size: 24px; text-transform: uppercase; }
-              .info-box { background: #F7FAFC; border: 1px solid #E2E8F0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; }
-              .content { white-space: pre-wrap; font-size: 14px; border: 1px solid #E2E8F0; padding: 20px; border-radius: 8px; min-height: 200px; }
-              .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #A0AEC0; border-top: 1px solid #E2E8F0; padding-top: 20px; }
-              .signature { margin-top: 80px; text-align: center; width: 300px; float: right; border-top: 1px solid #333; padding-top: 5px; }
-          </style>
-      </head>
-      <body>
-          <div class="header">
-              <h1>Evolução Clínica</h1>
-          </div>
-          
-          <div class="info-box">
-              <strong>Paciente:</strong> ${currentPatient.nome_completo}<br>
-              <strong>Data do Atendimento:</strong> ${record.created_at}<br>
-              <strong>Profissional:</strong> Dr(a) ${record.doctor_nome}
-          </div>
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Evolução - ${currentPatient.nome_completo}</title>
+            <style>
+                body { font-family: 'Arial', sans-serif; padding: 40px; color: #333; line-height: 1.5; }
+                
+                /* CABEÇALHO PADRÃO */
+                .header-container { border: 1px solid #ccc; padding: 15px; margin-bottom: 25px; border-radius: 5px; font-size: 14px; background-color: #fff;}
+                .header-title { text-align: center; font-size: 20px; font-weight: bold; text-transform: uppercase; margin-bottom: 20px; background-color: #e2e8f0; padding: 8px; border: 1px solid #cbd5e0; color: #2d3748; letter-spacing: 2px;}
+                .info-row { margin-bottom: 5px; }
+                
+                /* CAIXA DE TEXTOS */
+                .section { margin-bottom: 25px; page-break-inside: avoid; border: 1px solid #e2e8f0; padding: 15px; border-radius: 5px;}
+                .title { font-size: 14px; font-weight: bold; margin-bottom: 10px; color: #4a5568;}
+                .content { white-space: pre-wrap; font-size: 14px; }
+                
+                /* ASSINATURA CENTRALIZADA E DETALHADA */
+                .signature-box { margin-top: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; page-break-inside: avoid; }
+                .signature-line { border-top: 1px solid #000; width: 350px; margin-bottom: 5px; }
+                .signature-text { margin: 2px 0; font-size: 14px; }
+                .signature-name { font-weight: bold; font-size: 15px; text-transform: uppercase;}
+                
+                .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
+            </style>
+        </head>
+        <body>
+            <div class="header-container">
+                <div class="info-row"><strong>Prontuário/Paciente:</strong> ${currentPatient.nome_completo} ${patientAge !== '-' ? `(${patientAge})` : ''}</div>
+                <div class="info-row"><strong>Registro de Atendimento:</strong> ${recordIdFormatted} - ${record.created_at}</div>
+                <div class="info-row"><strong>Profissional:</strong> ${docInfo.fullName}</div>
+            </div>
 
-          <h3 style="color: #2D3748; margin-bottom: 10px;">Descrição da Evolução</h3>
-          <div class="content">${record.anamnese || "Nenhuma evolução registrada."}</div>
+            <div class="header-title">Evolução Clínica</div>
 
-          <div class="signature">
-              <strong>Dr(a) ${record.doctor_nome}</strong><br>
-              Assinatura do Profissional
-          </div>
+            ${record.diagnostico_cid ? `
+            <div class="section">
+                <div class="title">Diagnóstico (CID-10)</div>
+                <div class="content">${record.diagnostico_cid}</div>
+            </div>` : ''}
 
-          <div style="clear: both;"></div>
-          <div class="footer">Documento gerado eletronicamente.</div>
-      </body>
-      </html>
+            ${record.prescricao ? `
+            <div class="section">
+                <div class="title">Prescrição e Exames</div>
+                <div class="content">${record.prescricao}</div>
+            </div>` : ''}
+
+            ${record.anamnese ? `
+            <div class="section">
+                <div class="title">Descrição da Evolução</div>
+                <div class="content">${record.anamnese}</div>
+            </div>` : ''}
+
+            <div class="signature-box">
+                <div class="signature-line"></div>
+                <p class="signature-text signature-name">${docInfo.fullName}</p>
+                <p class="signature-text">${docInfo.title}</p>
+                <p class="signature-text">${docReg}</p>
+            </div>
+
+            <div class="footer">Gerado de forma segura por MedicalSaaS</div>
+        </body>
+        </html>
     `;
 
     printWindow.document.write(html);
@@ -319,7 +381,6 @@ export default function Patients() {
         <Button size="sm" variant={filter === 'inativos' ? 'solid' : 'outline'} colorScheme="red" onClick={() => setFilter('inativos')}>Inativos</Button>
       </HStack>
 
-      {/* TABELA PRINCIPAL */}
       <Box bg={bgCard} shadow="sm" borderRadius="md" overflow="hidden" border="1px solid" borderColor={borderColor}>
         <Table variant="simple" size="sm"> 
             <Thead bg={bgHeader}>
@@ -392,7 +453,7 @@ export default function Patients() {
       </Box>
 
       {/* MODAL CADASTRO / EDIÇÃO */}
-      <Modal isOpen={isOpen} onClose={onClose} size="2xl"> {/* Alterado para 2xl para caber o endereço confortavelmente */}
+      <Modal isOpen={isOpen} onClose={onClose} size="2xl">
         <ModalOverlay />
         <ModalContent bg={modalBg}>
           <ModalHeader>{isEditing ? 'Editar Paciente' : 'Novo Paciente'}</ModalHeader>
@@ -400,7 +461,6 @@ export default function Patients() {
           <ModalBody pb={4}>
             <VStack spacing={4} align="stretch">
               
-              {/* SEÇÃO 1: DADOS PESSOAIS */}
               <Text fontWeight="bold" color={textColor} fontSize="sm" textTransform="uppercase">Dados Pessoais</Text>
               
               <FormControl isRequired>
@@ -463,7 +523,6 @@ export default function Patients() {
 
               <Divider my={2} />
 
-              {/* SEÇÃO 2: ENDEREÇO COM BUSCA DE CEP */}
               <Text fontWeight="bold" color={textColor} fontSize="sm" textTransform="uppercase">Endereço</Text>
               
               <HStack w="full" spacing={4} align="flex-end">
@@ -565,7 +624,6 @@ export default function Patients() {
           </ModalHeader>
           <ModalCloseButton />
           <ModalBody display="flex" p={0}>
-            {/* LADO ESQUERDO: LISTA */}
             <Box w="35%" borderRight="1px solid" borderColor={borderColor} bg={recordListBg} p={4} overflowY="auto">
                 <Heading size="sm" mb={4} color={textColor}><Icon as={FaHistory} mr={2}/>Atendimentos</Heading>
                 {records.length === 0 ? <Text fontSize="sm" color="gray.500">Nenhum registro.</Text> : (
@@ -592,7 +650,6 @@ export default function Patients() {
                 )}
             </Box>
             
-            {/* LADO DIREITO: DETALHES */}
             <Box w="65%" p={8} overflowY="auto" bg={recordDetailBg}>
                 {selectedRecord ? (
                     <Box>

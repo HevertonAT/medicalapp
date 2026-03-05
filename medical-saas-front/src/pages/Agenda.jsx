@@ -5,7 +5,8 @@ import {
   FormControl, FormLabel, Input, Select, ModalFooter, useDisclosure,
   VStack, HStack, IconButton, Icon, Textarea, Tabs, TabList, TabPanels, Tab, TabPanel,
   useColorModeValue, Table, Thead, Tbody, Tr, Th, Td, InputGroup, InputLeftElement,
-  SimpleGrid, Menu, MenuButton, MenuList, MenuItem
+  SimpleGrid, Menu, MenuButton, MenuList, MenuItem,
+  Accordion, AccordionItem, AccordionButton, AccordionPanel, AccordionIcon
 } from '@chakra-ui/react';
 import { 
   FaPlus, FaUserMd, FaSearch, FaPlay, FaCheckDouble, 
@@ -14,7 +15,7 @@ import {
 } from 'react-icons/fa';
 import React from 'react'; 
 import { useNavigate } from 'react-router-dom';
-import { jwtDecode } from "jwt-decode"; // <-- IMPORTANTE: Adicionado para ler o token
+import { jwtDecode } from "jwt-decode"; 
 
 import api from '../services/api';
 import SpecialtyFormRenderer from '../components/SpecialtyFormRenderer';
@@ -29,7 +30,6 @@ export default function Agenda() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // --- NOVOS ESTADOS PARA CONTROLE DE AGENDA E PERMISSÕES ---
   const [currentUserRole, setCurrentUserRole] = useState('');
   const [availableSlots, setAvailableSlots] = useState([]);
   const [rescheduleSlots, setRescheduleSlots] = useState([]);
@@ -38,7 +38,6 @@ export default function Agenda() {
   const { isOpen: isConsultOpen, onOpen: onConsultOpen, onClose: onConsultClose } = useDisclosure(); 
   const { isOpen: isCancelOpen, onOpen: onCancelOpen, onClose: onCancelClose } = useDisclosure();
   const { isOpen: isRescheduleOpen, onOpen: onRescheduleOpen, onClose: onRescheduleClose } = useDisclosure();
-  
   const { isOpen: isPrintModalOpen, onOpen: onPrintModalOpen, onClose: onPrintModalClose } = useDisclosure();
 
   const toast = useToast();
@@ -58,6 +57,8 @@ export default function Agenda() {
   const [currentDocSpecialty, setCurrentDocSpecialty] = useState("");
   const [startTime, setStartTime] = useState(null);
   const [minhasMacros, setMinhasMacros] = useState([]); 
+  
+  const [lastSavedRecord, setLastSavedRecord] = useState(null);
 
   const bgPage = useColorModeValue('gray.50', 'gray.900');
   const bgCard = useColorModeValue('white', 'gray.800');
@@ -97,7 +98,6 @@ export default function Agenda() {
     }
   }, []);
 
-  // --- EFEITO 1: DESCOBRE SE QUEM ESTÁ LOGADO É MÉDICO ---
   useEffect(() => {
     const token = localStorage.getItem('medical_token');
     if (token) {
@@ -105,8 +105,6 @@ export default function Agenda() {
             const decoded = jwtDecode(token);
             const role = decoded.role || localStorage.getItem('user_role');
             setCurrentUserRole(role);
-            
-            // Se for médico, busca o ID dele e já preenche o formulário
             if (role === 'doctor' || role === 'medico') {
                 api.get('/doctors/me').then(res => {
                     if (res.data && res.data.id) {
@@ -119,7 +117,6 @@ export default function Agenda() {
     fetchData(); 
   }, [fetchData]);
 
-  // --- EFEITO 2: BUSCA HORÁRIOS LIVRES PARA NOVO AGENDAMENTO ---
   useEffect(() => {
       if (newApp.doctor_id && newApp.data) {
           api.get(`/appointments/available-slots?doctor_id=${newApp.doctor_id}&data=${newApp.data}`)
@@ -130,7 +127,6 @@ export default function Agenda() {
       }
   }, [newApp.doctor_id, newApp.data]);
 
-  // --- EFEITO 3: BUSCA HORÁRIOS LIVRES PARA REAGENDAMENTO ---
   useEffect(() => {
       if (currentAppointment && rescheduleData.data) {
           api.get(`/appointments/available-slots?doctor_id=${currentAppointment.doctor_id}&data=${rescheduleData.data}`)
@@ -188,6 +184,7 @@ export default function Agenda() {
   const handleStartConsultation = async (app) => {
     setCurrentAppointment(app);
     setStartTime(new Date()); 
+    setLastSavedRecord(null); 
     
     try {
       if (app.status === 'agendado' || app.status === 'AGENDADO') {
@@ -227,8 +224,7 @@ export default function Agenda() {
 
     try {
         const endTime = new Date(); 
-
-        await api.post('/medical-records/', {
+        const response = await api.post('/medical-records/', {
             appointment_id: currentAppointment.id,
             patient_id: currentAppointment.patient_id,
             anamnese: consultData.anamnese,
@@ -240,10 +236,10 @@ export default function Agenda() {
             data_fim: endTime
         });
 
+        setLastSavedRecord(response.data);
         toast({ title: 'Atendimento finalizado com sucesso! ✅', status: 'success' });
         onConsultClose();
         fetchData();
-
         onPrintModalOpen();
 
     } catch (error) {
@@ -252,42 +248,88 @@ export default function Agenda() {
     }
   };
 
+  // --- O TRADUTOR INTELIGENTE DE ESPECIALIDADE POR GÊNERO ---
+  const formatDoctorInfo = (name, specialtyArea, gender) => {
+    const isMale = gender === 'Masculino' || gender === 'M' || gender === 'masculino' || gender === 'm';
+    const isFemale = gender === 'Feminino' || gender === 'F' || gender === 'feminino' || gender === 'f';
+    const prefix = isMale ? "Dr." : isFemale ? "Dra." : "Dr(a).";
+    let title = specialtyArea || "Clínico Geral";
+    const area = title.toLowerCase().trim();
+
+    const genderMap = {
+        'fonoaudiologia': { m: 'Fonoaudiólogo', f: 'Fonoaudióloga', d: 'Fonoaudiólogo(a)' },
+        'nutrologia': { m: 'Nutrólogo', f: 'Nutróloga', d: 'Nutrólogo(a)' },
+        'psicologia': { m: 'Psicólogo', f: 'Psicóloga', d: 'Psicólogo(a)' },
+        'clínico geral': { m: 'Clínico Geral', f: 'Clínica Geral', d: 'Clínico(a) Geral' },
+        'clínica médica': { m: 'Clínico Geral', f: 'Clínica Geral', d: 'Clínico(a) Geral' },
+        'fisioterapia': { m: 'Fisioterapeuta', f: 'Fisioterapeuta', d: 'Fisioterapeuta' },
+        'nutrição': { m: 'Nutricionista', f: 'Nutricionista', d: 'Nutricionista' },
+        'enfermagem': { m: 'Enfermeiro', f: 'Enfermeira', d: 'Enfermeiro(a)' },
+        'biomedicina': { m: 'Biomédico', f: 'Biomédica', d: 'Biomédico(a)' },
+        'odontologia': { m: 'Dentista', f: 'Dentista', d: 'Dentista' }
+    };
+
+    if (genderMap[area]) {
+        title = isMale ? genderMap[area].m : isFemale ? genderMap[area].f : genderMap[area].d;
+    } else {
+        if (area.endsWith('logia')) title = title.replace(/logia$/i, 'logista');
+        else if (area.endsWith('iatria') && area !== 'pediatria') title = title.replace(/iatria$/i, 'iatra');
+        else if (area === 'pediatria') title = 'Pediatra';
+        else if (area === 'ortopedia') title = 'Ortopedista';
+    }
+
+    // Deixa a primeira letra maiúscula
+    title = title.charAt(0).toUpperCase() + title.slice(1);
+
+    return { prefix, title, fullName: `${prefix} ${name}` };
+  };
+
   const handlePrintRecord = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-        toast({ title: "Pop-up bloqueado", description: "Por favor, permita os pop-ups neste site para poder imprimir.", status: "warning" });
+        toast({ title: "Pop-up bloqueado", description: "Permita os pop-ups neste site para poder imprimir.", status: "warning" });
         return;
     }
+
+    const doc = doctors.find(d => String(d.id) === String(currentAppointment?.doctor_id));
+    const docReg = doc?.conselho_regional || doc?.numero_conselho || doc?.registro_conselho || doc?.documento || doc?.conselho || "CR não informado";
+    
+    // Mágica acontecendo aqui:
+    const docInfo = formatDoctorInfo(currentAppointment?.doctor_nome, doc?.especialidade, doc?.genero);
+    
+    const patientAge = calculateAge(currentAppointment?.patient_id);
+    const recordIdFormatted = lastSavedRecord?.id ? String(lastSavedRecord.id).padStart(9, '0') : Math.floor(Math.random() * 1000000).toString().padStart(9, '0');
 
     const html = `
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Receituário - ${currentAppointment?.patient_nome}</title>
+            <title>Evolução - ${currentAppointment?.patient_nome}</title>
             <style>
-                body { font-family: 'Arial', sans-serif; padding: 40px; color: #333; line-height: 1.6; }
-                .header { text-align: center; border-bottom: 2px solid #3182CE; padding-bottom: 20px; margin-bottom: 30px; }
-                .header h1 { margin: 0; color: #3182CE; font-size: 24px; text-transform: uppercase; }
-                .header p { margin: 5px 0 0 0; font-size: 14px; color: #666; }
-                .section { margin-bottom: 25px; page-break-inside: avoid; }
-                .title { font-size: 16px; font-weight: bold; color: #3182CE; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+                body { font-family: 'Arial', sans-serif; padding: 40px; color: #333; line-height: 1.5; }
+                .header-container { border: 1px solid #ccc; padding: 15px; margin-bottom: 25px; border-radius: 5px; font-size: 14px; background-color: #fff;}
+                .header-title { text-align: center; font-size: 20px; font-weight: bold; text-transform: uppercase; margin-bottom: 20px; background-color: #e2e8f0; padding: 8px; border: 1px solid #cbd5e0; color: #2d3748; letter-spacing: 2px;}
+                .info-row { margin-bottom: 5px; }
+                .section { margin-bottom: 25px; page-break-inside: avoid; border: 1px solid #e2e8f0; padding: 15px; border-radius: 5px;}
+                .title { font-size: 14px; font-weight: bold; margin-bottom: 10px; color: #4a5568;}
                 .content { white-space: pre-wrap; font-size: 14px; }
-                .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
-                .signature-block { margin-top: 80px; text-align: center; width: 300px; float: right; }
-                .signature-line { border-top: 1px solid #333; margin-bottom: 5px; }
-                .clear { clear: both; }
+                
+                .signature-box { margin-top: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; page-break-inside: avoid; }
+                .signature-line { border-top: 1px solid #000; width: 350px; margin-bottom: 5px; }
+                .signature-text { margin: 2px 0; font-size: 14px; }
+                .signature-name { font-weight: bold; font-size: 15px; text-transform: uppercase;}
+                
+                .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
             </style>
         </head>
         <body>
-            <div class="header">
-                <h1>Evolução</h1>
-                <p>Resumo do Atendimento</p>
+            <div class="header-container">
+                <div class="info-row"><strong>Prontuário/Paciente:</strong> ${currentAppointment?.patient_nome || 'Não informado'} ${patientAge !== '-' ? `(${patientAge})` : ''}</div>
+                <div class="info-row"><strong>Registro de Atendimento:</strong> ${recordIdFormatted} - ${new Date().toLocaleString('pt-BR')}</div>
+                <div class="info-row"><strong>Profissional:</strong> ${docInfo.fullName}</div>
             </div>
-            
-            <div class="section">
-                <div class="content"><strong>Paciente:</strong> ${currentAppointment?.patient_nome || 'Não informado'}</div>
-                <div class="content"><strong>Data:</strong> ${new Date().toLocaleDateString('pt-BR')}</div>
-            </div>
+
+            <div class="header-title">Evolução Clínica</div>
 
             ${consultData.diagnostico_cid ? `
             <div class="section">
@@ -302,32 +344,26 @@ export default function Agenda() {
             </div>` : ''}
 
             ${consultData.anamnese ? `
-            <div class="section" style="margin-top: 40px;">
-                <div class="title">Evolução</div>
+            <div class="section">
+                <div class="title">Descrição da Evolução</div>
                 <div class="content">${consultData.anamnese}</div>
             </div>` : ''}
 
-            <div class="signature-block">
+            <div class="signature-box">
                 <div class="signature-line"></div>
-                <div>Assinatura e Carimbo do Profissional</div>
+                <p class="signature-text signature-name">${docInfo.fullName}</p>
+                <p class="signature-text">${docInfo.title}</p>
+                <p class="signature-text">${docReg}</p>
             </div>
 
-            <div class="clear"></div>
-
-            <div class="footer">
-                Gerado de forma segura por MedicalApp
-            </div>
+            <div class="footer">Gerado de forma segura por MedicalSaaS</div>
         </body>
         </html>
     `;
 
     printWindow.document.write(html);
     printWindow.document.close();
-    
-    setTimeout(() => {
-        printWindow.print();
-    }, 250);
-
+    setTimeout(() => { printWindow.print(); }, 250);
     onPrintModalClose();
   };
 
@@ -347,7 +383,6 @@ export default function Agenda() {
       setCurrentAppointment(app);
       setActionReason('');
       const currentIso = app.data_horario.split('T');
-      // Limpamos a hora para forçar o usuário a escolher um horário válido na nova data
       setRescheduleData({ data: currentIso[0], hora: '' });
       onRescheduleOpen();
   };
@@ -424,11 +459,9 @@ export default function Agenda() {
         </Box>
       )}
 
-      {/* --- MODAL NOVO AGENDAMENTO INTELIGENTE --- */}
       <Modal isOpen={isOpen} onClose={() => { onClose(); resetNewAppForm(); }} size="lg">
         <ModalOverlay /><ModalContent bg={modalBg}><ModalHeader>Novo Agendamento</ModalHeader><ModalCloseButton />
           <ModalBody>
-            {/* Reorganizado: Profissional primeiro, pois a hora depende dele */}
             <FormControl mb={4}>
                 <FormLabel>Profissional</FormLabel>
                 <Select 
@@ -454,7 +487,6 @@ export default function Agenda() {
                     <Input type="date" bg={inputBg} size="sm" value={newApp.data} onChange={(e) => setNewApp({...newApp, data: e.target.value, hora: ''})} />
                 </FormControl>
                 
-                {/* CAMPO DE HORA SUBSTITUÍDO PELO SELECT INTELIGENTE */}
                 <FormControl>
                     <FormLabel>Horários</FormLabel>
                     <Select 
@@ -475,10 +507,8 @@ export default function Agenda() {
         </ModalContent>
       </Modal>
 
-      {/* --- MODAIS AUXILIARES --- */}
       <Modal isOpen={isCancelOpen} onClose={onCancelClose}><ModalOverlay /><ModalContent bg={modalBg}><ModalHeader>Cancelar</ModalHeader><ModalBody><Textarea bg={inputBg} value={actionReason} onChange={(e) => setActionReason(e.target.value)} placeholder="Motivo..." /></ModalBody><ModalFooter><Button colorScheme="red" mr={3} onClick={handleConfirmCancel}>Confirmar</Button></ModalFooter></ModalContent></Modal>
       
-      {/* MODAL REAGENDAR (AGORA INTELIGENTE) */}
       <Modal isOpen={isRescheduleOpen} onClose={onRescheduleClose}>
           <ModalOverlay /><ModalContent bg={modalBg}><ModalHeader>Reagendar</ModalHeader>
           <ModalBody>
@@ -506,7 +536,6 @@ export default function Agenda() {
         </ModalContent>
       </Modal>
 
-      {/* --- MODAL DE PERGUNTA: IMPRIMIR --- */}
       <Modal isOpen={isPrintModalOpen} onClose={onPrintModalClose} isCentered>
         <ModalOverlay />
         <ModalContent bg={modalBg}>
@@ -525,8 +554,7 @@ export default function Agenda() {
         </ModalContent>
       </Modal>
 
-      {/* --- MODAL DO PRONTUÁRIO --- */}
-      <Modal isOpen={isConsultOpen} onClose={onConsultClose} size="5xl" closeOnOverlayClick={false}>
+      <Modal isOpen={isConsultOpen} onClose={onConsultClose} size="5xl" closeOnOverlayClick={false} scrollBehavior="inside">
         <ModalOverlay />
         <ModalContent h="90vh" bg={modalBg} display="flex" flexDirection="column">
           <ModalHeader bg={headerBg} borderBottom="1px solid" borderColor={borderColor}>
@@ -539,17 +567,16 @@ export default function Agenda() {
           </ModalHeader>
           <ModalCloseButton />
           
-          <ModalBody py={4} display="flex" flexDirection="column" overflowY="hidden">
-            <Tabs variant="enclosed" colorScheme="blue" h="100%" display="flex" flexDirection="column">
-                <TabList>
-                    <Tab fontWeight="bold" color={textColor}><Icon as={FaUserMd} mr={2}/> Anamnese</Tab>
-                    <Tab fontWeight="bold" color={textColor}><Icon as={FaPrescriptionBottleAlt} mr={2}/> Prescrição</Tab>
-                </TabList>
-                
-                <TabPanels flex="1" overflowY="auto" mt={2}>
-                    
-                    {/* ABA DE ANAMNESE E FORMULÁRIO DINÂMICO */}
-                    <TabPanel h="full" display="flex" flexDirection="column">
+          <ModalBody py={6} overflowY="auto">
+            <Accordion allowMultiple defaultIndex={[0]} w="100%">
+                <AccordionItem border="1px solid" borderColor={borderColor} borderRadius="md" mb={4} bg={bgCard}>
+                    <AccordionButton _expanded={{ bg: useColorModeValue('blue.50', 'gray.700') }} borderRadius="md" py={3}>
+                        <Box flex="1" textAlign="left" fontWeight="bold" color={textColor} display="flex" alignItems="center">
+                            <Icon as={FaUserMd} mr={3} color="blue.500" /> Anamnese e Avaliação Específica
+                        </Box>
+                        <AccordionIcon />
+                    </AccordionButton>
+                    <AccordionPanel pb={6} pt={4}>
                         <SpecialtyFormRenderer 
                             specialty={currentDocSpecialty} 
                             settings={specialtySettings} 
@@ -557,11 +584,9 @@ export default function Agenda() {
                             onChange={setSpecialtyData} 
                         />
 
-                        {/* Texto livre com o botão de Macros */}
-                        <FormControl mt={6} display="flex" flexDirection="column" flex="1">
+                        <FormControl mt={6} display="flex" flexDirection="column">
                           <Flex justify="space-between" align="center" mb={2}>
-                            <FormLabel color={textColor} mb={0}>Evolução / Observações Livres:</FormLabel>
-                            
+                            <FormLabel color={textColor} mb={0} fontWeight="bold">Evolução / Observações Livres:</FormLabel>
                             {minhasMacros.length > 0 && (
                               <Menu>
                                 <MenuButton as={Button} size="xs" colorScheme="yellow" variant="solid" leftIcon={<FaBolt />}>
@@ -586,11 +611,9 @@ export default function Agenda() {
                               </Menu>
                             )}
                           </Flex>
-                          
                           <Textarea 
                               size="sm" 
-                              h="250px"
-                              resize="none" 
+                              minH="250px"
                               value={consultData.anamnese} 
                               onChange={(e) => setConsultData({...consultData, anamnese: e.target.value})} 
                               bg={tabBg} 
@@ -598,13 +621,19 @@ export default function Agenda() {
                               placeholder="Evolução, observações adicionais..."
                               _focus={{ borderColor: "blue.400", boxShadow: "0 0 0 1px blue.400" }}
                           />
-                      </FormControl>
-                    </TabPanel>
+                        </FormControl>
+                    </AccordionPanel>
+                </AccordionItem>
 
-                    {/* ABA DE PRESCRIÇÃO E CID */}
-                    <TabPanel h="full" display="flex" flexDirection="column" gap={4}>
-                        
-                        <FormControl>
+                <AccordionItem border="1px solid" borderColor={borderColor} borderRadius="md" mb={4} bg={bgCard}>
+                    <AccordionButton _expanded={{ bg: useColorModeValue('blue.50', 'gray.700') }} borderRadius="md" py={3}>
+                        <Box flex="1" textAlign="left" fontWeight="bold" color={textColor} display="flex" alignItems="center">
+                            <Icon as={FaPrescriptionBottleAlt} mr={3} color="green.500" /> Prescrição e Diagnóstico (CID)
+                        </Box>
+                        <AccordionIcon />
+                    </AccordionButton>
+                    <AccordionPanel pb={6} pt={4}>
+                        <FormControl mb={6}>
                             <FormLabel color={textColor} fontWeight="bold">Diagnóstico (CID-10):</FormLabel>
                             <CidAutocomplete 
                                 value={consultData.diagnostico_cid}
@@ -613,11 +642,10 @@ export default function Agenda() {
                             />
                         </FormControl>
 
-                        <FormControl h="full" display="flex" flexDirection="column">
+                        <FormControl display="flex" flexDirection="column">
                             <FormLabel color={textColor} fontWeight="bold">Prescrição Médica e Pedido de Exames:</FormLabel>
                             <Textarea 
                                 size="sm" 
-                                flex="1" 
                                 minH="250px"
                                 value={consultData.prescricao} 
                                 onChange={(e) => setConsultData({...consultData, prescricao: e.target.value})} 
@@ -626,13 +654,12 @@ export default function Agenda() {
                                 _focus={{ borderColor: "blue.400", boxShadow: "0 0 0 1px blue.400" }}
                             />
                         </FormControl>
-                    </TabPanel>
-
-                </TabPanels>
-            </Tabs>
+                    </AccordionPanel>
+                </AccordionItem>
+            </Accordion>
           </ModalBody>
           
-          <ModalFooter borderTop="1px solid" borderColor={borderColor}>
+          <ModalFooter borderTop="1px solid" borderColor={borderColor} bg={headerBg}>
             <Button variant="ghost" size="sm" mr={3} onClick={onConsultClose}>Cancelar</Button>
             <Button colorScheme="green" size="sm" leftIcon={<FaCheckDouble />} onClick={handleFinishConsultation}>Salvar e Finalizar Prontuário</Button>
           </ModalFooter>
