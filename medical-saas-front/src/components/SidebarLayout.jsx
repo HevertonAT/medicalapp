@@ -4,7 +4,7 @@ import {
 import { 
   FaHome, FaUserInjured, FaUserMd, FaCalendarAlt, FaSignOutAlt, 
   FaChartPie, FaCode, FaBars, FaChevronLeft, FaChevronRight, 
-  FaHeartbeat, FaFileMedical, FaClock, FaBuilding, FaFileInvoiceDollar
+  FaHeartbeat, FaFileMedical, FaClock, FaBuilding, FaFileInvoiceDollar, FaUserTie
 } from 'react-icons/fa';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
