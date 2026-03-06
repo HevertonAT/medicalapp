@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
 from sqlalchemy import desc
-from datetime import datetime
+from datetime import datetime, timedelta, timezone # <-- ADICIONADO PARA FUSO HORÁRIO
 
 from app.db.base import get_db
 from app.models.prontuarios import MedicalRecord
@@ -21,6 +21,9 @@ from app.schemas.esquema_prontuarios import MedicalRecordCreate, MedicalRecordRe
 from app.core.deps import get_current_user
 
 router = APIRouter()
+
+# --- CONFIGURAÇÃO DO FUSO HORÁRIO DO BRASIL (UTC-3) ---
+BRT_TZ = timezone(timedelta(hours=-3))
 
 # --- SCHEMAS INTERNOS ---
 class MacroCreate(BaseModel):
@@ -36,7 +39,7 @@ class RecordHistoryResponse(BaseModel):
     doctor_nome: str
     doctor_specialty: Optional[str] = None 
     doctor_document: Optional[str] = None  
-    doctor_gender: Optional[str] = None # <-- NOVO CAMPO DE GÊNERO
+    doctor_gender: Optional[str] = None 
 
     class Config:
         from_attributes = True
@@ -140,12 +143,15 @@ def get_patient_records(
             elif hasattr(r.doctor, 'documento') and getattr(r.doctor, 'documento'):
                 doc_doc = getattr(r.doctor, 'documento')
 
+        # --- A MÁGICA DA CONVERSÃO DE TEMPO ACONTECE AQUI ---
+        criado_brt = r.criado_em.astimezone(BRT_TZ) if r.criado_em else datetime.now(BRT_TZ)
+
         results.append({
             "id": r.id, 
             "anamnese": r.anamnese, 
             "prescricao": r.prescricao,
             "diagnostico_cid": r.diagnostico_cid,
-            "created_at": r.criado_em.strftime("%d/%m/%Y %H:%M"),
+            "created_at": criado_brt.strftime("%d/%m/%Y %H:%M"), # Hora 100% corrigida
             "doctor_nome": doc_name,
             "doctor_specialty": doc_spec,
             "doctor_document": doc_doc,
@@ -169,7 +175,10 @@ def generate_prescription_pdf(
     
     clinica_nome = current_user.clinic.nome if current_user.clinic and current_user.clinic.nome else "Minha Clínica"
     
-    data_fmt = record.criado_em.strftime('%d/%m/%Y') if record.criado_em else datetime.now().strftime('%d/%m/%Y')
+    # --- CONVERSÃO DE FUSO PARA O PDF ---
+    data_fmt = datetime.now(BRT_TZ).strftime('%d/%m/%Y')
+    if record.criado_em:
+        data_fmt = record.criado_em.astimezone(BRT_TZ).strftime('%d/%m/%Y')
 
     p.setFont("Helvetica-Bold", 20)
     p.drawString(200, 800, "RECEITA MEDICA")
@@ -196,14 +205,3 @@ def generate_prescription_pdf(
     p.save()
     buffer.seek(0)
     return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=receita_{record.id}.pdf"})
-
-@router.get("/macros/list")
-def get_macros(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return db.query(Macro).filter(Macro.clinic_id == current_user.clinic_id).all()
-
-@router.post("/macros")
-def create_macro(macro: MacroCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    new_macro = Macro(clinic_id=current_user.clinic_id, titulo=macro.titulo, texto_padrao=macro.texto_padrao)
-    db.add(new_macro)
-    db.commit()
-    return {"message": "Modelo salvo!"}

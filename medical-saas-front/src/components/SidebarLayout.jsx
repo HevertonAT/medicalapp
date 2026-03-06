@@ -4,7 +4,7 @@ import {
 import { 
   FaHome, FaUserInjured, FaUserMd, FaCalendarAlt, FaSignOutAlt, 
   FaChartPie, FaCode, FaBars, FaChevronLeft, FaChevronRight, 
-  FaHeartbeat, FaFileMedical, FaClock, FaBuilding, FaFileInvoiceDollar // <-- Ícone do Contas adicionado
+  FaHeartbeat, FaFileMedical, FaClock, FaBuilding, FaFileInvoiceDollar
 } from 'react-icons/fa';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
@@ -46,23 +46,29 @@ export default function SidebarLayout() {
   }, []);
 
   const menuItems = [
-    // Menu Admin / Médico / SaaS
+    // Menu Admin / Médico
     { name: 'Painel', icon: FaHome, path: '/dashboard', roles: ['admin', 'doctor'] },
     
     { name: 'Cadastro de Clinicas', icon: FaBuilding, path: '/clinicas', roles: ['superuser'] },
-    { name: 'Pacientes', icon: FaUserInjured, path: '/patients', roles: ['admin', 'doctor'] },
-    { name: 'Configurações', icon: FaClock, path: '/minha-agenda', roles: ['doctor'] },
+    
+    // --- A MÁGICA ACONTECE AQUI: Liberamos Pacientes e Agenda para a Recepcionista ---
+    { name: 'Pacientes', icon: FaUserInjured, path: '/patients', roles: ['admin', 'doctor', 'recepcionista'] },
+    { name: 'Agenda', icon: FaCalendarAlt, path: '/agenda', roles: ['superuser', 'admin', 'doctor', 'recepcionista'] }, 
+    
+    { name: 'Configurações', icon: FaClock, path: '/minha-agenda', roles: ['doctor', 'admin'] },
     { name: 'Profissionais', icon: FaUserMd, path: '/doctors', roles: ['superuser', 'admin'] },
     { name: 'Especialidades', icon: FaCode, path: '/specialties', roles: ['superuser', 'admin'] },
-    { name: 'Agenda', icon: FaCalendarAlt, path: '/agenda', roles: ['superuser', 'admin', 'doctor'] }, 
     
-    // --- MÓDULO FINANCEIRO ---
+    // --- MÓDULO FINANCEIRO (Bloqueado para Recepcionista) ---
     { name: 'Dashboard Caixa', icon: FaChartPie, path: '/financial', roles: ['admin'] },
     { name: 'Contas (Pagar/Receber)', icon: FaFileInvoiceDollar, path: '/contas', roles: ['admin'] }, 
+    
+    // Menu SaaS (Apenas Dono do Sistema)
     { name: 'Painel SaaS', icon: FaBuilding, path: '/saas', roles: ['superuser'] },
     { name: 'Área Dev', icon: FaCode, path: '/dev-tools', roles: ['superuser'] },
-    
-    // Menu Exclusivo Paciente
+    { name: 'Minha Equipe', icon: FaUserTie, path: '/equipe', roles: ['admin', 'superuser'] },
+
+    // Menu Exclusivo Paciente (Portal do Paciente)
     { name: 'Minha Saúde', icon: FaHeartbeat, path: '/minha-saude', roles: ['patient', 'paciente'] },
     { name: 'Meus Exames', icon: FaFileMedical, path: '/meus-exames', roles: ['patient', 'paciente'] },
   ];
@@ -71,6 +77,15 @@ export default function SidebarLayout() {
     localStorage.removeItem('medical_token');
     localStorage.removeItem('user_role');
     navigate('/');
+  };
+
+  // Define a cor da badge dinamicamente baseada no cargo
+  const getBadgeColor = (role) => {
+      if (role === 'superuser') return 'purple';
+      if (role === 'doctor') return 'green';
+      if (role === 'recepcionista') return 'pink'; // Cor destacada para a recepcionista
+      if (role === 'patient' || role === 'paciente') return 'orange';
+      return 'blue'; // Admin
   };
 
   return (
@@ -111,12 +126,12 @@ export default function SidebarLayout() {
 
         <Flex justify="center" mb={8}>
             {isSidebarOpen ? (
-                <Badge colorScheme={simulatedRole === 'superuser' ? 'purple' : simulatedRole === 'doctor' ? 'green' : simulatedRole === 'patient' || simulatedRole === 'paciente' ? 'orange' : 'blue'}>
+                <Badge colorScheme={getBadgeColor(simulatedRole)}>
                     {simulatedRole ? simulatedRole.toUpperCase() : '...'}
                 </Badge>
             ) : (
                 <Tooltip label={simulatedRole.toUpperCase()} placement="right">
-                    <Box w={2} h={2} borderRadius="full" bg={simulatedRole === 'superuser' ? 'purple.400' : 'blue.400'} />
+                    <Box w={2} h={2} borderRadius="full" bg={`${getBadgeColor(simulatedRole)}.400`} />
                 </Tooltip>
             )}
         </Flex>

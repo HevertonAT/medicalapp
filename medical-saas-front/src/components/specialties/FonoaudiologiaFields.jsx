@@ -68,7 +68,7 @@ export default function FonoaudiologiaFields({ formData, handleChange, bgInput, 
             onChange={handleChange} 
             placeholder="Descreva o progresso fonológico, semântico e motor oral do paciente..."
             resize="none" 
-            minH="180px"  // <-- MAIOR ESPAÇO PARA RELATOS DE EVOLUÇÃO
+            minH="180px"
             bg={bgInput}
             color={textColor}
             borderColor={borderColor}

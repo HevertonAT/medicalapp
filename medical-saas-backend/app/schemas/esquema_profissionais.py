@@ -5,7 +5,7 @@ class DoctorBase(BaseModel):
     nome: str
     especialidade: str
     crm: str
-    genero: Optional[str] = None # <-- ADICIONADO AQUI
+    genero: Optional[str] = None
     ativo: Optional[bool] = True 
     agenda_config: Optional[Dict[str, Any]] = None 
 
@@ -17,7 +17,7 @@ class DoctorUpdate(BaseModel):
     nome: Optional[str] = None
     especialidade: Optional[str] = None
     crm: Optional[str] = None
-    genero: Optional[str] = None # <-- ADICIONADO AQUI
+    genero: Optional[str] = None
     ativo: Optional[bool] = None
     agenda_config: Optional[Dict[str, Any]] = None 
 

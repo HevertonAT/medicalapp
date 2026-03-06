@@ -5,6 +5,7 @@ import {
 } from '@chakra-ui/react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { jwtDecode } from "jwt-decode"; // <-- IMPORTAÇÃO DO DECODE
 import { ColorModeSwitcher } from '../components/ColorModeSwitcher';
 import { API_BASE } from '../services/api';
 
@@ -77,7 +78,7 @@ export default function Login() {
     return regex.test(emailInput);
   };
 
-  // --- AÇÃO DE LOGIN ---
+  // --- AÇÃO DE LOGIN COM ROTEAMENTO INTELIGENTE ---
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -94,17 +95,27 @@ export default function Login() {
       );
 
       const token = response.data.access_token;
-      const userRole = response.data.role;
-
       localStorage.setItem('medical_token', token);
-      if (userRole) localStorage.setItem('user_role', userRole);
+
+      // Decodifica o token para ter certeza do cargo
+      const decoded = jwtDecode(token);
+      const userRole = decoded.role || response.data.role || 'admin';
+      localStorage.setItem('user_role', userRole);
 
       toast({ title: 'Bem-vindo(a)!', status: 'success', duration: 2000, isClosable: true });
       
-      if (userRole === 'patient' || userRole === 'paciente') {
+      // ROTEAMENTO INTELIGENTE
+      if (userRole === 'superuser') {
+          navigate("/saas"); 
+      } 
+      else if (userRole === 'recepcionista') {
+          navigate("/agenda"); 
+      } 
+      else if (userRole === 'patient' || userRole === 'paciente') {
           navigate("/minha-saude"); 
-      } else {
-          navigate("/dashboard");
+      } 
+      else {
+          navigate("/dashboard"); // Admin e Doctor
       }
       
     } catch (error) {

@@ -248,7 +248,6 @@ export default function Agenda() {
     }
   };
 
-  // --- O TRADUTOR INTELIGENTE DE ESPECIALIDADE POR GÊNERO ---
   const formatDoctorInfo = (name, specialtyArea, gender) => {
     const isMale = gender === 'Masculino' || gender === 'M' || gender === 'masculino' || gender === 'm';
     const isFemale = gender === 'Feminino' || gender === 'F' || gender === 'feminino' || gender === 'f';
@@ -278,7 +277,6 @@ export default function Agenda() {
         else if (area === 'ortopedia') title = 'Ortopedista';
     }
 
-    // Deixa a primeira letra maiúscula
     title = title.charAt(0).toUpperCase() + title.slice(1);
 
     return { prefix, title, fullName: `${prefix} ${name}` };
@@ -293,10 +291,7 @@ export default function Agenda() {
 
     const doc = doctors.find(d => String(d.id) === String(currentAppointment?.doctor_id));
     const docReg = doc?.conselho_regional || doc?.numero_conselho || doc?.registro_conselho || doc?.documento || doc?.conselho || "CR não informado";
-    
-    // Mágica acontecendo aqui:
     const docInfo = formatDoctorInfo(currentAppointment?.doctor_nome, doc?.especialidade, doc?.genero);
-    
     const patientAge = calculateAge(currentAppointment?.patient_id);
     const recordIdFormatted = lastSavedRecord?.id ? String(lastSavedRecord.id).padStart(9, '0') : Math.floor(Math.random() * 1000000).toString().padStart(9, '0');
 
@@ -313,12 +308,10 @@ export default function Agenda() {
                 .section { margin-bottom: 25px; page-break-inside: avoid; border: 1px solid #e2e8f0; padding: 15px; border-radius: 5px;}
                 .title { font-size: 14px; font-weight: bold; margin-bottom: 10px; color: #4a5568;}
                 .content { white-space: pre-wrap; font-size: 14px; }
-                
                 .signature-box { margin-top: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; page-break-inside: avoid; }
                 .signature-line { border-top: 1px solid #000; width: 350px; margin-bottom: 5px; }
                 .signature-text { margin: 2px 0; font-size: 14px; }
                 .signature-name { font-weight: bold; font-size: 15px; text-transform: uppercase;}
-                
                 .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
             </style>
         </head>
@@ -328,34 +321,16 @@ export default function Agenda() {
                 <div class="info-row"><strong>Registro de Atendimento:</strong> ${recordIdFormatted} - ${new Date().toLocaleString('pt-BR')}</div>
                 <div class="info-row"><strong>Profissional:</strong> ${docInfo.fullName}</div>
             </div>
-
             <div class="header-title">Evolução Clínica</div>
-
-            ${consultData.diagnostico_cid ? `
-            <div class="section">
-                <div class="title">Diagnóstico (CID-10)</div>
-                <div class="content">${consultData.diagnostico_cid}</div>
-            </div>` : ''}
-
-            ${consultData.prescricao ? `
-            <div class="section">
-                <div class="title">Prescrição e Exames</div>
-                <div class="content">${consultData.prescricao}</div>
-            </div>` : ''}
-
-            ${consultData.anamnese ? `
-            <div class="section">
-                <div class="title">Descrição da Evolução</div>
-                <div class="content">${consultData.anamnese}</div>
-            </div>` : ''}
-
+            ${consultData.diagnostico_cid ? `<div class="section"><div class="title">Diagnóstico (CID-10)</div><div class="content">${consultData.diagnostico_cid}</div></div>` : ''}
+            ${consultData.prescricao ? `<div class="section"><div class="title">Prescrição e Exames</div><div class="content">${consultData.prescricao}</div></div>` : ''}
+            ${consultData.anamnese ? `<div class="section"><div class="title">Descrição da Evolução</div><div class="content">${consultData.anamnese}</div></div>` : ''}
             <div class="signature-box">
                 <div class="signature-line"></div>
                 <p class="signature-text signature-name">${docInfo.fullName}</p>
                 <p class="signature-text">${docInfo.title}</p>
                 <p class="signature-text">${docReg}</p>
             </div>
-
             <div class="footer">Gerado de forma segura por MedicalSaaS</div>
         </body>
         </html>
@@ -445,9 +420,13 @@ export default function Agenda() {
                                     <>
                                         {app.status === 'agendado' && <IconButton icon={<FaTimes />} size="xs" colorScheme="red" variant="ghost" onClick={() => openCancelModal(app)} />}
                                         {app.status === 'agendado' && <IconButton icon={<FaRedo />} size="xs" colorScheme="blue" variant="ghost" onClick={() => openRescheduleModal(app)} />}
-                                        <Button leftIcon={app.status === 'em_andamento' ? <FaCheckDouble /> : <FaPlay />} size="xs" colorScheme={app.status === 'em_andamento' ? 'green' : 'blue'} onClick={() => handleStartConsultation(app)}>
-                                            {app.status === 'em_andamento' ? 'Retomar' : 'Iniciar'}
-                                        </Button>
+                                        
+                                        {/* A MÁGICA: A RECEPCIONISTA NÃO VÊ ESSE BOTÃO DE ATENDER */}
+                                        {currentUserRole !== 'recepcionista' && (
+                                            <Button leftIcon={app.status === 'em_andamento' ? <FaCheckDouble /> : <FaPlay />} size="xs" colorScheme={app.status === 'em_andamento' ? 'green' : 'blue'} onClick={() => handleStartConsultation(app)}>
+                                                {app.status === 'em_andamento' ? 'Retomar' : 'Iniciar'}
+                                            </Button>
+                                        )}
                                     </>
                                 )}
                                 {(app.status === 'concluido' || app.status === 'REALIZADO' || app.status === 'cancelado' || app.status === 'reagendado') && <Icon as={FaHistory} color="gray.300" />}
@@ -464,12 +443,7 @@ export default function Agenda() {
           <ModalBody>
             <FormControl mb={4}>
                 <FormLabel>Profissional</FormLabel>
-                <Select 
-                    bg={inputBg} size="sm" placeholder="Selecione o profissional..." 
-                    value={newApp.doctor_id} 
-                    onChange={(e) => setNewApp({...newApp, doctor_id: e.target.value, hora: ''})}
-                    isDisabled={currentUserRole === 'doctor' || currentUserRole === 'medico'}
-                >
+                <Select bg={inputBg} size="sm" placeholder="Selecione o profissional..." value={newApp.doctor_id} onChange={(e) => setNewApp({...newApp, doctor_id: e.target.value, hora: ''})} isDisabled={currentUserRole === 'doctor' || currentUserRole === 'medico'}>
                     {doctors.filter(d => d.ativo).map(d => <option key={d.id} value={d.id}>{d.nome}</option>)}
                 </Select>
             </FormControl>
@@ -489,13 +463,7 @@ export default function Agenda() {
                 
                 <FormControl>
                     <FormLabel>Horários</FormLabel>
-                    <Select 
-                        bg={inputBg} size="sm" 
-                        placeholder={availableSlots.length > 0 ? "Selecione o horário" : "Selecione a Data"} 
-                        value={newApp.hora} 
-                        onChange={(e) => setNewApp({...newApp, hora: e.target.value})}
-                        isDisabled={availableSlots.length === 0}
-                    >
+                    <Select bg={inputBg} size="sm" placeholder={availableSlots.length > 0 ? "Selecione o horário" : "Selecione a Data"} value={newApp.hora} onChange={(e) => setNewApp({...newApp, hora: e.target.value})} isDisabled={availableSlots.length === 0}>
                         {availableSlots.map(slot => <option key={slot} value={slot}>{slot}</option>)}
                     </Select>
                 </FormControl>
@@ -519,13 +487,7 @@ export default function Agenda() {
               </FormControl>
               <FormControl>
                   <FormLabel>Novo Horário</FormLabel>
-                  <Select 
-                      bg={inputBg} 
-                      value={rescheduleData.hora} 
-                      onChange={(e) => setRescheduleData({...rescheduleData, hora: e.target.value})}
-                      isDisabled={rescheduleSlots.length === 0}
-                      placeholder={rescheduleSlots.length > 0 ? "Selecione o horário" : "Selecione a data primeiro"}
-                  >
+                  <Select bg={inputBg} value={rescheduleData.hora} onChange={(e) => setRescheduleData({...rescheduleData, hora: e.target.value})} isDisabled={rescheduleSlots.length === 0} placeholder={rescheduleSlots.length > 0 ? "Selecione o horário" : "Selecione a data primeiro"}>
                       {rescheduleSlots.map(slot => <option key={slot} value={slot}>{slot}</option>)}
                   </Select>
               </FormControl>
@@ -577,12 +539,7 @@ export default function Agenda() {
                         <AccordionIcon />
                     </AccordionButton>
                     <AccordionPanel pb={6} pt={4}>
-                        <SpecialtyFormRenderer 
-                            specialty={currentDocSpecialty} 
-                            settings={specialtySettings} 
-                            data={specialtyData} 
-                            onChange={setSpecialtyData} 
-                        />
+                        <SpecialtyFormRenderer specialty={currentDocSpecialty} settings={specialtySettings} data={specialtyData} onChange={setSpecialtyData} />
 
                         <FormControl mt={6} display="flex" flexDirection="column">
                           <Flex justify="space-between" align="center" mb={2}>
@@ -594,11 +551,7 @@ export default function Agenda() {
                                 </MenuButton>
                                 <MenuList bg={bgCard} borderColor={borderColor}>
                                   {minhasMacros.map(macro => (
-                                    <MenuItem 
-                                      key={macro.id} 
-                                      bg={bgCard} 
-                                      _hover={{ bg: useColorModeValue('gray.100', 'gray.600') }}
-                                      onClick={() => {
+                                    <MenuItem key={macro.id} bg={bgCard} _hover={{ bg: useColorModeValue('gray.100', 'gray.600') }} onClick={() => {
                                         const textoAtual = consultData.anamnese;
                                         const novoTexto = textoAtual ? `${textoAtual}\n\n${macro.texto_padrao}` : macro.texto_padrao;
                                         setConsultData({...consultData, anamnese: novoTexto});
@@ -611,16 +564,7 @@ export default function Agenda() {
                               </Menu>
                             )}
                           </Flex>
-                          <Textarea 
-                              size="sm" 
-                              minH="250px"
-                              value={consultData.anamnese} 
-                              onChange={(e) => setConsultData({...consultData, anamnese: e.target.value})} 
-                              bg={tabBg} 
-                              borderColor={borderColor} 
-                              placeholder="Evolução, observações adicionais..."
-                              _focus={{ borderColor: "blue.400", boxShadow: "0 0 0 1px blue.400" }}
-                          />
+                          <Textarea size="sm" minH="250px" value={consultData.anamnese} onChange={(e) => setConsultData({...consultData, anamnese: e.target.value})} bg={tabBg} borderColor={borderColor} placeholder="Evolução, observações adicionais..." _focus={{ borderColor: "blue.400", boxShadow: "0 0 0 1px blue.400" }}/>
                         </FormControl>
                     </AccordionPanel>
                 </AccordionItem>
@@ -635,24 +579,12 @@ export default function Agenda() {
                     <AccordionPanel pb={6} pt={4}>
                         <FormControl mb={6}>
                             <FormLabel color={textColor} fontWeight="bold">Diagnóstico (CID-10):</FormLabel>
-                            <CidAutocomplete 
-                                value={consultData.diagnostico_cid}
-                                onChange={(val) => setConsultData({...consultData, diagnostico_cid: val})}
-                                specialty={currentDocSpecialty}
-                            />
+                            <CidAutocomplete value={consultData.diagnostico_cid} onChange={(val) => setConsultData({...consultData, diagnostico_cid: val})} specialty={currentDocSpecialty}/>
                         </FormControl>
 
                         <FormControl display="flex" flexDirection="column">
                             <FormLabel color={textColor} fontWeight="bold">Prescrição Médica e Pedido de Exames:</FormLabel>
-                            <Textarea 
-                                size="sm" 
-                                minH="250px"
-                                value={consultData.prescricao} 
-                                onChange={(e) => setConsultData({...consultData, prescricao: e.target.value})} 
-                                bg={tabBg} 
-                                borderColor={borderColor} 
-                                _focus={{ borderColor: "blue.400", boxShadow: "0 0 0 1px blue.400" }}
-                            />
+                            <Textarea size="sm" minH="250px" value={consultData.prescricao} onChange={(e) => setConsultData({...consultData, prescricao: e.target.value})} bg={tabBg} borderColor={borderColor} _focus={{ borderColor: "blue.400", boxShadow: "0 0 0 1px blue.400" }}/>
                         </FormControl>
                     </AccordionPanel>
                 </AccordionItem>
