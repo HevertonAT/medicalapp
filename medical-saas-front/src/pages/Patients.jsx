@@ -8,7 +8,7 @@ import {
 } from '@chakra-ui/react';
 import { FaPlus, FaFileMedical, FaHistory, FaPrescriptionBottleAlt, FaEdit, FaBan, FaCheck, FaPrint, FaSearch } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
-import { jwtDecode } from "jwt-decode"; // <-- IMPORTADO PARA LER O CARGO
+import { jwtDecode } from "jwt-decode"; 
 
 import api from '../services/api';
 
@@ -32,7 +32,6 @@ export default function Patients() {
   
   const [filter, setFilter] = useState('ativos'); 
   
-  // --- NOVO ESTADO: CARGO DO USUÁRIO LOGADO ---
   const [currentUserRole, setCurrentUserRole] = useState('');
 
   const toast = useToast();
@@ -133,7 +132,6 @@ export default function Patients() {
     }
   };
 
-  // --- LÊ O TOKEN PARA DESCOBRIR A PERMISSÃO ---
   useEffect(() => { 
     const token = localStorage.getItem('medical_token');
     if (token) {
@@ -295,7 +293,6 @@ export default function Patients() {
 
                 <Td py={2}>
                     <HStack justify="center" spacing={1}>
-                    {/* A MÁGICA: SE NÃO FOR RECEPCIONISTA, MOSTRA O PRONTUÁRIO */}
                     {currentUserRole !== 'recepcionista' && (
                         <Button 
                             size="xs" leftIcon={<FaFileMedical />} colorScheme="teal" 
@@ -536,6 +533,27 @@ export default function Patients() {
                     <Box>
                         <Flex justify="space-between" align="center" mb={6}>
                             <Badge colorScheme="teal" fontSize="0.9em" p={1}>REALIZADO EM {selectedRecord.created_at}</Badge>
+                            
+                            {/* BOTÕES RESTAURADOS AQUI */}
+                            <HStack spacing={3}>
+                                <Button 
+                                    size="sm" 
+                                    colorScheme="orange" 
+                                    variant="outline"
+                                    leftIcon={<FaPrescriptionBottleAlt />}
+                                    onClick={() => window.print()}
+                                >
+                                    Imprimir Receita
+                                </Button>
+                                <Button 
+                                    size="sm" 
+                                    colorScheme="teal" 
+                                    leftIcon={<FaPrint />}
+                                    onClick={() => window.print()}
+                                >
+                                    Imprimir Evolução
+                                </Button>
+                            </HStack>
                         </Flex>
                         
                         <Box mb={6}>

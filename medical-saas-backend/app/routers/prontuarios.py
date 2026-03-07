@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
 from sqlalchemy import desc
-from datetime import datetime, timedelta, timezone # <-- ADICIONADO PARA FUSO HORÁRIO
+from datetime import datetime, date, timedelta, timezone # <-- ADICIONADO 'date' PARA CÁLCULO DE IDADE
 
 from app.db.base import get_db
 from app.models.prontuarios import MedicalRecord
@@ -43,6 +43,31 @@ class RecordHistoryResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+# --- FUNÇÃO AUXILIAR DE IDADE ---
+def calcular_idade_completa(data_nascimento):
+    if not data_nascimento:
+        return "Idade não informada"
+    
+    # Caso venha como string do banco, converte para data
+    if isinstance(data_nascimento, str):
+        try:
+            data_nascimento = datetime.strptime(data_nascimento, "%Y-%m-%d").date()
+        except:
+            return "Idade não informada"
+
+    hoje = date.today()
+    anos = hoje.year - data_nascimento.year
+    meses = hoje.month - data_nascimento.month
+    
+    if hoje.day < data_nascimento.day:
+        meses -= 1
+    if meses < 0:
+        anos -= 1
+        meses += 12
+        
+    return f"{anos} anos e {meses} meses"
+
 
 # --- ROTAS DE PRONTUÁRIO ---
 
@@ -159,6 +184,8 @@ def get_patient_records(
         })
     return results
 
+
+# --- GERADOR DE PDF DE EVOLUÇÃO (ATUALIZADO E DINÂMICO) ---
 @router.get("/{record_id}/pdf")
 def generate_prescription_pdf(
     record_id: int,
@@ -170,38 +197,79 @@ def generate_prescription_pdf(
     
     buffer = BytesIO()
     p = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
     
-    nome_paciente = record.patient.nome_completo if record.patient and record.patient.nome_completo else "Paciente não identificado"
+    paciente = record.patient
+    profissional = record.doctor
     
-    clinica_nome = current_user.clinic.nome if current_user.clinic and current_user.clinic.nome else "Minha Clínica"
-    
-    # --- CONVERSÃO DE FUSO PARA O PDF ---
-    data_fmt = datetime.now(BRT_TZ).strftime('%d/%m/%Y')
+    # --- CABEÇALHO DA EVOLUÇÃO ---
+    p.setFont("Helvetica-Bold", 12)
+    p.drawString(50, 800, f"Paciente: {paciente.nome_completo if paciente else 'Paciente não identificado'}")
+
+    p.setFont("Helvetica", 10)
+    idade_str = calcular_idade_completa(paciente.data_nascimento) if paciente and paciente.data_nascimento else "Idade não informada"
+    p.drawString(50, 785, f"Idade do Paciente: {idade_str}")
+    p.drawString(50, 770, f"Num. Prontuário: {str(record.id).zfill(9)}")
+
+    # Data do atendimento no formato DD/MM/YY - HH:MM
     if record.criado_em:
-        data_fmt = record.criado_em.astimezone(BRT_TZ).strftime('%d/%m/%Y')
-
-    p.setFont("Helvetica-Bold", 20)
-    p.drawString(200, 800, "RECEITA MEDICA")
-    p.setFont("Helvetica", 12)
-    p.drawString(50, 750, f"Clinica: {clinica_nome}")
-    p.line(50, 740, 550, 740)
-    p.drawString(50, 700, f"Paciente: {nome_paciente}")
-    p.drawString(50, 680, f"Data: {data_fmt}")
-    p.setFont("Helvetica-Bold", 14)
-    p.drawString(50, 630, "Uso:")
-    p.setFont("Helvetica", 12)
+        data_formatada = record.criado_em.astimezone(BRT_TZ).strftime("%d/%m/%y - %H:%M")
+    else:
+        data_formatada = datetime.now(BRT_TZ).strftime("%d/%m/%y - %H:%M")
+        
+    p.drawString(50, 755, f"Data do Atendimento: {data_formatada}")
     
-    prescricao_texto = record.prescricao if record.prescricao else "Sem prescricao."
-    text_object = p.beginText(50, 610)
-    for line in prescricao_texto.split('\n'):
-        text_object.textLine(line)
-    p.drawText(text_object)
+    nome_prof = profissional.nome if profissional else "Não identificado"
+    p.drawString(50, 740, f"Nome do Profissional: {nome_prof}")
 
-    p.line(50, 100, 550, 100)
-    p.setFont("Helvetica-Oblique", 10)
-    p.drawString(200, 80, "Assinatura e Carimbo")
+    # Linha divisória
+    p.line(50, 730, width - 50, 730)
+
+    # --- CORPO DO TEXTO (EVOLUÇÃO E PRESCRIÇÃO) ---
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(50, 700, "Evolução / Prescrição:")
+    
+    p.setFont("Helvetica", 12)
+    conteudo = []
+    if record.anamnese:
+        conteudo.append("Evolução:")
+        conteudo.append(record.anamnese)
+        conteudo.append("") # Quebra de linha visual
+    if record.prescricao:
+        conteudo.append("Prescrição / Receita:")
+        conteudo.append(record.prescricao)
+        
+    texto_completo = "\n".join(conteudo) if conteudo else "Nenhum registro encontrado neste atendimento."
+    
+    text_object = p.beginText(50, 680)
+    for line in texto_completo.split('\n'):
+        text_object.textLine(line)
+        
+    p.drawText(text_object)
+    
+    # --- ÁREA DE ASSINATURA (RODAPÉ DINÂMICO) ---
+    p.line(200, 120, 400, 120) 
+    
+    # Nome do Profissional (Centralizado)
+    p.setFont("Helvetica-Bold", 10)
+    nome_prof_assinatura = profissional.nome if profissional else "Profissional Responsável"
+    p.drawCentredString(300, 105, nome_prof_assinatura)
+
+    # Especialidade Dinâmica (Ex: Fonoaudióloga)
+    p.setFont("Helvetica", 10)
+    especialidade_prof = profissional.especialidade if profissional and profissional.especialidade else "Clínico(a) Geral"
+    p.drawCentredString(300, 90, especialidade_prof)
+
+    # Número do Conselho Dinâmico (Ex: CRFa-12345)
+    crm_prof = profissional.crm if profissional and profissional.crm else "CR Não Informado"
+    p.drawCentredString(300, 75, crm_prof)
     
     p.showPage()
     p.save()
     buffer.seek(0)
-    return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=receita_{record.id}.pdf"})
+    
+    return StreamingResponse(
+        buffer, 
+        media_type="application/pdf", 
+        headers={"Content-Disposition": f"attachment; filename=evolucao_{str(record.id).zfill(9)}.pdf"}
+    )
