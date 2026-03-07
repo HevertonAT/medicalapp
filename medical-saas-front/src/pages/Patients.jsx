@@ -244,6 +244,26 @@ export default function Patients() {
     } catch (error) { console.error("Erro prontuário"); }
   };
 
+  // --- NOVA FUNÇÃO PARA BAIXAR/ABRIR O PDF DO BACKEND ---
+  const handlePrintPDF = async (recordId) => {
+    try {
+        toast({ title: 'Gerando documento...', status: 'info', duration: 2000 });
+        
+        const response = await api.get(`/medical-records/${recordId}/pdf`, {
+            responseType: 'blob'
+        });
+
+        const file = new Blob([response.data], { type: 'application/pdf' });
+        const fileURL = URL.createObjectURL(file);
+        
+        window.open(fileURL, '_blank'); 
+        
+    } catch (error) {
+        console.error("Erro ao gerar PDF", error);
+        toast({ title: 'Erro ao gerar o documento.', status: 'error' });
+    }
+  };
+
   return (
     <Box p={8}>
       <Flex justify="space-between" align="center" mb={6}>
@@ -534,14 +554,14 @@ export default function Patients() {
                         <Flex justify="space-between" align="center" mb={6}>
                             <Badge colorScheme="teal" fontSize="0.9em" p={1}>REALIZADO EM {selectedRecord.created_at}</Badge>
                             
-                            {/* BOTÕES RESTAURADOS AQUI */}
+                            {/* BOTÕES RESTAURADOS AQUI COM A FUNÇÃO DE DOWNLOAD/ABRIR PDF */}
                             <HStack spacing={3}>
                                 <Button 
                                     size="sm" 
                                     colorScheme="orange" 
                                     variant="outline"
                                     leftIcon={<FaPrescriptionBottleAlt />}
-                                    onClick={() => window.print()}
+                                    onClick={() => handlePrintPDF(selectedRecord.id)}
                                 >
                                     Imprimir Receita
                                 </Button>
@@ -549,7 +569,7 @@ export default function Patients() {
                                     size="sm" 
                                     colorScheme="teal" 
                                     leftIcon={<FaPrint />}
-                                    onClick={() => window.print()}
+                                    onClick={() => handlePrintPDF(selectedRecord.id)}
                                 >
                                     Imprimir Evolução
                                 </Button>
