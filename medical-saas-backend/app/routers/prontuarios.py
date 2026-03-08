@@ -23,11 +23,9 @@ from app.core.deps import get_current_user
 router = APIRouter()
 
 BRT_TZ = timezone(timedelta(hours=-3))
-# --- SCHEMAS INTERNOS ---
 class MacroCreate(BaseModel):
     titulo: str
     texto_padrao: str
-
 class RecordHistoryResponse(BaseModel):
     id: int 
     anamnese: Optional[str]
@@ -37,16 +35,20 @@ class RecordHistoryResponse(BaseModel):
     doctor_nome: str
     doctor_specialty: Optional[str] = None 
     doctor_document: Optional[str] = None  
-    doctor_gender: Optional[str] = None # <-- NOVO CAMPO DE GÊNERO
-
+    doctor_gender: Optional[str] = None
     class Config:
         from_attributes = True
-
 
 def calcular_idade_completa(data_nascimento):
     if not data_nascimento:
         return "Idade não informada"
     
+    if isinstance(data_nascimento, str):
+        try:
+            data_nascimento = datetime.strptime(data_nascimento, "%Y-%m-%d").date()
+        except:
+            return "Idade não informada"
+
     hoje = date.today()
     anos = hoje.year - data_nascimento.year
     meses = hoje.month - data_nascimento.month
@@ -58,8 +60,8 @@ def calcular_idade_completa(data_nascimento):
         meses += 12
         
     return f"{anos} anos e {meses} meses"
-# --- ROTAS DE PRONTUÁRIO ---
 
+# --- ROTAS DE PRONTUÁRIO ---
 @router.post("/", response_model=MedicalRecordResponse, status_code=status.HTTP_201_CREATED)
 def create_medical_record(
     data: MedicalRecordCreate, 
