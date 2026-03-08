@@ -299,46 +299,71 @@ export default function Agenda() {
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Evolução - ${currentAppointment?.patient_nome}</title>
+            <title>Receituário - ${currentAppointment?.patient_nome}</title>
             <style>
-                body { font-family: 'Arial', sans-serif; padding: 40px; color: #333; line-height: 1.5; }
-                .header-container { border: 1px solid #ccc; padding: 15px; margin-bottom: 25px; border-radius: 5px; font-size: 14px; background-color: #fff;}
-                .header-title { text-align: center; font-size: 20px; font-weight: bold; text-transform: uppercase; margin-bottom: 20px; background-color: #e2e8f0; padding: 8px; border: 1px solid #cbd5e0; color: #2d3748; letter-spacing: 2px;}
-                .info-row { margin-bottom: 5px; }
-                .section { margin-bottom: 25px; page-break-inside: avoid; border: 1px solid #e2e8f0; padding: 15px; border-radius: 5px;}
-                .title { font-size: 14px; font-weight: bold; margin-bottom: 10px; color: #4a5568;}
+                body { font-family: 'Arial', sans-serif; padding: 40px; color: #333; line-height: 1.6; }
+                .header { text-align: center; border-bottom: 2px solid #3182CE; padding-bottom: 20px; margin-bottom: 30px; }
+                .header h1 { margin: 0; color: #3182CE; font-size: 24px; text-transform: uppercase; }
+                .header p { margin: 5px 0 0 0; font-size: 14px; color: #666; }
+                .section { margin-bottom: 25px; page-break-inside: avoid; }
+                .title { font-size: 16px; font-weight: bold; color: #3182CE; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
                 .content { white-space: pre-wrap; font-size: 14px; }
-                .signature-box { margin-top: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; page-break-inside: avoid; }
-                .signature-line { border-top: 1px solid #000; width: 350px; margin-bottom: 5px; }
-                .signature-text { margin: 2px 0; font-size: 14px; }
-                .signature-name { font-weight: bold; font-size: 15px; text-transform: uppercase;}
-                .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
+                .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
+                .signature-block { margin-top: 80px; text-align: center; width: 300px; float: right; }
+                .signature-line { border-top: 1px solid #333; margin-bottom: 5px; }
+                .clear { clear: both; }
             </style>
         </head>
         <body>
-            <div class="header-container">
-                <div class="info-row"><strong>Prontuário/Paciente:</strong> ${currentAppointment?.patient_nome || 'Não informado'} ${patientAge !== '-' ? `(${patientAge})` : ''}</div>
-                <div class="info-row"><strong>Registro de Atendimento:</strong> ${recordIdFormatted} - ${new Date().toLocaleString('pt-BR')}</div>
-                <div class="info-row"><strong>Profissional:</strong> ${docInfo.fullName}</div>
+            <div class="header">
+                <h1>Receituário Médico</h1>
+                <p>Resumo do Atendimento</p>
             </div>
-            <div class="header-title">Evolução Clínica</div>
-            ${consultData.diagnostico_cid ? `<div class="section"><div class="title">Diagnóstico (CID-10)</div><div class="content">${consultData.diagnostico_cid}</div></div>` : ''}
-            ${consultData.prescricao ? `<div class="section"><div class="title">Prescrição e Exames</div><div class="content">${consultData.prescricao}</div></div>` : ''}
-            ${consultData.anamnese ? `<div class="section"><div class="title">Descrição da Evolução</div><div class="content">${consultData.anamnese}</div></div>` : ''}
-            <div class="signature-box">
+            
+            <div class="section">
+                <div class="content"><strong>Paciente:</strong> ${currentAppointment?.patient_nome || 'Não informado'}</div>
+                <div class="content"><strong>Data:</strong> ${new Date().toLocaleDateString('pt-BR')}</div>
+            </div>
+
+            ${consultData.diagnostico_cid ? `
+            <div class="section">
+                <div class="title">Diagnóstico (CID-10)</div>
+                <div class="content">${consultData.diagnostico_cid}</div>
+            </div>` : ''}
+
+            ${consultData.prescricao ? `
+            <div class="section">
+                <div class="title">Prescrição e Exames</div>
+                <div class="content">${consultData.prescricao}</div>
+            </div>` : ''}
+
+            ${consultData.anamnese ? `
+            <div class="section" style="margin-top: 40px;">
+                <div class="title">Evolução / Observações</div>
+                <div class="content">${consultData.anamnese}</div>
+            </div>` : ''}
+
+            <div class="signature-block">
                 <div class="signature-line"></div>
-                <p class="signature-text signature-name">${docInfo.fullName}</p>
-                <p class="signature-text">${docInfo.title}</p>
-                <p class="signature-text">${docReg}</p>
+                <div>Assinatura e Carimbo do Profissional</div>
             </div>
-            <div class="footer">Gerado de forma segura por MedicalSaaS</div>
+
+            <div class="clear"></div>
+
+            <div class="footer">
+                Gerado de forma segura por MedicalApp
+            </div>
         </body>
         </html>
     `;
 
     printWindow.document.write(html);
     printWindow.document.close();
-    setTimeout(() => { printWindow.print(); }, 250);
+    
+    setTimeout(() => {
+        printWindow.print();
+    }, 250);
+
     onPrintModalClose();
   };
 
