@@ -56,9 +56,9 @@ app = FastAPI(
 # --- CORREÇÃO DA CONFIGURAÇÃO DO CORS ---
 # As vírgulas que faltavam foram adicionadas e a URL exata do seu Front-end Vercel foi incluída
 origins = [
-    "http://127.0.0.1:8000",
-    "http://localhost:3000", 
-    "http://localhost:5173", 
+    #"http://127.0.0.1:8000",
+    #"http://localhost:3000", 
+    #"http://localhost:5173", 
     "https://medicalappfront.vercel.app",
 ]
 

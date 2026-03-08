@@ -14,7 +14,7 @@ router = APIRouter()
 
 # Configuração da pasta de destino
 UPLOAD_DIR = "uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True) # Cria a pasta se não existir
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @router.post("/{patient_id}", response_model=FileResponse)
 def upload_file(
