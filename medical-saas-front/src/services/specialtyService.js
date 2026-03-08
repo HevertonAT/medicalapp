@@ -28,21 +28,21 @@ export const MASTER_SPECIALTIES = [
 
 export async function getEffectiveRule(specialty) {
   // Codifica a string para evitar erros com acentos na URL
-  const res = await api.get(`/settings/specialties/effective/${encodeURIComponent(specialty)}`);
+  const res = await api.get(`/specialties/effective/${encodeURIComponent(specialty)}`);
   return res.data.settings || {};
 }
 
 export async function listRules() {
-  const res = await api.get("/settings/specialties/");
+  const res = await api.get("/specialties/");
   return res.data;
 }
 
 export async function createRule(payload) {
-  const res = await api.post("/settings/specialties/", payload);
+  const res = await api.post("/specialties/", payload);
   return res.data;
 }
 
 export async function updateRule(id, payload) {
-  const res = await api.put(`/settings/specialties/${id}`, payload);
+  const res = await api.put(`/specialties/${id}`, payload);
   return res.data;
 }
