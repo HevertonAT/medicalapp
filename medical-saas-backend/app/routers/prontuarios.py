@@ -7,21 +7,25 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
 from sqlalchemy import desc
-from datetime import datetime, date, timedelta, timezone
+from datetime import datetime
 
 from app.db.base import get_db
 from app.models.prontuarios import MedicalRecord
 from app.models.agendamentos import Appointment
 from app.models.usuarios import User
+from app.models.macros import Macro
 from app.models.profissionais import Doctor
 from app.models.regras_especialidades import SpecialtyRule
+from app.models.pacientes import Patient
 from app.schemas.esquema_prontuarios import MedicalRecordCreate, MedicalRecordResponse
 from app.core.deps import get_current_user
 
 router = APIRouter()
 
-# --- CONFIGURAÇÃO DO FUSO HORÁRIO DO BRASIL (UTC-3) ---
-BRT_TZ = timezone(timedelta(hours=-3))
+# --- SCHEMAS INTERNOS ---
+class MacroCreate(BaseModel):
+    titulo: str
+    texto_padrao: str
 
 class RecordHistoryResponse(BaseModel):
     id: int 
@@ -32,31 +36,12 @@ class RecordHistoryResponse(BaseModel):
     doctor_nome: str
     doctor_specialty: Optional[str] = None 
     doctor_document: Optional[str] = None  
-    doctor_gender: Optional[str] = None 
+    doctor_gender: Optional[str] = None # <-- NOVO CAMPO DE GÊNERO
 
     class Config:
         from_attributes = True
 
-def calcular_idade_completa(data_nascimento):
-    if not data_nascimento:
-        return "Idade não informada"
-    if isinstance(data_nascimento, str):
-        try:
-            data_nascimento = datetime.strptime(data_nascimento, "%Y-%m-%d").date()
-        except:
-            return "Idade não informada"
-
-    hoje = date.today()
-    anos = hoje.year - data_nascimento.year
-    meses = hoje.month - data_nascimento.month
-    
-    if hoje.day < data_nascimento.day:
-        meses -= 1
-    if meses < 0:
-        anos -= 1
-        meses += 12
-        
-    return f"{anos} anos e {meses} meses"
+# --- ROTAS DE PRONTUÁRIO ---
 
 @router.post("/", response_model=MedicalRecordResponse, status_code=status.HTTP_201_CREATED)
 def create_medical_record(
@@ -94,7 +79,7 @@ def create_medical_record(
             sd = data.specialty_data.copy() if data.specialty_data else {}
 
         except Exception as e:
-            print(f"⚠️ Aviso: Falha ao verificar regras. Erro: {e}")
+            print(f"⚠️ Aviso: Falha ao verificar regras de especialidade. Prosseguindo com salvamento padrão. Erro: {e}")
             sd = {} 
 
         new_record = MedicalRecord(
@@ -112,8 +97,10 @@ def create_medical_record(
         )
 
         db.add(new_record)
+        
         appointment.status = "REALIZADO"
         db.add(appointment)
+        
         db.commit()
         db.refresh(new_record)
         return new_record
@@ -123,6 +110,7 @@ def create_medical_record(
         raise
     except Exception as e:
         db.rollback()
+        print(f"❌ Erro ao criar prontuário: {e}")
         raise HTTPException(status_code=500, detail=f"Erro ao criar prontuário: {str(e)}")
 
 @router.get("/patient/{patient_id}", response_model=List[RecordHistoryResponse])
@@ -132,12 +120,13 @@ def get_patient_records(
     current_user: User = Depends(get_current_user)
 ):
     query = db.query(MedicalRecord).filter(MedicalRecord.patient_id == patient_id)
+    
     if current_user.role != 'superuser' and current_user.clinic_id:
         query = query.filter(MedicalRecord.clinic_id == current_user.clinic_id)
         
     records = query.order_by(desc(MedicalRecord.criado_em)).all()
-    results = []
     
+    results = []
     for r in records:
         doc_name = r.doctor.nome if r.doctor else "Profissional"
         doc_spec = r.doctor.especialidade if r.doctor and hasattr(r.doctor, 'especialidade') else "Clínica Geral"
@@ -145,20 +134,21 @@ def get_patient_records(
         
         doc_doc = ""
         if r.doctor:
-            if hasattr(r.doctor, 'numero_conselho') and getattr(r.doctor, 'numero_conselho'):
+            # CORREÇÃO: Lê diretamente o campo "crm" da base de dados do Doctor
+            if hasattr(r.doctor, 'crm') and getattr(r.doctor, 'crm'):
+                doc_doc = getattr(r.doctor, 'crm')
+            elif hasattr(r.doctor, 'numero_conselho') and getattr(r.doctor, 'numero_conselho'):
                 conselho = getattr(r.doctor, 'conselho', 'CRM')
                 doc_doc = f"{conselho} {r.doctor.numero_conselho}"
             elif hasattr(r.doctor, 'documento') and getattr(r.doctor, 'documento'):
                 doc_doc = getattr(r.doctor, 'documento')
-
-        criado_brt = r.criado_em.astimezone(BRT_TZ) if r.criado_em else datetime.now(BRT_TZ)
 
         results.append({
             "id": r.id, 
             "anamnese": r.anamnese, 
             "prescricao": r.prescricao,
             "diagnostico_cid": r.diagnostico_cid,
-            "created_at": criado_brt.strftime("%d/%m/%Y %H:%M"), 
+            "created_at": r.criado_em.strftime("%d/%m/%Y %H:%M"),
             "doctor_nome": doc_name,
             "doctor_specialty": doc_spec,
             "doctor_document": doc_doc,
@@ -166,116 +156,57 @@ def get_patient_records(
         })
     return results
 
-# ==========================================
-# 📄 GERADOR DE PDF 1: EVOLUÇÃO (COMPLETO)
-# ==========================================
-@router.get("/{record_id}/evolucao/pdf")
-def generate_evolucao_pdf(record_id: int, db: Session = Depends(get_db)):
+@router.get("/{record_id}/pdf")
+def generate_prescription_pdf(
+    record_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     record = db.query(MedicalRecord).filter(MedicalRecord.id == record_id).first()
     if not record: raise HTTPException(404, "Prontuário não encontrado.")
     
     buffer = BytesIO()
     p = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
     
-    paciente = record.patient
-    profissional = record.doctor
+    nome_paciente = record.patient.nome_completo if record.patient and record.patient.nome_completo else "Paciente não identificado"
     
-    p.setFont("Helvetica-Bold", 12)
-    p.drawString(50, 800, f"Paciente: {paciente.nome_completo if paciente else 'Paciente não identificado'}")
+    clinica_nome = current_user.clinic.nome if current_user.clinic and current_user.clinic.nome else "Minha Clínica"
+    
+    data_fmt = record.criado_em.strftime('%d/%m/%Y') if record.criado_em else datetime.now().strftime('%d/%m/%Y')
 
-    p.setFont("Helvetica", 10)
-    idade_str = calcular_idade_completa(paciente.data_nascimento) if paciente and paciente.data_nascimento else "Idade não informada"
-    p.drawString(50, 785, f"Idade do Paciente: {idade_str}")
-    p.drawString(50, 770, f"Num. Prontuário: {str(record.id).zfill(9)}")
-
-    if record.criado_em:
-        data_formatada = record.criado_em.astimezone(BRT_TZ).strftime("%d/%m/%y - %H:%M")
-    else:
-        data_formatada = datetime.now(BRT_TZ).strftime("%d/%m/%y - %H:%M")
-        
-    p.drawString(50, 755, f"Data do Atendimento: {data_formatada}")
-    p.drawString(50, 740, f"Nome do Profissional: {profissional.nome if profissional else 'Não identificado'}")
-
-    p.line(50, 730, width - 50, 730)
-
-    p.setFont("Helvetica-Bold", 14)
-    p.drawString(50, 700, "Evolução:")
-    
-    p.setFont("Helvetica", 12)
-    texto_completo = record.anamnese if record.anamnese else "Nenhum registro de evolução encontrado."
-    
-    text_object = p.beginText(50, 680)
-    for line in texto_completo.split('\n'):
-        text_object.textLine(line)
-    p.drawText(text_object)
-    
-    # RODAPÉ DINÂMICO
-    p.line(200, 120, 400, 120) 
-    p.setFont("Helvetica-Bold", 10)
-    p.drawCentredString(300, 105, profissional.nome if profissional else "Profissional")
-    p.setFont("Helvetica", 10)
-    p.drawCentredString(300, 90, profissional.especialidade if profissional and profissional.especialidade else "Clínico(a) Geral")
-    p.drawCentredString(300, 75, profissional.crm if profissional and profissional.crm else "CR Não Informado")
-    
-    p.showPage()
-    p.save()
-    buffer.seek(0)
-    
-    return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=evolucao_{str(record.id).zfill(9)}.pdf"})
-
-# ==========================================
-# 📄 GERADOR DE PDF 2: RECEITUÁRIO (SIMPLES)
-# ==========================================
-@router.get("/{record_id}/receita/pdf")
-def generate_receita_pdf(record_id: int, db: Session = Depends(get_db)):
-    record = db.query(MedicalRecord).filter(MedicalRecord.id == record_id).first()
-    if not record: raise HTTPException(404, "Prontuário não encontrado.")
-    
-    buffer = BytesIO()
-    p = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
-    
-    paciente = record.patient
-    profissional = record.doctor
-    
-    if record.criado_em:
-        data_formatada = record.criado_em.astimezone(BRT_TZ).strftime("%d/%m/%Y")
-    else:
-        data_formatada = datetime.now(BRT_TZ).strftime("%d/%m/%Y")
-
-    # CABEÇALHO SIMPLES (Apenas Nome e Data)
     p.setFont("Helvetica-Bold", 20)
-    p.drawCentredString(width / 2, 800, "RECEITUÁRIO")
-    
+    p.drawString(200, 800, "RECEITA MEDICA")
     p.setFont("Helvetica", 12)
-    p.drawString(50, 750, f"Paciente: {paciente.nome_completo if paciente else 'Paciente não identificado'}")
-    p.drawString(50, 730, f"Data do Atendimento: {data_formatada}")
-    
-    p.line(50, 720, width - 50, 720)
-
-    # CORPO DA RECEITA
+    p.drawString(50, 750, f"Clinica: {clinica_nome}")
+    p.line(50, 740, 550, 740)
+    p.drawString(50, 700, f"Paciente: {nome_paciente}")
+    p.drawString(50, 680, f"Data: {data_fmt}")
     p.setFont("Helvetica-Bold", 14)
-    p.drawString(50, 690, "Uso:")
-    
+    p.drawString(50, 630, "Uso:")
     p.setFont("Helvetica", 12)
-    prescricao_texto = record.prescricao if record.prescricao else "Sem prescrição."
     
-    text_object = p.beginText(50, 670)
+    prescricao_texto = record.prescricao if record.prescricao else "Sem prescricao."
+    text_object = p.beginText(50, 610)
     for line in prescricao_texto.split('\n'):
         text_object.textLine(line)
     p.drawText(text_object)
 
-    # RODAPÉ DINÂMICO
-    p.line(200, 120, 400, 120) 
-    p.setFont("Helvetica-Bold", 10)
-    p.drawCentredString(300, 105, profissional.nome if profissional else "Profissional")
-    p.setFont("Helvetica", 10)
-    p.drawCentredString(300, 90, profissional.especialidade if profissional and profissional.especialidade else "Clínico(a) Geral")
-    p.drawCentredString(300, 75, profissional.crm if profissional and profissional.crm else "CR Não Informado")
+    p.line(50, 100, 550, 100)
+    p.setFont("Helvetica-Oblique", 10)
+    p.drawString(200, 80, "Assinatura e Carimbo")
     
     p.showPage()
     p.save()
     buffer.seek(0)
-    
-    return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=receita_{str(record.id).zfill(9)}.pdf"})
+    return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=receita_{record.id}.pdf"})
+
+@router.get("/macros/list")
+def get_macros(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return db.query(Macro).filter(Macro.clinic_id == current_user.clinic_id).all()
+
+@router.post("/macros")
+def create_macro(macro: MacroCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    new_macro = Macro(clinic_id=current_user.clinic_id, titulo=macro.titulo, texto_padrao=macro.texto_padrao)
+    db.add(new_macro)
+    db.commit()
+    return {"message": "Modelo salvo!"}

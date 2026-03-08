@@ -84,7 +84,7 @@ export default function Doctors() {
         nome: currentDoctor.nome,
         especialidade: currentDoctor.especialidade,
         crm: currentDoctor.crm,
-        genero: currentDoctor.genero, // <-- ENVIANDO O GÊNERO PARA O BACK-END
+        genero: currentDoctor.genero,
         agenda_config: agendaConfig 
       };
 

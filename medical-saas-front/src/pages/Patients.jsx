@@ -8,7 +8,6 @@ import {
 } from '@chakra-ui/react';
 import { FaPlus, FaFileMedical, FaHistory, FaPrescriptionBottleAlt, FaEdit, FaBan, FaCheck, FaPrint, FaSearch } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
-import { jwtDecode } from "jwt-decode"; 
 
 import api from '../services/api';
 
@@ -31,8 +30,6 @@ export default function Patients() {
   const [isFetchingCep, setIsFetchingCep] = useState(false); 
   
   const [filter, setFilter] = useState('ativos'); 
-  
-  const [currentUserRole, setCurrentUserRole] = useState('');
 
   const toast = useToast();
   const navigate = useNavigate();
@@ -132,16 +129,7 @@ export default function Patients() {
     }
   };
 
-  useEffect(() => { 
-    const token = localStorage.getItem('medical_token');
-    if (token) {
-        try {
-            const decoded = jwtDecode(token);
-            setCurrentUserRole(decoded.role || localStorage.getItem('user_role'));
-        } catch (e) { console.error("Erro ao ler token", e); }
-    }
-    fetchPatients(); 
-  }, []);
+  useEffect(() => { fetchPatients(); }, []);
 
   const filteredPatients = patients.filter(p => {
     if (filter === 'ativos') return p.ativo === true;
@@ -244,23 +232,141 @@ export default function Patients() {
     } catch (error) { console.error("Erro prontuário"); }
   };
 
-  // --- NOVA FUNÇÃO PARA BAIXAR/ABRIR O PDF DO BACKEND ---
-  const handlePrintPDF = async (recordId) => {
-    try {
-        toast({ title: 'Gerando documento...', status: 'info', duration: 2000 });
-        
-        const response = await api.get(`/medical-records/${recordId}/pdf`, {
-            responseType: 'blob'
-        });
+  // --- O TRADUTOR INTELIGENTE DE ESPECIALIDADE POR GÊNERO ---
+  const formatDoctorInfo = (name, specialtyArea, gender) => {
+    const isMale = gender === 'Masculino' || gender === 'M' || gender === 'masculino' || gender === 'm';
+    const isFemale = gender === 'Feminino' || gender === 'F' || gender === 'feminino' || gender === 'f';
+    const prefix = isMale ? "Dr." : isFemale ? "Dra." : "Dr(a).";
+    let title = specialtyArea || "Clínico Geral";
+    const area = title.toLowerCase().trim();
 
-        const file = new Blob([response.data], { type: 'application/pdf' });
-        const fileURL = URL.createObjectURL(file);
-        
-        window.open(fileURL, '_blank'); 
-        
+    const genderMap = {
+        'fonoaudiologia': { m: 'Fonoaudiólogo', f: 'Fonoaudióloga', d: 'Fonoaudiólogo(a)' },
+        'nutrologia': { m: 'Nutrólogo', f: 'Nutróloga', d: 'Nutrólogo(a)' },
+        'psicologia': { m: 'Psicólogo', f: 'Psicóloga', d: 'Psicólogo(a)' },
+        'clínico geral': { m: 'Clínico Geral', f: 'Clínica Geral', d: 'Clínico(a) Geral' },
+        'clínica médica': { m: 'Clínico Geral', f: 'Clínica Geral', d: 'Clínico(a) Geral' },
+        'fisioterapia': { m: 'Fisioterapeuta', f: 'Fisioterapeuta', d: 'Fisioterapeuta' },
+        'nutrição': { m: 'Nutricionista', f: 'Nutricionista', d: 'Nutricionista' },
+        'enfermagem': { m: 'Enfermeiro', f: 'Enfermeira', d: 'Enfermeiro(a)' },
+        'biomedicina': { m: 'Biomédico', f: 'Biomédica', d: 'Biomédico(a)' },
+        'odontologia': { m: 'Dentista', f: 'Dentista', d: 'Dentista' }
+    };
+
+    if (genderMap[area]) {
+        title = isMale ? genderMap[area].m : isFemale ? genderMap[area].f : genderMap[area].d;
+    } else {
+        if (area.endsWith('logia')) title = title.replace(/logia$/i, 'logista');
+        else if (area.endsWith('iatria') && area !== 'pediatria') title = title.replace(/iatria$/i, 'iatra');
+        else if (area === 'pediatria') title = 'Pediatra';
+        else if (area === 'ortopedia') title = 'Ortopedista';
+    }
+
+    title = title.charAt(0).toUpperCase() + title.slice(1);
+    return { prefix, title, fullName: `${prefix} ${name}` };
+  };
+
+  const handlePrintEvolution = (record) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({ title: "Pop-up bloqueado", description: "Permita os pop-ups para imprimir.", status: "warning" });
+      return;
+    }
+
+    const patientAge = calculateAge(currentPatient.data_nascimento);
+    
+    // --- CORREÇÃO AQUI: Tenta buscar o CR de várias propriedades possíveis ---
+    const docReg = record.doctor_document || record.doctor_crm || record.crm || "CR não informado";
+    
+    // Mágica acontecendo aqui:
+    const docInfo = formatDoctorInfo(record.doctor_nome, record.doctor_specialty, record.doctor_gender);
+    
+    // Formata o ID do Prontuário para 9 dígitos ex: 000000152
+    const recordIdFormatted = record.id ? String(record.id).padStart(9, '0') : "000000000";
+
+    const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Evolução - ${currentPatient.nome_completo}</title>
+            <style>
+                body { font-family: 'Arial', sans-serif; padding: 40px; color: #333; line-height: 1.5; }
+                
+                /* CABEÇALHO PADRÃO */
+                .header-container { border: 1px solid #ccc; padding: 15px; margin-bottom: 25px; border-radius: 5px; font-size: 14px; background-color: #fff;}
+                .header-title { text-align: center; font-size: 20px; font-weight: bold; text-transform: uppercase; margin-bottom: 20px; background-color: #e2e8f0; padding: 8px; border: 1px solid #cbd5e0; color: #2d3748; letter-spacing: 2px;}
+                .info-row { margin-bottom: 5px; }
+                
+                /* CAIXA DE TEXTOS */
+                .section { margin-bottom: 25px; page-break-inside: avoid; border: 1px solid #e2e8f0; padding: 15px; border-radius: 5px;}
+                .title { font-size: 14px; font-weight: bold; margin-bottom: 10px; color: #4a5568;}
+                .content { white-space: pre-wrap; font-size: 14px; }
+                
+                /* ASSINATURA CENTRALIZADA E DETALHADA */
+                .signature-box { margin-top: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; page-break-inside: avoid; }
+                .signature-line { border-top: 1px solid #000; width: 350px; margin-bottom: 5px; }
+                .signature-text { margin: 2px 0; font-size: 14px; }
+                .signature-name { font-weight: bold; font-size: 15px; text-transform: uppercase;}
+                
+                .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
+            </style>
+        </head>
+        <body>
+            <div class="header-container">
+                <div class="info-row"><strong>Prontuário/Paciente:</strong> ${currentPatient.nome_completo} ${patientAge !== '-' ? `(${patientAge})` : ''}</div>
+                <div class="info-row"><strong>Registro de Atendimento:</strong> ${recordIdFormatted} - ${record.created_at}</div>
+                <div class="info-row"><strong>Profissional:</strong> ${docInfo.fullName}</div>
+            </div>
+
+            <div class="header-title">Evolução Clínica</div>
+
+            ${record.diagnostico_cid ? `
+            <div class="section">
+                <div class="title">Diagnóstico (CID-10)</div>
+                <div class="content">${record.diagnostico_cid}</div>
+            </div>` : ''}
+
+            ${record.prescricao ? `
+            <div class="section">
+                <div class="title">Prescrição e Exames</div>
+                <div class="content">${record.prescricao}</div>
+            </div>` : ''}
+
+            ${record.anamnese ? `
+            <div class="section">
+                <div class="title">Descrição da Evolução</div>
+                <div class="content">${record.anamnese}</div>
+            </div>` : ''}
+
+            <div class="signature-box">
+                <div class="signature-line"></div>
+                <p class="signature-text signature-name">${docInfo.fullName}</p>
+                <p class="signature-text">${docInfo.title}</p>
+                <p class="signature-text">${docReg}</p>
+            </div>
+
+            <div class="footer">Gerado de forma segura por MedicalSaaS</div>
+        </body>
+        </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    setTimeout(() => { printWindow.print(); }, 250);
+  };
+
+  const handleDownloadPDF = async (recordId) => {
+    try {
+        const response = await api.get(`/medical-records/${recordId}/pdf`, { responseType: 'blob' });
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `receita_${recordId}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
     } catch (error) {
-        console.error("Erro ao gerar PDF", error);
-        toast({ title: 'Erro ao gerar o documento.', status: 'error' });
+        toast({ title: 'Erro ao gerar receita.', status: 'error' });
     }
   };
 
@@ -313,14 +419,12 @@ export default function Patients() {
 
                 <Td py={2}>
                     <HStack justify="center" spacing={1}>
-                    {currentUserRole !== 'recepcionista' && (
-                        <Button 
-                            size="xs" leftIcon={<FaFileMedical />} colorScheme="teal" 
-                            onClick={() => handleOpenRecord(p)}
-                        >
-                            Prontuário
-                        </Button>
-                    )}
+                    <Button 
+                        size="xs" leftIcon={<FaFileMedical />} colorScheme="teal" 
+                        onClick={() => handleOpenRecord(p)}
+                    >
+                        Prontuário
+                    </Button>
                     
                     <IconButton 
                         icon={<FaEdit />} size="xs" colorScheme="yellow" variant="ghost"
@@ -554,24 +658,19 @@ export default function Patients() {
                         <Flex justify="space-between" align="center" mb={6}>
                             <Badge colorScheme="teal" fontSize="0.9em" p={1}>REALIZADO EM {selectedRecord.created_at}</Badge>
                             
-                            {/* BOTÕES RESTAURADOS AQUI COM A FUNÇÃO DE DOWNLOAD/ABRIR PDF */}
                             <HStack spacing={3}>
                                 <Button 
-                                    size="sm" 
-                                    colorScheme="orange" 
-                                    variant="outline"
-                                    leftIcon={<FaPrescriptionBottleAlt />}
-                                    onClick={() => handlePrintPDF(selectedRecord.id)}
-                                >
-                                    Imprimir Receita
-                                </Button>
-                                <Button 
-                                    size="sm" 
-                                    colorScheme="teal" 
-                                    leftIcon={<FaPrint />}
-                                    onClick={() => handlePrintPDF(selectedRecord.id)}
+                                    size="sm" leftIcon={<FaPrint />} colorScheme="blue" variant="solid" 
+                                    onClick={() => handlePrintEvolution(selectedRecord)}
                                 >
                                     Imprimir Evolução
+                                </Button>
+
+                                <Button 
+                                    size="sm" leftIcon={<FaPrescriptionBottleAlt />} variant="outline" 
+                                    onClick={() => handleDownloadPDF(selectedRecord.id)}
+                                >
+                                    Ver Receita
                                 </Button>
                             </HStack>
                         </Flex>
