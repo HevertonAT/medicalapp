@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
 from sqlalchemy import desc
-from datetime import datetime
+from datetime import date, datetime, timedelta, timezone
 
 from app.db.base import get_db
 from app.models.prontuarios import MedicalRecord
@@ -22,6 +22,7 @@ from app.core.deps import get_current_user
 
 router = APIRouter()
 
+BRT_TZ = timezone(timedelta(hours=-3))
 # --- SCHEMAS INTERNOS ---
 class MacroCreate(BaseModel):
     titulo: str
@@ -41,6 +42,22 @@ class RecordHistoryResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+def calcular_idade_completa(data_nascimento):
+    if not data_nascimento:
+        return "Idade não informada"
+    
+    hoje = date.today()
+    anos = hoje.year - data_nascimento.year
+    meses = hoje.month - data_nascimento.month
+    
+    if hoje.day < data_nascimento.day:
+        meses -= 1
+    if meses < 0:
+        anos -= 1
+        meses += 12
+        
+    return f"{anos} anos e {meses} meses"
 # --- ROTAS DE PRONTUÁRIO ---
 
 @router.post("/", response_model=MedicalRecordResponse, status_code=status.HTTP_201_CREATED)
