@@ -12,7 +12,6 @@ router = APIRouter()
 
 @router.get("/", response_model=List[RuleResponse])
 def list_rules(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    # MURO DE CONCRETO
     return db.query(SpecialtyRule).filter(SpecialtyRule.clinic_id == current_user.clinic_id).all()
 
 @router.get("/rules/{specialty_name}")
@@ -38,7 +37,7 @@ def create_rule(rule: RuleCreate, db: Session = Depends(get_db), current_user: U
     
     new_rule = SpecialtyRule(
         specialty=rule.specialty,
-        clinic_id=current_user.clinic_id, # AMARRA NA CLÍNICA
+        clinic_id=current_user.clinic_id,
         settings=rule.settings,
         active=rule.active
     )

@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 import bcrypt 
-
 from app.db.base import get_db
 from app.core.deps import get_current_user
 from app.models.profissionais import Doctor
@@ -54,9 +53,7 @@ def create_doctor(doctor: DoctorCreate, db: Session = Depends(get_db), current_u
     if not target_clinic_id:
         raise HTTPException(status_code=400, detail="Não foi possível identificar a clínica.")
 
-    # =========================================================================
-    # DEMANDA 1: TRAVA DE LIMITE DO PLANO (COBRANÇA POR AGENDA)
-    # =========================================================================
+    #TRAVA DE LIMITE DO PLANO (COBRANÇA POR AGENDA)
     clinic = db.query(Clinic).filter(Clinic.id == target_clinic_id).first()
     if clinic and clinic.plano_id:
         plan = db.query(Plan).filter(Plan.id == clinic.plano_id).first()
@@ -72,9 +69,7 @@ def create_doctor(doctor: DoctorCreate, db: Session = Depends(get_db), current_u
                     detail=f"Limite do plano atingido! Seu plano atual ({plan.nome}) permite no máximo {plan.max_usuarios} profissionais ativos. Contate o suporte para fazer um upgrade."
                 )
 
-    # =========================================================================
-    # DEMANDA 2: VINCULAR ADMIN A UMA CONTA DE MÉDICO (SE E-MAIL FOR O MESMO)
-    # =========================================================================
+    # VINCULAR ADMIN A UMA CONTA DE MÉDICO (SE E-MAIL FOR O MESMO)
     user_exists = db.query(User).filter(User.email == doctor.email).first()
     
     if user_exists:

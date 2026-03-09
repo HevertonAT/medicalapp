@@ -14,7 +14,7 @@ if not SQLALCHEMY_DATABASE_URL:
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     pool_pre_ping=True, # Testa se a conexão está viva antes de usar (Evita quedas da Render)
-    pool_size=5,        # Limita o número de conexões para a Vercel não sobrecarregar o banco
+    pool_size=5, # Limita o número de conexões para a Vercel não sobrecarregar o banco
     max_overflow=10,
     connect_args={"connect_timeout": 10} # Se demorar mais de 10s para conectar, ele avisa em vez de travar
 )

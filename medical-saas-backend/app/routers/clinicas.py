@@ -52,7 +52,7 @@ def create_clinic(
 
     # 4. Salva a clínica no banco temporariamente para gerar o ID dela
     db.add(nova_clinica)
-    db.flush() # O nova_clinica.id agora existe, mas ainda não foi commitado de vez!
+    db.flush() # Gera o ID da clínica sem efetivar a transação, permitindo criar o admin com clinic_id correto
 
     # 5. Cria o Usuário Admin usando o ID da clínica que acabou de nascer
     novo_admin = User(
@@ -77,7 +77,7 @@ def list_clinics(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Apenas o superusuário pode ver a lista de todos os seus clientes
+    # Superuser pode ver a lista de todos os seus clientes
     if current_user.role != 'superuser':
         raise HTTPException(status_code=403, detail="Acesso negado.")
         

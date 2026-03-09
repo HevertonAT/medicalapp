@@ -8,7 +8,7 @@ class Settings:
     PROJECT_NAME: str = "Clinify"
     PROJECT_VERSION: str = "1.0.0"
 
-    # Tenta pegar do .env; se não achar, usa um valor padrão (fallback)
+    #Pega do .env; se não achar, usa um valor padrão (fallback)
     DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://user:pass@localhost/db")
 
     # Segurança

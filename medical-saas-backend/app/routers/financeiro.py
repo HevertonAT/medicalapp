@@ -3,18 +3,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, extract
 from datetime import date, datetime
 from typing import Optional, List
-
-# Ajuste: Importar get_db de app.db.base
 from app.db.base import get_db
-
-# Ajuste: Importar Models Corretos
 from app.models.usuarios import User
 from app.models.transacoes import Transaction 
-
-# Ajuste: Importar RoleChecker e Dependency
 from app.core.deps import get_current_user, RoleChecker 
-
-# Importar Schemas Mistos
 from app.schemas.esquema_transacoes import (
     TransactionCreate, 
     TransactionCompleteCreate, 
@@ -25,7 +17,6 @@ from app.schemas.esquema_transacoes import (
 router = APIRouter()
 
 # --- DEFINIÇÃO DE SEGURANÇA ---
-# Apenas 'admin' e 'superuser' acessam.
 allow_only_admin = RoleChecker(["admin", "superuser"])
 
 @router.get("/stats")
@@ -46,7 +37,6 @@ def get_financial_stats(
     else:
         end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
 
-    # Muro de Concreto Embutido no Filtro
     base_filter = [Transaction.clinic_id == current_user.clinic_id] if current_user.role != 'superuser' else []
 
     # 1. Total Receita no Período
@@ -114,7 +104,7 @@ def create_quick_transaction(
         raise HTTPException(status_code=400, detail="Clínica não identificada.")
 
     new_trans = Transaction(
-        clinic_id=target_clinic_id if target_clinic_id else 1, # Ajuste se o superuser lançar
+        clinic_id=target_clinic_id if target_clinic_id else 1,
         valor=transacao.valor_total,              
         forma_pagamento=transacao.metodo_pagamento, 
         descricao=transacao.descricao,            
@@ -131,7 +121,6 @@ def create_quick_transaction(
     
     return {"message": "Lançamento realizado com sucesso!", "id": new_trans.id}
 
-
 # =========================================================================
 # 2. ROTAS COMPLETAS (Para a nova tela de Contas a Pagar/Receber)
 # =========================================================================
@@ -147,7 +136,6 @@ def get_all_transactions(
 ):
     query = db.query(Transaction)
 
-    # MURO DE CONCRETO
     if current_user.role != 'superuser':
         query = query.filter(Transaction.clinic_id == current_user.clinic_id)
 
@@ -159,7 +147,6 @@ def get_all_transactions(
         query = query.filter(extract('year', Transaction.data_vencimento) == ano)
 
     return query.order_by(Transaction.data_vencimento.desc()).all()
-
 
 @router.post("/full", status_code=status.HTTP_201_CREATED)
 def create_full_transaction(
@@ -191,7 +178,6 @@ def create_full_transaction(
     db.refresh(new_tx)
     return new_tx
 
-
 @router.put("/{tx_id}")
 def update_transaction(
     tx_id: int, 
@@ -216,7 +202,6 @@ def update_transaction(
     db.commit()
     db.refresh(db_tx)
     return db_tx
-
 
 @router.delete("/{tx_id}")
 def delete_transaction(

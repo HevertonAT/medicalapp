@@ -8,7 +8,6 @@ from typing import List, Optional
 from pydantic import BaseModel
 from sqlalchemy import desc
 from datetime import date, datetime, timedelta, timezone
-
 from app.db.base import get_db
 from app.models.prontuarios import MedicalRecord
 from app.models.agendamentos import Appointment
@@ -153,7 +152,6 @@ def get_patient_records(
         
         doc_doc = ""
         if r.doctor:
-            # CORREÇÃO: Lê diretamente o campo "crm" da base de dados do Doctor
             if hasattr(r.doctor, 'crm') and getattr(r.doctor, 'crm'):
                 doc_doc = getattr(r.doctor, 'crm')
             elif hasattr(r.doctor, 'numero_conselho') and getattr(r.doctor, 'numero_conselho'):

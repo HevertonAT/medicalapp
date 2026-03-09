@@ -12,9 +12,7 @@ router = APIRouter()
 # Trava de Segurança Máxima: Só você (superuser) entra aqui.
 allow_only_superuser = RoleChecker(["superuser"])
 
-# ==========================================
-# SCHEMA: Validação dos dados que vêm do Front-end
-# ==========================================
+# Validação dos dados que vêm do Front-end
 class SaasUpdate(BaseModel):
     plano: str
     valor_mensalidade: float
@@ -51,9 +49,7 @@ def get_saas_dashboard(
         "clinics": clinics_list
     }
 
-# ==========================================
-# ROTA: Atualizar todos os dados da Assinatura
-# ==========================================
+# Atualizar todos os dados da Assinatura
 @router.put("/clinica/{clinic_id}")
 def update_clinic_saas_info(
     clinic_id: int, 

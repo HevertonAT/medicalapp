@@ -14,11 +14,7 @@ class Insurance(Base):
     ativo = Column(Boolean, default=True)
     criado_em = Column(DateTime(timezone=True), server_default=func.now())
 
-    # Conexão com a Clínica
+    # Relacionamentos
     clinic_id = Column(Integer, ForeignKey("clinicas.id"), nullable=True)
     clinic = relationship("Clinic")
-
-    # --- CORREÇÃO AQUI ---
-    # Esta linha é obrigatória porque o arquivo 'precos_procedimentos.py' 
-    # está apontando para cá com back_populates="procedure_prices"
     procedure_prices = relationship("ProcedurePrice", back_populates="insurance")

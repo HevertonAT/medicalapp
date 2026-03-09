@@ -12,7 +12,6 @@ router = APIRouter()
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def create_user(user_data: UserCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    # Apenas admin ou superuser podem criar equipe
     if current_user.role not in ['admin', 'superuser']:
         raise HTTPException(status_code=403, detail="Acesso negado.")
 
@@ -40,7 +39,6 @@ def create_user(user_data: UserCreate, db: Session = Depends(get_db), current_us
     db.refresh(novo_usuario)
     return novo_usuario
 
-# --- MURO DE CONCRETO APLICADO ---
 @router.get("/", response_model=List[UserResponse])
 def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     query = db.query(User)

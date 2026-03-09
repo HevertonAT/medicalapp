@@ -17,8 +17,7 @@ def login_for_access_token(
     db: Session = Depends(get_db)
 ):
     print(f"🔍 TENTATIVA DE LOGIN: {form_data.username}")
-    
-    # Limpeza de dados
+
     email_limpo = form_data.username.strip()
 
     user = db.query(User).filter(User.email == email_limpo).first()
@@ -51,7 +50,6 @@ def login_for_access_token(
         "user_id": user.id
     }
 
-# --- ROTA DE REGISTRO BLINDADA COM CPF, DATA E TELEFONE ---
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 def register(user: UserCreate, db: Session = Depends(get_db)):
     print(f"📝 Iniciando cadastro para: {user.email}")
@@ -70,7 +68,7 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     # 2. Cria o Usuário (Login)
     try:
         new_user = User(
-            full_name=user.full_name,  # <--- AQUI ESTAVA O PROBLEMA! AGORA ELE SALVA O NOME
+            full_name=user.full_name,
             email=user.email,
             hashed_password=get_password_hash(user.password),
             role=user.role, 
@@ -84,7 +82,6 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         print(f"❌ ERRO FATAL AO CRIAR USER: {e}")
         raise HTTPException(status_code=500, detail="Erro ao salvar usuário no banco.")
 
-    # 3. Tenta criar o perfil de Paciente com todos os dados
     if user.role == 'paciente' or user.role == 'patient':
         try:
             print(f"   -> Criando perfil de Paciente para ID {new_user.id}...")
@@ -93,8 +90,8 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
                 nome_completo=user.full_name, 
                 user_id=new_user.id,          
                 ativo=True,
-                cpf=user.cpf,                  # Salvando o CPF
-                telefone=user.telefone,        # Salvando o Telefone
+                cpf=user.cpf, # Salvando o CPF
+                telefone=user.telefone,  # Salvando o Telefone
                 data_nascimento=user.data_nascimento, # Salvando a Data de Nascimento
                 insurance_id=None
             )

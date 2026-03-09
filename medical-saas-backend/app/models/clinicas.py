@@ -16,10 +16,8 @@ class Clinic(Base):
     valor_mensalidade = Column(Float, default=199.90)
     dia_vencimento = Column(Integer, default=10)
     status_assinatura = Column(String, default="ativa") # ativa, inadimplente, bloqueada
-    # --- NOVO: VÍNCULO COM O PLANO DO SAAS ---
     plano_id = Column(Integer, ForeignKey("planos.id"), nullable=True)
-    
-    # --- NOSSO BOTÃO DE LIGA/DESLIGA ---
+
     is_active = Column(Boolean, default=True) 
     
     criado_em = Column(DateTime(timezone=True), server_default=func.now())

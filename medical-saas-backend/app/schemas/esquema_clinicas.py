@@ -19,7 +19,7 @@ class AtualizarClinica(BaseModel):
     cnpj: Optional[str] = None
     email_clinica: Optional[str] = None
     endereco: Optional[str] = None
-    telefone: Optional[str] = None  # <-- Garantindo que a edição aceite o telefone
+    telefone: Optional[str] = None
     plano_id: Optional[int] = None
     is_active: Optional[bool] = None
 
@@ -28,7 +28,7 @@ class RespostaClinica(BaseModel):
     nome: str 
     cnpj: Optional[str] = None
     email: Optional[str] = None
-    telefone: Optional[str] = None  # <-- Garantindo que a API devolva o telefone
+    telefone: Optional[str] = None
     endereco: Optional[str] = None
     plano_id: Optional[int] = None
     is_active: bool

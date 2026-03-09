@@ -6,9 +6,8 @@ class SpecialtyRule(Base):
     __tablename__ = "regras_especialidades"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    specialty = Column(String, index=True, nullable=False) # Retirado o unique=True
+    specialty = Column(String, index=True, nullable=False)
     
-    # NOVO: Isolamento por clínica
     clinic_id = Column(Integer, ForeignKey("clinicas.id"), nullable=True)
     
     settings = Column(JSON, default={})

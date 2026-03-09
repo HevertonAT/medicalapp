@@ -5,12 +5,8 @@ from io import BytesIO
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from datetime import datetime
-
-# Ajuste: Importar get_db de app.db.base
 from app.db.base import get_db
 from app.core.deps import get_current_user
-
-# Ajuste: Importar Models Corretos (Inglês)
 from app.models.usuarios import User
 from app.models.transacoes import Transaction
 
@@ -65,16 +61,13 @@ def generate_faturamento_pdf(
             p.showPage()
             y = height - 50
         
-        # Correção dos Atributos (criado_em, forma_pagamento, valor)
         data_fmt = trans.criado_em.strftime("%d/%m/%Y") if trans.criado_em else "--"
         
         metodo = str(trans.forma_pagamento) if trans.forma_pagamento else "N/A"
         status = str(trans.status) if trans.status else "N/A" # Usando 'status' em vez de 'status_nfe' para o geral
         
-        # Correção: usar 'valor' em vez de 'valor_total'
         valor_atual = trans.valor if trans.valor is not None else 0.0
         
-        # Formatação Moeda Brasileira
         valor_fmt = f"R$ {valor_atual:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         
         p.drawString(50, y, data_fmt)

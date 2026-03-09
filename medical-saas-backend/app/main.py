@@ -46,15 +46,11 @@ from app.routers import (
 )
 
 app = FastAPI(
-    title="Clinify API", 
-    description="API para gerenciamento de clínicas, pacientes, agendamentos e mais.", 
+    title="VezzCare", 
+    description="API para gerenciamento de clínicas, agendamento, prontuário eletrônico, financeiro e muito mais.", 
     version="1.0.0"
 )
 
-#Base.metadata.create_all(bind=engine)
-
-# --- CORREÇÃO DA CONFIGURAÇÃO DO CORS ---
-# As vírgulas que faltavam foram adicionadas e a URL exata do seu Front-end Vercel foi incluída
 origins = [
     #"http://127.0.0.1:8000",
     #"http://localhost:3000", 
@@ -70,7 +66,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- PROTEÇÃO PARA AMBIENTE NUVEM (VERCEL) ---
 # Garante que a pasta uploads exista para a API não "quebrar" (erro 500/404) ao iniciar
 if not os.path.exists("uploads"):
     os.makedirs("uploads")
@@ -79,22 +74,22 @@ if not os.path.exists("uploads"):
 app.mount("/arquivos", StaticFiles(directory="uploads"), name="uploads")
 
 # --- REGISTRO DAS ROTAS ---
-app.include_router(autenticacao.router, prefix="/auth", tags=["Autenticação"])
-app.include_router(clinicas.router, prefix="/clinics", tags=["Clínicas"])
-app.include_router(profissionais.router, prefix="/doctors", tags=["Profissionais"]) 
-app.include_router(usuarios.router, prefix="/users", tags=["Usuários"])
-app.include_router(pacientes.router, prefix="/patients", tags=["Pacientes"])
 app.include_router(agendamentos.router, prefix="/appointments", tags=["Agendamentos"])
-app.include_router(prontuarios.router, prefix="/medical-records", tags=["Prontuário"])
-app.include_router(financeiro.router, prefix="/financial", tags=["Financeiro"]) 
 app.include_router(arquivos.router, prefix="/files", tags=["Arquivos"]) 
-app.include_router(relatorios.router, prefix="/reports", tags=["Relatórios"])  
-app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
-app.include_router(regras_especialidades.router, prefix="/specialties", tags=["Configuração Especialidades"])
-app.include_router(macros.router, prefix="/macros", tags=["Macros"])
+app.include_router(autenticacao.router, prefix="/auth", tags=["Autenticação"])
 app.include_router(cids.router, prefix="/cids", tags=["CIDs"])
+app.include_router(clinicas.router, prefix="/clinics", tags=["Clínicas"])
+app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
+app.include_router(financeiro.router, prefix="/financial", tags=["Financeiro"]) 
+app.include_router(macros.router, prefix="/macros", tags=["Macros"])
+app.include_router(pacientes.router, prefix="/patients", tags=["Pacientes"])
 app.include_router(planos.router, prefix="/planos", tags=["Planos de Assinatura"])
+app.include_router(profissionais.router, prefix="/doctors", tags=["Profissionais"]) 
+app.include_router(prontuarios.router, prefix="/medical-records", tags=["Prontuário"])
+app.include_router(regras_especialidades.router, prefix="/specialties", tags=["Configuração Especialidades"])
+app.include_router(relatorios.router, prefix="/reports", tags=["Relatórios"])  
 app.include_router(saas.router, prefix="/saas", tags=["SaaS"])
+app.include_router(usuarios.router, prefix="/users", tags=["Usuários"])
 
 @app.get("/")
 def health_check():

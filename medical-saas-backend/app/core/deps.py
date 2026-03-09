@@ -4,10 +4,10 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 
-# Ajuste: Importar get_db de app.db.base (onde definimos a engine)
+# Importar get_db de app.db.base (onde definimos a engine)
 from app.db.base import get_db
 
-# Ajuste: Importar a Classe User e a Classe Clinic
+# Importar a Classe User e a Classe Clinic
 from app.models.usuarios import User
 from app.models.clinicas import Clinic  # <--- NOVO: Importamos a Clínica para vigiá-la
 
@@ -43,10 +43,7 @@ def get_current_user(
     if user is None:
         raise credentials_exception
         
-    # ==========================================================
-    # --- A NOSSA TRAVA DE SEGURANÇA MÁXIMA (SAAS) ---
-    # ==========================================================
-    # Se o usuário possui um clinic_id, significa que ele é cliente (Médico, Admin, etc)
+    # TRAVA DE SEGURANÇA: Se o usuário tiver um clinic_id, verificamos se a clínica está ativa
     if getattr(user, "clinic_id", None):
         clinica = db.query(Clinic).filter(Clinic.id == user.clinic_id).first()
         

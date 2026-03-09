@@ -6,13 +6,11 @@ class UserCreate(BaseModel):
     full_name: str
     email: EmailStr
     password: str
-    # Tornamos opcionais para não quebrar o cadastro simples da tela de login
     cpf: Optional[str] = None        
-    data_nascimento: Optional[date] = None # Acertou em cheio aqui!
-    telefone: Optional[str] = None         # Acertou em cheio aqui!
+    data_nascimento: Optional[date] = None
+    telefone: Optional[str] = None
     clinic_id: Optional[int] = None 
     
-    # Campo novo para controlar o acesso
     role: str = "patient"            
 
 class UserResponse(BaseModel):
@@ -20,8 +18,8 @@ class UserResponse(BaseModel):
     full_name: str
     email: EmailStr
     is_active: bool
-    role: str # Retornamos o role para o frontend saber quem é
-    clinic_id: Optional[int] = None # Agora pode vir vazio
+    role: str
+    clinic_id: Optional[int] = None
 
     class Config:
         from_attributes = True

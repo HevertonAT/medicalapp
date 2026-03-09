@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status
 from sqlalchemy.orm import Session
 from app.db.base import get_db
 from app.models.arquivos_pacientes import PatientFile
-from app.models.pacientes import Patient # Para verificar se o paciente pertence à clínica do usuário
+from app.models.pacientes import Patient
 from app.models.usuarios import User
 
 from app.schemas.esquema_arquivos import FileResponse
@@ -45,7 +45,6 @@ def upload_file(
         raise HTTPException(status_code=500, detail=f"Erro ao salvar arquivo no disco: {str(e)}")
 
     # 3. Salvar o registro no Banco
-    # A classe PatientFile deve estar correta no model arquivos_pacientes.py
     new_file = PatientFile(
         patient_id=patient_id,
         filename=file.filename,

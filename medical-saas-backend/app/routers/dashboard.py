@@ -5,8 +5,6 @@ from datetime import date, datetime, timedelta
 from typing import Optional
 from app.db.base import get_db
 from app.core.deps import get_current_user
-
-# Ajuste: Importar Models Corretos (Inglês) dos arquivos em Português
 from app.models.usuarios import User
 from app.models.pacientes import Patient
 from app.models.agendamentos import Appointment
@@ -21,7 +19,6 @@ def get_dashboard_stats(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Lógica de Datas
     today = date.today()
     filter_start = today
     filter_end = today
@@ -46,28 +43,23 @@ def get_dashboard_stats(
     ).count()
 
     # 2. Consultas no Período (Contagem)
-    # Usamos func.date para comparar apenas a parte da data, ignorando a hora
     appointments_query = db.query(Appointment).filter(
         Appointment.clinic_id == current_user.clinic_id,
         func.date(Appointment.data_horario) >= filter_start,
         func.date(Appointment.data_horario) <= filter_end
     )
     
-    # Filtramos cancelados da contagem do card
     appointments_count = appointments_query.filter(Appointment.status != 'cancelado').count()
 
-    # 3. LISTA DE ATENDIMENTOS DO PERÍODO
     period_appointments = appointments_query.order_by(Appointment.data_horario.desc()).all()
 
     appointments_list = []
     for app in period_appointments:
-        # CORREÇÃO CRÍTICA: Acessar via relacionamento (ORM)
-        # Verificamos se app.patient existe para evitar erro se o paciente foi deletado
         pat_name = app.patient.nome_completo if app.patient else "Paciente Excluído"
         doc_name = app.doctor.nome if app.doctor else "Médico não atribuído"
 
         appointments_list.append({
-            "id": app.id, # Agora é Inteiro
+            "id": app.id,
             "patient_name": pat_name,
             "doctor_name": doc_name,
             "data_horario": app.data_horario,

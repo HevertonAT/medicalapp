@@ -22,7 +22,7 @@ def get_my_macros(db: Session = Depends(get_db), current_user: User = Depends(ge
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao listar: {str(e)}")
 
-# 2. CRIAR UM NOVO MACRO (AGORA COM CAPTURA DE ERRO DETALHADA)
+# 2. CRIAR UM NOVO MACRO
 @router.post("/", response_model=MacroResponse, status_code=status.HTTP_201_CREATED)
 def create_macro(macro: MacroCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
@@ -39,9 +39,9 @@ def create_macro(macro: MacroCreate, db: Session = Depends(get_db), current_user
         db.commit()
         db.refresh(new_macro)
         return new_macro
-        
+
+# Se o banco de dados travar, desfazemos a operação e pegamos o erro detalhado do Python para ajudar no debug
     except Exception as e:
-        # Se o banco de dados travar, desfazemos a operação e pegamos o motivo exato
         db.rollback()
         raise HTTPException(status_code=500, detail=f"ERRO DETALHADO DO PYTHON: {str(e)}")
 

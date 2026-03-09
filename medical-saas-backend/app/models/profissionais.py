@@ -11,10 +11,7 @@ class Doctor(Base):
     nome = Column(String, nullable=False)
     especialidade = Column(String, nullable=True)
     crm = Column(String, unique=True, nullable=True)
-    
-    # NOVA COLUNA: Gênero do profissional (Para a assinatura inteligente)
-    genero = Column(String, nullable=True) # <-- ADICIONADO AQUI
-    
+    genero = Column(String, nullable=True)
     agenda_config = Column(JSON, nullable=True)
     
     user_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
