@@ -115,17 +115,17 @@ export default function Login() {
           navigate("/minha-saude"); 
       } 
       else {
-          navigate("/dashboard"); // Admin e Doctor
+          navigate("/dashboard"); // Admin e Doctor vão para o dashboard padrão, onde terão acesso às suas funcionalidades específicas via menu lateral
       }
       
     } catch (error) {
       let mensagem = "Erro ao conectar.";
       if (error.response) {
         if (error.response.status === 401) mensagem = "E-mail ou senha incorretos.";
-        else if (error.response.status === 422) mensagem = "Formato de dados inválido (Erro 422).";
+        else if (error.response.status === 422) mensagem = "Formato de dados inválido.";
         else mensagem = "Erro no servidor: " + error.response.status;
       } else if (error.code === "ERR_NETWORK") {
-        mensagem = "Não foi possível conectar ao Backend. Verifique se o servidor está rodando.";
+        mensagem = "Não foi possível conectar.";
       }
       toast({ title: 'Falha no login', description: mensagem, status: 'error', duration: 4000, isClosable: true });
     } finally {

@@ -1,5 +1,5 @@
 import { 
-  Box, Flex, Icon, Text, VStack, Button, Badge, useColorModeValue, IconButton, Tooltip 
+  Box, Flex, Icon, Text, VStack, Button, Badge, useColorModeValue, IconButton, Tooltip, Image 
 } from '@chakra-ui/react';
 import { 
   FaHome, FaUserInjured, FaUserMd, FaCalendarAlt, FaSignOutAlt, 
@@ -110,8 +110,14 @@ export default function SidebarLayout() {
             direction={isSidebarOpen ? "row" : "column-reverse"} 
             gap={2}
         >
-            {isSidebarOpen && (
-                <Text fontSize="xl" fontWeight="bold" color={headingColor}>Medical</Text>
+            {/* --- LOGO ATUALIZADA AQUI --- */}
+            {isSidebarOpen ? (
+                <Flex align="center" gap={2}>
+                    <Image src="/icon-512.png" alt="VezzCare Logo" boxSize="32px" borderRadius="md" />
+                    <Text fontSize="xl" fontWeight="bold" color={headingColor}>VezzCare</Text>
+                </Flex>
+            ) : (
+                <Image src="/icon-512.png" alt="VezzCare Logo" boxSize="32px" borderRadius="md" />
             )}
             
             <IconButton 
