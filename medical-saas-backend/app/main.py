@@ -54,7 +54,7 @@ app = FastAPI(
 origins = [
     "http://127.0.0.1:8000",
     "capacitor://localhost",
-    "http://localhost",
+    "https://localhost",
     "http://localhost:3000", 
     "http://localhost:5173", 
     "https://medicalappfront.vercel.app",
