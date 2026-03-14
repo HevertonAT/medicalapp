@@ -4,12 +4,13 @@ import {
   IconButton, useDisclosure, Modal, ModalOverlay, ModalContent,
   ModalHeader, ModalBody, ModalCloseButton, FormControl, FormLabel,
   Input, ModalFooter, useToast, Spinner, Text, HStack, VStack,
-  useColorModeValue, Tooltip, Badge, Select, Divider, SimpleGrid
+  useColorModeValue, Tooltip, Badge, Select, Divider, SimpleGrid, Icon
 } from '@chakra-ui/react';
-import { FaPlus, FaEdit, FaBan, FaCheck } from 'react-icons/fa';
+import { FaPlus, FaEdit, FaBan, FaCheck, FaBuilding, FaUserMd } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { MASTER_SPECIALTIES } from '../services/specialtyService';
+import { jwtDecode } from "jwt-decode";
 
 import AgendaConfigFields from '../components/profissionais/AgendaConfigFields';
 
@@ -19,7 +20,11 @@ export default function Doctors() {
   const [loading, setLoading] = useState(true);
   const { isOpen, onOpen, onClose } = useDisclosure();
   
-  // <-- ESTADO ATUALIZADO COM O GÊNERO -->
+  // --- ESTADOS DO SUPERUSER ---
+  const [loggedUser, setLoggedUser] = useState(null);
+  const [allClinics, setAllClinics] = useState([]);
+  const [selectedClinicId, setSelectedClinicId] = useState("");
+
   const [currentDoctor, setCurrentDoctor] = useState({ 
     id: '', nome: '', especialidade: '', crm: '', email: '', senha: '', genero: '' 
   });
@@ -52,6 +57,24 @@ export default function Doctors() {
   const activeColor = useColorModeValue('green.600', 'green.300');
   const inactiveColor = useColorModeValue('red.600', 'red.300');
 
+  useEffect(() => {
+      const token = localStorage.getItem('medical_token');
+      if (token) {
+          const decoded = jwtDecode(token);
+          setLoggedUser(decoded);
+          
+          if (decoded.role === 'superuser') {
+              api.get('/clinics/').then(res => {
+                  setAllClinics(Array.isArray(res.data) ? res.data : []);
+              }).catch(e => console.error("Erro ao buscar clínicas", e));
+          } else {
+              setSelectedClinicId(decoded.clinic_id);
+          }
+      }
+      fetchDoctors(); 
+      fetchRules();
+  }, []);
+
   const fetchDoctors = async () => {
     setLoading(true);
     try {
@@ -73,11 +96,6 @@ export default function Doctors() {
     }
   };
 
-  useEffect(() => { 
-    fetchDoctors(); 
-    fetchRules();
-  }, []);
-
   const handleSave = async () => {
     try {
       const payload = {
@@ -85,7 +103,8 @@ export default function Doctors() {
         especialidade: currentDoctor.especialidade,
         crm: currentDoctor.crm,
         genero: currentDoctor.genero,
-        agenda_config: agendaConfig 
+        agenda_config: agendaConfig,
+        clinic_id: loggedUser?.role === 'superuser' ? parseInt(selectedClinicId) : undefined
       };
 
       if (isEditing && currentDoctor.id) {
@@ -115,6 +134,11 @@ export default function Doctors() {
   };
 
   const openModal = (doctor = null) => {
+    if (loggedUser?.role === 'superuser' && !selectedClinicId) {
+        toast({ title: "Selecione uma clínica primeiro!", status: "warning" });
+        return;
+    }
+
     fetchRules();
     if (doctor) {
       setCurrentDoctor({ ...doctor, email: '', senha: '', genero: doctor.genero || '' });
@@ -129,10 +153,20 @@ export default function Doctors() {
   };
 
   const safeDoctors = Array.isArray(doctors) ? doctors : [];
+  
+  // A MURALHA DE ISOLAMENTO
   const filteredDoctors = safeDoctors.filter(doc => {
-    if (filter === 'ativos') return doc.ativo === true;
-    if (filter === 'inativos') return doc.ativo === false;
-    return true;
+      // 1. Filtro de Clínica
+      if (loggedUser?.role === 'superuser') {
+          if (!selectedClinicId) return false; // Se o superuser não escolheu clínica, mostra nada
+          const docClinicId = String(doc.clinic_id || doc.clinica_id || doc.id_clinica || doc.clinic);
+          if (docClinicId !== String(selectedClinicId)) return false;
+      }
+
+      // 2. Filtro de Ativo/Inativo
+      if (filter === 'ativos') return doc.ativo === true;
+      if (filter === 'inativos') return doc.ativo === false;
+      return true;
   });
 
   const handleInactivate = async (id) => {
@@ -160,13 +194,35 @@ export default function Doctors() {
         <Button leftIcon={<FaPlus />} colorScheme="blue" onClick={() => openModal()}>Novo</Button>
       </Flex>
 
+      {/* SELETOR SUPERUSER NO TOPO */}
+      {loggedUser?.role === 'superuser' && (
+          <Box bg={bgCard} borderColor={borderColor} borderWidth={1} borderRadius="md" p={4} mb={6} shadow="sm">
+              <HStack spacing={4}>
+                  <Icon as={FaBuilding} color="blue.500" w={5} h={5} />
+                  <Text fontWeight="bold" color={textColor}>Selecionar Cliente:</Text>
+                  <Select 
+                      maxW="400px" 
+                      bg={inputBg} 
+                      borderColor={borderColor}
+                      placeholder="Escolha uma clínica para gerenciar médicos..."
+                      value={selectedClinicId}
+                      onChange={(e) => setSelectedClinicId(e.target.value)}
+                  >
+                      {allClinics.map(c => (
+                          <option key={c.id} value={c.id}>{c.nome}</option>
+                      ))}
+                  </Select>
+              </HStack>
+          </Box>
+      )}
+
       <HStack mb={4} spacing={4}>
         <Button size="sm" variant={filter === 'todos' ? 'solid' : 'outline'} colorScheme="blue" onClick={() => setFilter('todos')}>Todos</Button>
         <Button size="sm" variant={filter === 'ativos' ? 'solid' : 'outline'} colorScheme="green" onClick={() => setFilter('ativos')}>Ativos</Button>
         <Button size="sm" variant={filter === 'inativos' ? 'solid' : 'outline'} colorScheme="red" onClick={() => setFilter('inativos')}>Inativos</Button>
       </HStack>
 
-      {loading ? <Spinner /> : (
+      {loading ? <Flex justify="center"><Spinner /></Flex> : (
         <Box bg={bgCard} shadow="sm" borderRadius="lg" overflow="hidden">
           <Table variant="simple">
             <Thead bg={bgHeader}>
@@ -204,7 +260,14 @@ export default function Doctors() {
                 </Tr>
               ))}
               {filteredDoctors.length === 0 && (
-                 <Tr><Td colSpan={5} textAlign="center" py={4}>Nenhum profissional encontrado.</Td></Tr>
+                 <Tr>
+                     <Td colSpan={5} textAlign="center" py={10} color="gray.500">
+                         {loggedUser?.role === 'superuser' && !selectedClinicId 
+                            ? <Flex direction="column" align="center"><Icon as={FaUserMd} w={8} h={8} mb={3} opacity={0.3} /> Selecione um cliente acima para ver os profissionais.</Flex>
+                            : 'Nenhum profissional encontrado.'
+                         }
+                     </Td>
+                 </Tr>
               )}
             </Tbody>
           </Table>
@@ -236,7 +299,6 @@ export default function Doctors() {
                         />
                     </FormControl>
 
-                    {/* CAIXA DE SELEÇÃO DE GÊNERO */}
                     <FormControl isRequired>
                         <FormLabel color={textColor}>Gênero</FormLabel>
                         <Select 

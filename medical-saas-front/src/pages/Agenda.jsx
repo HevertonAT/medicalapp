@@ -11,7 +11,7 @@ import {
 import { 
   FaPlus, FaUserMd, FaSearch, FaPlay, FaCheckDouble, 
   FaTimes, FaStethoscope, FaPrescriptionBottleAlt, FaRedo, 
-  FaCalendarAlt, FaHistory, FaBolt, FaPrint
+  FaCalendarAlt, FaHistory, FaBolt, FaPrint, FaBuilding
 } from 'react-icons/fa';
 import React from 'react'; 
 import { useNavigate } from 'react-router-dom';
@@ -22,7 +22,6 @@ import SpecialtyFormRenderer from '../components/SpecialtyFormRenderer';
 import CidAutocomplete from '../components/profissionais/CidAutocomplete';
 
 export default function Agenda() {
-  // 1. TODOS OS HOOKS NO TOPO
   const [appointments, setAppointments] = useState([]);
   const [doctors, setDoctors] = useState([]);
   const [patients, setPatients] = useState([]);
@@ -34,6 +33,10 @@ export default function Agenda() {
   const [currentUserRole, setCurrentUserRole] = useState('');
   const [loggedUser, setLoggedUser] = useState(null); 
   
+  // --- ESTADOS DO SUPERUSER ---
+  const [allClinics, setAllClinics] = useState([]);
+  const [selectedClinicId, setSelectedClinicId] = useState("");
+
   const [availableSlots, setAvailableSlots] = useState([]);
   const [rescheduleSlots, setRescheduleSlots] = useState([]);
 
@@ -63,7 +66,6 @@ export default function Agenda() {
   
   const [lastSavedRecord, setLastSavedRecord] = useState(null);
 
-  // --- O SEGREDO: TODAS AS CORES CHAKRA CARREGADAS NO TOPO ---
   const bgPage = useColorModeValue('gray.50', 'gray.900');
   const bgCard = useColorModeValue('white', 'gray.800');
   const modalBg = useColorModeValue('white', 'gray.800');
@@ -75,19 +77,16 @@ export default function Agenda() {
   const headerBg = useColorModeValue('gray.50', 'gray.700');
   const hoverTr = useColorModeValue('gray.50', 'gray.700');
   
-  // Cores dinâmicas que estavam a quebrar o código (agora protegidas no topo)
   const patientNameColor = useColorModeValue('gray.700', 'white');
   const accordionExpandedBg = useColorModeValue('blue.50', 'gray.700');
   const menuItemHoverBg = useColorModeValue('gray.100', 'gray.600');
 
-  // Cores dos Status carregadas no topo
   const statusGreen = useColorModeValue('green.600', 'green.300');
   const statusRed = useColorModeValue('red.600', 'red.300');
   const statusOrange = useColorModeValue('orange.500', 'orange.300');
   const statusCyan = useColorModeValue('cyan.600', 'cyan.300');
   const statusBlue = useColorModeValue('blue.600', 'blue.300');
 
-  // Função limpa (não quebra mais o React, pois não chama Hooks internamente)
   const getStatusColor = (status) => {
     switch (status) {
         case 'concluido': case 'REALIZADO': return statusGreen;
@@ -123,6 +122,12 @@ export default function Agenda() {
             setLoggedUser(decoded);
             const role = decoded.role || localStorage.getItem('user_role');
             setCurrentUserRole(role);
+            
+            if (role === 'superuser') {
+                api.get('/clinics/').then(res => setAllClinics(Array.isArray(res.data) ? res.data : []));
+            } else {
+                setSelectedClinicId(decoded.clinic_id);
+            }
             
             if (role === 'doctor' || role === 'medico') {
                 api.get('/doctors/me').then(res => {
@@ -416,13 +421,21 @@ export default function Agenda() {
   };
 
   // ==========================================
-  // 1. A MURALHA VISUAL & FILTROS DE BUSCA
+  // A MURALHA VISUAL & FILTROS DE BUSCA
   // ==========================================
   const filteredAppointments = appointments.filter(app => {
-      if (loggedUser) {
+      // FILTRO DO SUPERUSER 
+      if (currentUserRole === 'superuser') {
+          if (!selectedClinicId) return false;
+          
+          const doc = doctors.find(d => String(d.id) === String(app.doctor_id));
+          const appClinicId = String(app.clinic_id || doc?.clinic_id || doc?.clinica_id);
+          if (appClinicId !== String(selectedClinicId)) return false;
+      } else if (loggedUser) {
+          // FILTRO DO CLINICA/MEDICO
           if (currentUserRole === 'doctor' || currentUserRole === 'medico') {
               if (String(app.doctor_id) !== String(loggedUser.doctor_id)) return false;
-          } else if (currentUserRole !== 'superuser') {
+          } else {
               const doc = doctors.find(d => String(d.id) === String(app.doctor_id));
               if (String(app.clinic_id) !== String(loggedUser.clinic_id) && String(doc?.clinic_id) !== String(loggedUser.clinic_id)) {
                   return false;
@@ -445,24 +458,62 @@ export default function Agenda() {
 
   const availableDoctors = doctors.filter(d => {
       if (!d.ativo) return false;
-      if (currentUserRole === 'superuser') return true;
+      if (currentUserRole === 'superuser') {
+          return String(d.clinic_id || d.clinica_id) === String(selectedClinicId);
+      }
       if (currentUserRole === 'doctor' || currentUserRole === 'medico') return String(d.id) === String(loggedUser?.doctor_id);
       return String(d.clinic_id) === String(loggedUser?.clinic_id);
   });
 
   const availablePatients = patients.filter(p => {
       if (!p.ativo) return false;
-      if (currentUserRole === 'superuser') return true;
+      if (currentUserRole === 'superuser') {
+          return String(p.clinic_id || p.clinica_id) === String(selectedClinicId);
+      }
       return String(p.clinic_id) === String(loggedUser?.clinic_id);
   });
-
 
   return (
     <Box p={8} bg={bgPage} minH="100vh">
       <Flex justify="space-between" align="center" mb={6}>
         <Heading size="lg" color={headingColor}>Agenda de Atendimentos</Heading>
-        <Button leftIcon={<FaPlus />} colorScheme="blue" size="sm" onClick={onOpen}>Agendar</Button>
+        <Button 
+            leftIcon={<FaPlus />} 
+            colorScheme="blue" 
+            size="sm" 
+            onClick={() => {
+                if(currentUserRole === 'superuser' && !selectedClinicId) {
+                    toast({ title: "Selecione um cliente primeiro!", status: "warning" });
+                    return;
+                }
+                onOpen();
+            }}
+        >
+            Agendar
+        </Button>
       </Flex>
+
+      {/* SELETOR SUPERUSER NO TOPO */}
+      {currentUserRole === 'superuser' && (
+          <Box bg={bgCard} borderColor={borderColor} borderWidth={1} borderRadius="md" p={4} mb={6} shadow="sm">
+              <HStack spacing={4}>
+                  <Icon as={FaBuilding} color="blue.500" w={5} h={5} />
+                  <Text fontWeight="bold" color={textColor}>Selecionar Cliente:</Text>
+                  <Select 
+                      maxW="400px" 
+                      bg={inputBg} 
+                      borderColor={borderColor}
+                      placeholder="Escolha uma clínica para ver a agenda..."
+                      value={selectedClinicId}
+                      onChange={(e) => setSelectedClinicId(e.target.value)}
+                  >
+                      {allClinics.map(c => (
+                          <option key={c.id} value={c.id}>{c.nome}</option>
+                      ))}
+                  </Select>
+              </HStack>
+          </Box>
+      )}
 
       <Flex gap={4} mb={6} direction={{ base: 'column', md: 'row' }}>
         <InputGroup maxW={{ base: '100%', md: '400px' }}>
@@ -482,7 +533,16 @@ export default function Agenda() {
                     <Th color={textColor}>Paciente</Th><Th color={textColor}>Idade</Th><Th color={textColor}>Data / Hora</Th><Th color={textColor}>Profissional</Th><Th color={textColor}>Obs</Th><Th color={textColor}>Status</Th><Th color={textColor} textAlign="center">Ações</Th>
                 </Tr></Thead>
                 <Tbody>
-                    {filteredAppointments.length === 0 ? <Tr><Td colSpan={7} textAlign="center" py={4}>Nenhum agendamento.</Td></Tr> : filteredAppointments.map((app) => (
+                    {filteredAppointments.length === 0 ? (
+                        <Tr>
+                            <Td colSpan={7} textAlign="center" py={10} color="gray.500">
+                                {currentUserRole === 'superuser' && !selectedClinicId 
+                                    ? <Flex direction="column" align="center"><Icon as={FaCalendarAlt} w={8} h={8} mb={3} opacity={0.3} /> Selecione um cliente acima para ver a agenda.</Flex>
+                                    : 'Nenhum agendamento encontrado.'
+                                }
+                            </Td>
+                        </Tr>
+                    ) : filteredAppointments.map((app) => (
                         <Tr key={app.id} _hover={{ bg: hoverTr }}>
                             <Td fontWeight="bold" color={patientNameColor}>{app.patient_nome}</Td>
                             <Td>{calculateAge(app.patient_id)}</Td>

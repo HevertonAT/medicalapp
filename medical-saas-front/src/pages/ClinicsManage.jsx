@@ -229,7 +229,7 @@ export default function ClinicsManage() {
             {filteredAndSortedClinics.map((c) => (
                 <Tr key={c.id} opacity={c.is_active ? 1 : 0.6} _hover={{ bg: hoverTr }} transition="background 0.2s">
                     <Td py={3} fontWeight="bold" fontSize="xs">#{c.id}</Td>
-                    <Td py={3} fontWeight="bold" fontSize="xs" color="blue.500">{c.nome}</Td>
+                    <Td py={3} fontWeight="bold" fontSize="xs">{c.nome}</Td>
                     <Td py={3} fontSize="xs">{c.cnpj || '-'}</Td>
                     <Td py={3} fontSize="xs">{c.telefone || '-'}</Td>
                     <Td py={3} fontSize="xs">
@@ -305,7 +305,7 @@ export default function ClinicsManage() {
 
               {/* SESSÃO 2: ENDEREÇO (NOVO) */}
               <Box>
-                  <Flex align="center" mb={3} color="orange.500"><FaMapMarkerAlt /> <Text ml={2} fontWeight="bold">2. Endereço</Text></Flex>
+                  <Flex align="center" mb={3} color="blue.500"><FaBuilding /> <Text ml={2} fontWeight="bold">2. Endereço</Text></Flex>
                   <VStack spacing={3}>
                       <SimpleGrid columns={3} spacing={4} w="full">
                           <FormControl gridColumn="span 1">

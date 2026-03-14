@@ -31,6 +31,10 @@ class agendamentosCreate(BaseModel):
 
 class agendamentosResponse(BaseModel):
     id: int
+    clinic_id: Optional[int] = None 
+    doctor_id: Optional[int] = None 
+    patient_id: Optional[int] = None
+    
     status: str
     data_horario: datetime
     observacoes: Optional[str] = None

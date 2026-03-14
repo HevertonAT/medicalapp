@@ -6,46 +6,40 @@ import {
   useDisclosure, Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, 
   ModalFooter, ModalCloseButton, FormControl, FormLabel, Input, Select, HStack
 } from '@chakra-ui/react';
-import { FaBuilding, FaDollarSign, FaExclamationTriangle, FaChevronDown, FaCog, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
+import { FaBuilding, FaDollarSign, FaExclamationTriangle, FaCog, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
 import api from '../services/api';
 
-// Mapeamento dos planos reais do seu Banco de Dados para auto-preenchimento
-const PLANOS_DISPONIVEIS = {
-  'Plano Básico': 99.00,
-  'Plano Profissional': 179.00,
-  'Plano Premium': 295.90
-};
-
 export default function PainelSaaS() {
-  // 1. TODOS OS HOOKS DEVEM FICAR AQUI NO TOPO (SEM IFs, SEM MAPs)
   const [data, setData] = useState({ metrics: {}, clinics: [] });
+  const [planos, setPlanos] = useState([]); // <-- NOVO: Estado para os planos dinâmicos
   const [loading, setLoading] = useState(true);
   
-  // Controle de Ordenação da Tabela
   const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'asc' });
 
-  // Controle do Modal de Edição
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [isSaving, setIsSaving] = useState(false);
   const [editingClinic, setEditingClinic] = useState(null);
 
   const toast = useToast();
   
-  // Declaração de Cores do Tema (Chakra Hooks)
   const bgCard = useColorModeValue('white', 'gray.800');
   const textColor = useColorModeValue('gray.600', 'gray.200');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
   const inputBg = useColorModeValue('gray.50', 'gray.700');
-  const trHoverBg = useColorModeValue('gray.50', 'gray.700'); // <--- A SOLUÇÃO: A cor do hover da tabela subiu para cá!
+  const trHoverBg = useColorModeValue('gray.50', 'gray.700'); 
   const theadBg = useColorModeValue('gray.50', 'gray.800');
   const headingColor = useColorModeValue("gray.700", "white");
 
-  // 2. FUNÇÕES E EFEITOS
   const fetchDashboard = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/saas/dashboard');
-      setData(response.data);
+      // Busca os dados do painel e a lista de planos ao mesmo tempo
+      const [dashRes, planosRes] = await Promise.all([
+          api.get('/saas/dashboard'),
+          api.get('/planos/')
+      ]);
+      setData(dashRes.data);
+      setPlanos(Array.isArray(planosRes.data) ? planosRes.data : []);
     } catch (error) {
       toast({ title: "Erro ao carregar dados do SaaS", status: "error" });
     } finally {
@@ -57,7 +51,15 @@ export default function PainelSaaS() {
     fetchDashboard();
   }, []);
 
-  // --- LÓGICA DE ORDENAÇÃO (SORT) ---
+  // --- Função para pegar o Nome Bonito do Plano ---
+  const getPlanoNome = (plano_id, plano_text) => {
+      if (plano_id) {
+          const plano = planos.find(p => p.id === plano_id);
+          if (plano) return plano.nome;
+      }
+      return plano_text || 'Plano Básico';
+  };
+
   const handleSort = (key) => {
     let direction = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
@@ -75,36 +77,38 @@ export default function PainelSaaS() {
     return sortConfig.direction === 'asc' ? <FaSortUp color="blue" /> : <FaSortDown color="blue" />;
   };
 
-  // --- LÓGICA DE EDIÇÃO ---
   const openEditModal = (clinic) => {
     setEditingClinic({
       id: clinic.id,
       nome: clinic.nome,
-      plano: clinic.plano || 'Plano Básico',
-      valor_mensalidade: clinic.valor_mensalidade || 99.00,
+      plano_id: clinic.plano_id || '', // Usamos o ID agora
+      plano: clinic.plano || '',
+      valor_mensalidade: clinic.valor_mensalidade || 0,
       dia_vencimento: clinic.dia_vencimento || 10,
       status_assinatura: clinic.status_assinatura || 'ativa'
     });
     onOpen();
   };
 
-  // Preenche o valor automaticamente quando muda o plano
   const handlePlanChange = (e) => {
-    const selectedPlan = e.target.value;
-    const autoPrice = PLANOS_DISPONIVEIS[selectedPlan];
+    const selectedId = parseInt(e.target.value);
+    const selectedPlan = planos.find(p => p.id === selectedId);
     
     setEditingClinic({
         ...editingClinic,
-        plano: selectedPlan,
-        valor_mensalidade: autoPrice ? autoPrice : editingClinic.valor_mensalidade
+        plano_id: selectedId,
+        plano: selectedPlan ? selectedPlan.nome : editingClinic.plano, // Atualiza o nome texto também
+        valor_mensalidade: selectedPlan ? selectedPlan.preco_mensal : editingClinic.valor_mensalidade
     });
   };
 
   const handleSaveEdit = async () => {
     setIsSaving(true);
     try {
-      await api.put(`/saas/clinica/${editingClinic.id}`, {
+      // Usamos a rota de atualizar clínica principal para aceitar todos os campos, incluindo plano_id
+      await api.put(`/clinics/${editingClinic.id}`, {
         plano: editingClinic.plano,
+        plano_id: editingClinic.plano_id,
         valor_mensalidade: parseFloat(editingClinic.valor_mensalidade),
         dia_vencimento: parseInt(editingClinic.dia_vencimento),
         status_assinatura: editingClinic.status_assinatura
@@ -170,7 +174,6 @@ export default function PainelSaaS() {
             </Stat>
           </SimpleGrid>
 
-          {/* TABELA DE ASSINATURAS ORDENÁVEL */}
           <Box bg={bgCard} shadow="sm" borderRadius="md" overflow="auto" border="1px" borderColor={borderColor}>
             <Box p={4} borderBottom="1px" borderColor={borderColor} bg={theadBg}>
                 <Text fontWeight="bold" color={textColor}>Gestão de Assinaturas</Text>
@@ -192,7 +195,12 @@ export default function PainelSaaS() {
                   <Tr key={clinic.id} _hover={{ bg: trHoverBg }}> 
                     <Td fontWeight="bold" color="gray.500">#{clinic.id}</Td>
                     <Td fontWeight="bold">{clinic.nome}</Td>
-                    <Td><Badge colorScheme="purple" variant="outline">{clinic.plano || 'Plano Básico'}</Badge></Td>
+                    <Td>
+                        {/* A MÁGICA VISUAL ACONTECE AQUI */}
+                        <Badge colorScheme="purple" variant="outline" px={2} py={1}>
+                            {getPlanoNome(clinic.plano_id, clinic.plano).toUpperCase()}
+                        </Badge>
+                    </Td>
                     <Td isNumeric fontWeight="bold" color="green.500">
                         R$ {clinic.valor_mensalidade ? clinic.valor_mensalidade.toFixed(2) : '99.00'}
                     </Td>
@@ -220,7 +228,7 @@ export default function PainelSaaS() {
         </>
       )}
 
-      {/* MODAL DE EDIÇÃO DE ASSINATURA COM AUTO-PREENCHIMENTO */}
+      {/* MODAL DE EDIÇÃO DE ASSINATURA */}
       <Modal isOpen={isOpen} onClose={onClose} isCentered>
         <ModalOverlay />
         <ModalContent bg={bgCard} border="1px" borderColor={borderColor}>
@@ -230,10 +238,11 @@ export default function PainelSaaS() {
             <SimpleGrid columns={2} spacing={4}>
                 <FormControl isRequired colSpan={2}>
                     <FormLabel color={textColor}>Plano Contratado</FormLabel>
-                    <Select bg={inputBg} borderColor={borderColor} value={editingClinic?.plano || ''} onChange={handlePlanChange}>
-                        <option value="Plano Básico">Plano Básico</option>
-                        <option value="Plano Profissional">Plano Profissional</option>
-                        <option value="Plano Premium">Plano Premium</option>
+                    <Select bg={inputBg} borderColor={borderColor} value={editingClinic?.plano_id || ''} onChange={handlePlanChange}>
+                        <option value="">Selecione o plano...</option>
+                        {planos.map(plano => (
+                            <option key={plano.id} value={plano.id}>{plano.nome}</option>
+                        ))}
                     </Select>
                 </FormControl>
                 <FormControl isRequired>

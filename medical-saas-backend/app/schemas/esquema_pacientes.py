@@ -44,6 +44,6 @@ class PatientResponse(PatientBase):
     id: int
     clinic_id: Optional[int] = None
     user_id: Optional[int] = None
-    
+
     class Config:
         from_attributes = True
