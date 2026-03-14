@@ -4,9 +4,9 @@ import {
   IconButton, useDisclosure, Modal, ModalOverlay, ModalContent,
   ModalHeader, ModalBody, ModalCloseButton, useToast, VStack, Text, 
   HStack, FormControl, FormLabel, Input, ModalFooter, Divider, useColorModeValue, Select, Tooltip,
-  InputGroup, InputRightElement, Badge
+  InputGroup, InputRightElement, Badge, InputLeftElement
 } from '@chakra-ui/react';
-import { FaPlus, FaBuilding, FaUserTie, FaEdit, FaBan, FaCheck, FaEye, FaEyeSlash } from 'react-icons/fa';
+import { FaPlus, FaBuilding, FaUserTie, FaEdit, FaBan, FaCheck, FaEye, FaEyeSlash, FaSearch } from 'react-icons/fa';
 import api from '../services/api';
 
 export default function ClinicsManage() {
@@ -17,6 +17,9 @@ export default function ClinicsManage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
+
+  // --- NOVO: Estado para a barra de pesquisa ---
+  const [searchTerm, setSearchTerm] = useState('');
 
   const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'asc' });
 
@@ -77,22 +80,32 @@ export default function ClinicsManage() {
     setSortConfig({ key, direction });
   };
 
-  // --- LÓGICA DE ORDENAÇÃO ATUALIZADA PARA ACEITAR "PAGAMENTO" ---
-  const sortedClinics = [...clinics].sort((a, b) => {
-    // Se a chave for pagamento, usamos o is_active como base de ordenação
-    let aValue = sortConfig.key === 'pagamento' ? a.is_active : a[sortConfig.key];
-    let bValue = sortConfig.key === 'pagamento' ? b.is_active : b[sortConfig.key];
+  // --- LÓGICA DE ORDENAÇÃO E BUSCA COMBINADAS ---
+  const filteredAndSortedClinics = [...clinics]
+    .filter(clinic => {
+        // Filtro de Busca (procura no Nome, CNPJ ou E-mail)
+        const searchLower = searchTerm.toLowerCase();
+        const nome = (clinic.nome || '').toLowerCase();
+        const cnpj = (clinic.cnpj || '').toLowerCase();
+        const email = (clinic.email_clinica || clinic.email || '').toLowerCase();
+        
+        return nome.includes(searchLower) || cnpj.includes(searchLower) || email.includes(searchLower);
+    })
+    .sort((a, b) => {
+        // Lógica de Ordenação Original
+        let aValue = sortConfig.key === 'pagamento' ? a.is_active : a[sortConfig.key];
+        let bValue = sortConfig.key === 'pagamento' ? b.is_active : b[sortConfig.key];
 
-    if (typeof aValue === 'string') aValue = aValue.toLowerCase();
-    if (typeof bValue === 'string') bValue = bValue.toLowerCase();
-    
-    if (aValue === null || aValue === undefined) aValue = '';
-    if (bValue === null || bValue === undefined) bValue = '';
+        if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+        if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+        
+        if (aValue === null || aValue === undefined) aValue = '';
+        if (bValue === null || bValue === undefined) bValue = '';
 
-    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-    return 0;
-  });
+        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+    });
 
   const getSortIcon = (columnName) => {
     if (sortConfig.key === columnName) {
@@ -165,6 +178,21 @@ export default function ClinicsManage() {
         <Button leftIcon={<FaPlus />} colorScheme="blue" onClick={() => handleOpenModal()}>Nova Clínica</Button>
       </Flex>
 
+      {/* --- NOVA BARRA DE BUSCA --- */}
+      <Flex mb={6}>
+        <InputGroup maxW={{ base: '100%', md: '400px' }}>
+            <InputLeftElement pointerEvents="none" children={<FaSearch color="gray.300" />} />
+            <Input 
+              bg={bgCard} 
+              border="1px solid" 
+              borderColor={borderColor} 
+              placeholder="Buscar clínica por nome, CNPJ..." 
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)} 
+            />
+        </InputGroup>
+      </Flex>
+
       <Box bg={bgCard} shadow="sm" borderRadius="md" overflow="hidden" border="1px solid" borderColor={borderColor}>
         <Table variant="simple" size="sm">
             <Thead bg={bgHeader}>
@@ -182,7 +210,6 @@ export default function ClinicsManage() {
                 <Th cursor="pointer" onClick={() => handleSort('plano_id')} color={textColor} py={3} _hover={{ bg: borderColor }}>
                     Plano{getSortIcon('plano_id')}
                 </Th>
-                {/* --- NOVO: PAGAMENTO AGORA É CLICÁVEL --- */}
                 <Th cursor="pointer" onClick={() => handleSort('pagamento')} color={textColor} py={3} _hover={{ bg: borderColor }}>
                     Pagamento{getSortIcon('pagamento')}
                 </Th>
@@ -193,7 +220,7 @@ export default function ClinicsManage() {
             </Tr>
             </Thead>
             <Tbody>
-            {sortedClinics.map((c) => (
+            {filteredAndSortedClinics.map((c) => (
                 <Tr key={c.id} opacity={c.is_active ? 1 : 0.6} _hover={{ bg: hoverTr }} transition="background 0.2s">
                     <Td py={3} fontWeight="bold" fontSize="xs">#{c.id}</Td>
                     <Td py={3} fontWeight="bold" fontSize="xs" color="blue.500">{c.nome}</Td>
@@ -232,8 +259,8 @@ export default function ClinicsManage() {
                     </Td>
                 </Tr>
             ))}
-            {clinics.length === 0 && (
-                <Tr><Td colSpan={8} textAlign="center" py={4}>Nenhuma clínica cadastrada.</Td></Tr>
+            {filteredAndSortedClinics.length === 0 && (
+                <Tr><Td colSpan={8} textAlign="center" py={4}>Nenhuma clínica encontrada.</Td></Tr>
             )}
             </Tbody>
         </Table>
@@ -275,7 +302,6 @@ export default function ClinicsManage() {
                         </FormControl>
                       </HStack>
 
-                      {/* SELETOR DINÂMICO DE PLANOS */}
                       <FormControl isRequired>
                           <FormLabel fontSize="sm">Plano de Assinatura</FormLabel>
                           <Select bg={inputBg} borderColor={borderColor} value={formData.plano_id} onChange={(e) => setFormData({...formData, plano_id: parseInt(e.target.value) || ''})}>
@@ -290,7 +316,7 @@ export default function ClinicsManage() {
                   </VStack>
               </Box>
 
-              {/* SESSÃO 2: ADMIN (SÓ APARECE SE FOR CRIAÇÃO) */}
+              {/* SESSÃO 2: ADMIN */}
               {!isEditing && (
                 <>
                   <Divider borderColor={borderColor} />

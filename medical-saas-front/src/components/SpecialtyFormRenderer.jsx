@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { 
   Box, FormControl, FormLabel, Input, HStack, SimpleGrid, 
   Textarea, Select, Heading, Divider, useColorModeValue 
@@ -28,6 +28,12 @@ import UrologiaFields from "./specialties/UrologiaFields";
 
 export default function SpecialtyFormRenderer({ specialty, settings = {}, data = {}, onChange }) {
   
+  // 🕵️‍♂️ O DETETIVE: Aperte F12 no navegador para ver o que o Back-end enviou!
+  useEffect(() => {
+      console.log("🛠️ Especialidade Carregada:", specialty);
+      console.log("⚙️ Configurações Recebidas do Banco:", settings);
+  }, [specialty, settings]);
+
   // --- DEFINIÇÃO DINÂMICA DE CORES (MODO CLARO / ESCURO) ---
   const bgContainer = useColorModeValue("white", "gray.800");
   const borderColor = useColorModeValue("gray.200", "gray.700");
@@ -41,6 +47,7 @@ export default function SpecialtyFormRenderer({ specialty, settings = {}, data =
   const tealBlock = useColorModeValue("teal.50", "teal.900");
   const orangeBlock = useColorModeValue("orange.50", "orange.900");
   const redBlock = useColorModeValue("red.50", "red.900");
+  const purpleBlock = useColorModeValue("purple.50", "purple.900"); // Nova cor para Sessões
 
   const updateField = (field, value) => {
     onChange({ ...data, [field]: value });
@@ -85,13 +92,22 @@ export default function SpecialtyFormRenderer({ specialty, settings = {}, data =
     }
   };
 
+  // --- TRADUTOR DE REGRAS FLEXÍVEL ---
+  // Verifica o nome em inglês OU o nome genérico que pode vir do Python
+  const showBirth = settings.enable_birth_data === true || settings.habilitar_dados_nascimento === true;
+  const showGestation = settings.enable_gestation_data === true || settings.habilitar_campos_gestacao === true;
+  const showVision = settings.enable_vision_data === true || settings.habilitar_campos_visao === true;
+  const showLaterality = settings.require_laterality === true || settings.exigir_lateralidade === true;
+  const showPA = settings.require_blood_pressure === true || settings.enable_blood_pressure === true || settings.exigir_pa === true;
+  const showSessions = settings.enable_sessions_control === true || settings.habilitar_controle_sessoes === true;
+
   return (
     <Box mt={4} p={4} borderWidth={1} borderRadius="md" bg={bgContainer} borderColor={borderColor} boxShadow="sm">
       <Heading size="sm" mb={4} color={headingColor}>Dados Clínicos Específicos: {specialty || "Geral"}</Heading>
 
       <SimpleGrid columns={[1, 2]} spacing={6}>
         
-        {settings.enable_birth_data && (
+        {showBirth && (
           <Box gridColumn="span 2" p={4} bg={blueBlock} borderRadius="md">
             <Heading size="xs" mb={3} color={useColorModeValue("blue.700", "blue.200")}>👶 Dados de Nascimento / Crescimento</Heading>
             <HStack>
@@ -111,7 +127,7 @@ export default function SpecialtyFormRenderer({ specialty, settings = {}, data =
           </Box>
         )}
 
-        {settings.enable_gestation_data && (
+        {showGestation && (
           <Box gridColumn="span 2" p={4} bg={pinkBlock} borderRadius="md">
             <Heading size="xs" mb={3} color={useColorModeValue("pink.700", "pink.200")}>🤰 Dados Obstétricos</Heading>
             <HStack>
@@ -127,7 +143,7 @@ export default function SpecialtyFormRenderer({ specialty, settings = {}, data =
           </Box>
         )}
 
-        {settings.enable_vision_data && (
+        {showVision && (
           <Box gridColumn="span 2" p={4} bg={tealBlock} borderRadius="md">
             <Heading size="xs" mb={3} color={useColorModeValue("teal.700", "teal.200")}>👁️ Acuidade Visual</Heading>
             <SimpleGrid columns={2} spacing={4}>
@@ -143,7 +159,24 @@ export default function SpecialtyFormRenderer({ specialty, settings = {}, data =
           </Box>
         )}
 
-        {settings.require_laterality && (
+        {/* --- NOVO: BLOCO DE CONTROLE DE SESSÕES --- */}
+        {showSessions && (
+          <Box gridColumn="span 2" p={4} bg={purpleBlock} borderRadius="md">
+            <Heading size="xs" mb={3} color={useColorModeValue("purple.700", "purple.200")}>🔄 Controle de Sessões</Heading>
+            <SimpleGrid columns={2} spacing={4}>
+              <FormControl>
+                <FormLabel fontSize="sm" color={textColor}>Sessão Atual (Nº)</FormLabel>
+                <Input type="number" bg={inputBg} color={textColor} borderColor={borderColor} placeholder="Ex: 3" value={data.sessao_atual || ""} onChange={e => updateField("sessao_atual", e.target.value)} />
+              </FormControl>
+              <FormControl>
+                <FormLabel fontSize="sm" color={textColor}>Total de Sessões Previstas</FormLabel>
+                <Input type="number" bg={inputBg} color={textColor} borderColor={borderColor} placeholder="Ex: 10" value={data.sessao_total || ""} onChange={e => updateField("sessao_total", e.target.value)} />
+              </FormControl>
+            </SimpleGrid>
+          </Box>
+        )}
+
+        {showLaterality && (
           <FormControl isRequired>
             <FormLabel fontWeight="bold" color={textColor}>Lado Acometido</FormLabel>
             <Select 
@@ -162,8 +195,7 @@ export default function SpecialtyFormRenderer({ specialty, settings = {}, data =
           </FormControl>
         )}
 
-        {/* --- CORREÇÃO: O campo P.A agora fica totalmente oculto se não for exigido --- */}
-        {(settings.require_blood_pressure || settings.enable_blood_pressure) && (
+        {showPA && (
           <FormControl isRequired>
             <FormLabel color={textColor}>
               Pressão Arterial (PA) <Box as="span" color="red.500" ml={1}>*</Box>

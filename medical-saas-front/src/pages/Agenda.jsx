@@ -31,6 +31,8 @@ export default function Agenda() {
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
 
   const [currentUserRole, setCurrentUserRole] = useState('');
+  const [loggedUser, setLoggedUser] = useState(null); // Guardamos o usuário completo aqui
+  
   const [availableSlots, setAvailableSlots] = useState([]);
   const [rescheduleSlots, setRescheduleSlots] = useState([]);
 
@@ -103,12 +105,16 @@ export default function Agenda() {
     if (token) {
         try {
             const decoded = jwtDecode(token);
+            setLoggedUser(decoded);
             const role = decoded.role || localStorage.getItem('user_role');
             setCurrentUserRole(role);
+            
             if (role === 'doctor' || role === 'medico') {
                 api.get('/doctors/me').then(res => {
                     if (res.data && res.data.id) {
                         setNewApp(prev => ({...prev, doctor_id: res.data.id}));
+                        // Salvamos o ID do médico no loggedUser para facilitar o filtro
+                        setLoggedUser(prev => ({...prev, doctor_id: res.data.id})); 
                     }
                 }).catch(e => console.error(e));
             }
@@ -120,8 +126,8 @@ export default function Agenda() {
   useEffect(() => {
       if (newApp.doctor_id && newApp.data) {
           api.get(`/appointments/available-slots?doctor_id=${newApp.doctor_id}&data=${newApp.data}`)
-             .then(res => setAvailableSlots(res.data))
-             .catch(e => setAvailableSlots([]));
+              .then(res => setAvailableSlots(res.data))
+              .catch(e => setAvailableSlots([]));
       } else {
           setAvailableSlots([]);
       }
@@ -130,8 +136,8 @@ export default function Agenda() {
   useEffect(() => {
       if (currentAppointment && rescheduleData.data) {
           api.get(`/appointments/available-slots?doctor_id=${currentAppointment.doctor_id}&data=${rescheduleData.data}`)
-             .then(res => setRescheduleSlots(res.data))
-             .catch(e => setRescheduleSlots([]));
+              .then(res => setRescheduleSlots(res.data))
+              .catch(e => setRescheduleSlots([]));
       } else {
           setRescheduleSlots([]);
       }
@@ -248,7 +254,6 @@ export default function Agenda() {
     }
   };
 
-  // --- O TRADUTOR INTELIGENTE DE ESPECIALIDADE POR GÊNERO ---
   const formatDoctorInfo = (name, specialtyArea, gender) => {
     const isMale = gender === 'Masculino' || gender === 'M' || gender === 'masculino' || gender === 'm';
     const isFemale = gender === 'Feminino' || gender === 'F' || gender === 'feminino' || gender === 'f';
@@ -278,9 +283,7 @@ export default function Agenda() {
         else if (area === 'ortopedia') title = 'Ortopedista';
     }
 
-    // Deixa a primeira letra maiúscula
     title = title.charAt(0).toUpperCase() + title.slice(1);
-
     return { prefix, title, fullName: `${prefix} ${name}` };
   };
 
@@ -293,8 +296,6 @@ export default function Agenda() {
 
     const doc = doctors.find(d => String(d.id) === String(currentAppointment?.doctor_id));
     const docReg = doc?.conselho_regional || doc?.numero_conselho || doc?.registro_conselho || doc?.documento || doc?.conselho || "CR não informado";
-    
-    // Mágica acontecendo aqui:
     const docInfo = formatDoctorInfo(currentAppointment?.doctor_nome, doc?.especialidade, doc?.genero);
     
     const patientAge = calculateAge(currentAppointment?.patient_id);
@@ -400,12 +401,56 @@ export default function Agenda() {
       } catch (error) { toast({ title: 'Erro ao reagendar.', status: 'error' }); }
   };
 
+  // ==========================================
+  // 1. A MURALHA VISUAL & FILTROS DE BUSCA
+  // ==========================================
   const filteredAppointments = appointments.filter(app => {
-      const patientName = app.patient_nome || "";
-      const matchesName = patientName.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesDate = filterDate ? app.data_horario.split('T')[0] === filterDate : true; 
-      return matchesName && matchesDate;
+      // Regra de Isolamento
+      if (loggedUser) {
+          if (currentUserRole === 'doctor' || currentUserRole === 'medico') {
+              // Médico só vê o que é dele
+              if (String(app.doctor_id) !== String(loggedUser.doctor_id)) return false;
+          } else if (currentUserRole !== 'superuser') {
+              // Admin/Recepção só vê a sua clínica (descobre a clínica através do médico)
+              const doc = doctors.find(d => String(d.id) === String(app.doctor_id));
+              if (String(app.clinic_id) !== String(loggedUser.clinic_id) && String(doc?.clinic_id) !== String(loggedUser.clinic_id)) {
+                  return false;
+              }
+          }
+      }
+
+      // Filtro de Busca Super Inteligente (Busca por Nome do Paciente, CPF ou Nome do Médico)
+      const searchLower = searchTerm.toLowerCase();
+      const patient = patients.find(p => p.id === app.patient_id) || {};
+      
+      const patientName = (app.patient_nome || patient.nome_completo || "").toLowerCase();
+      const patientCpf = (patient.cpf || "").toLowerCase();
+      const doctorName = (app.doctor_nome || "").toLowerCase();
+
+      const matchesSearch = patientName.includes(searchLower) || patientCpf.includes(searchLower) || doctorName.includes(searchLower);
+      
+      // 🔥 A MÁGICA DA DATA 🔥
+      // Se a barra de busca estiver vazia, filtra pela data selecionada. 
+      // Se houver qualquer coisa digitada, ignora a data e mostra todo o histórico!
+      const matchesDate = (filterDate && searchTerm.trim() === '') ? app.data_horario.split('T')[0] === filterDate : true; 
+      
+      return matchesSearch && matchesDate;
   });
+
+  // Filtra as listas do Modal de Agendamento baseadas na Muralha
+  const availableDoctors = doctors.filter(d => {
+      if (!d.ativo) return false;
+      if (currentUserRole === 'superuser') return true;
+      if (currentUserRole === 'doctor' || currentUserRole === 'medico') return String(d.id) === String(loggedUser?.doctor_id);
+      return String(d.clinic_id) === String(loggedUser?.clinic_id);
+  });
+
+  const availablePatients = patients.filter(p => {
+      if (!p.ativo) return false;
+      if (currentUserRole === 'superuser') return true;
+      return String(p.clinic_id) === String(loggedUser?.clinic_id);
+  });
+
 
   return (
     <Box p={8} bg={bgPage} minH="100vh">
@@ -417,7 +462,7 @@ export default function Agenda() {
       <Flex gap={4} mb={6} direction={{ base: 'column', md: 'row' }}>
         <InputGroup maxW={{ base: '100%', md: '400px' }}>
             <InputLeftElement pointerEvents="none" children={<FaSearch color="gray.300" />} />
-            <Input bg={bgCard} border="1px solid" borderColor={borderColor} placeholder="Pesquisar paciente..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            <Input bg={bgCard} border="1px solid" borderColor={borderColor} placeholder="Buscar paciente, CPF ou médico..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
         </InputGroup>
         <InputGroup maxW={{ base: '100%', md: '200px' }}>
              <InputLeftElement pointerEvents="none" children={<FaCalendarAlt color="gray.300" />} />
@@ -445,9 +490,13 @@ export default function Agenda() {
                                     <>
                                         {app.status === 'agendado' && <IconButton icon={<FaTimes />} size="xs" colorScheme="red" variant="ghost" onClick={() => openCancelModal(app)} />}
                                         {app.status === 'agendado' && <IconButton icon={<FaRedo />} size="xs" colorScheme="blue" variant="ghost" onClick={() => openRescheduleModal(app)} />}
-                                        <Button leftIcon={app.status === 'em_andamento' ? <FaCheckDouble /> : <FaPlay />} size="xs" colorScheme={app.status === 'em_andamento' ? 'green' : 'blue'} onClick={() => handleStartConsultation(app)}>
-                                            {app.status === 'em_andamento' ? 'Retomar' : 'Iniciar'}
-                                        </Button>
+                                        
+                                        {/* Bloqueia botão de iniciar atendimento para Admins e Recepcionistas */}
+                                        {(currentUserRole === 'doctor' || currentUserRole === 'medico' || currentUserRole === 'superuser') && (
+                                            <Button leftIcon={app.status === 'em_andamento' ? <FaCheckDouble /> : <FaPlay />} size="xs" colorScheme={app.status === 'em_andamento' ? 'green' : 'blue'} onClick={() => handleStartConsultation(app)}>
+                                                {app.status === 'em_andamento' ? 'Retomar' : 'Iniciar'}
+                                            </Button>
+                                        )}
                                     </>
                                 )}
                                 {(app.status === 'concluido' || app.status === 'REALIZADO' || app.status === 'cancelado' || app.status === 'reagendado') && <Icon as={FaHistory} color="gray.300" />}
@@ -470,14 +519,16 @@ export default function Agenda() {
                     onChange={(e) => setNewApp({...newApp, doctor_id: e.target.value, hora: ''})}
                     isDisabled={currentUserRole === 'doctor' || currentUserRole === 'medico'}
                 >
-                    {doctors.filter(d => d.ativo).map(d => <option key={d.id} value={d.id}>{d.nome}</option>)}
+                    {/* AQUI A MURALHA FUNCIONA PARA O DROPDOWN */}
+                    {availableDoctors.map(d => <option key={d.id} value={d.id}>{d.nome}</option>)}
                 </Select>
             </FormControl>
 
             <FormControl mb={4}>
                 <FormLabel>Paciente</FormLabel>
                 <Select bg={inputBg} size="sm" placeholder="Selecione o paciente..." value={newApp.patient_id} onChange={(e) => setNewApp({...newApp, patient_id: e.target.value})}>
-                    {patients.filter(p => p.ativo).map(p => <option key={p.id} value={p.id}>{p.nome_completo}</option>)}
+                    {/* AQUI A MURALHA FUNCIONA PARA O DROPDOWN DE PACIENTES */}
+                    {availablePatients.map(p => <option key={p.id} value={p.id}>{p.nome_completo}</option>)}
                 </Select>
             </FormControl>
 

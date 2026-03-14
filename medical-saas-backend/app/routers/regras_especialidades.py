@@ -10,10 +10,12 @@ from app.schemas.esquema_especialidades import RuleCreate, RuleUpdate, RuleRespo
 
 router = APIRouter()
 
+# Lista todas as regras da clínica
 @router.get("/", response_model=List[RuleResponse])
 def list_rules(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return db.query(SpecialtyRule).filter(SpecialtyRule.clinic_id == current_user.clinic_id).all()
 
+# Busca a regra de uma especialidade específica (Usado pela Agenda na hora da consulta)
 @router.get("/rules/{specialty_name}")
 def get_effective_rule(specialty_name: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     rule = db.query(SpecialtyRule).filter(
@@ -22,30 +24,44 @@ def get_effective_rule(specialty_name: str, db: Session = Depends(get_db), curre
     ).first()
     
     if not rule:
+        # Se não houver regra, devolvemos um dicionário vazio mas válido para não quebrar o site
         return {"specialty": specialty_name, "settings": {}}
     return rule
 
+# ==========================================
+# O CORAÇÃO DA CORREÇÃO: A ROTA UPSERT
+# Aceita / e /rules para acabar com o Erro 405
+# ==========================================
 @router.post("/", response_model=RuleResponse)
-def create_rule(rule: RuleCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+@router.post("/rules", response_model=RuleResponse)
+@router.post("/rules/", response_model=RuleResponse)
+def create_or_update_rule(rule: RuleCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     db_rule = db.query(SpecialtyRule).filter(
         func.lower(SpecialtyRule.specialty) == rule.specialty.lower(),
         SpecialtyRule.clinic_id == current_user.clinic_id
     ).first()
     
     if db_rule:
-        raise HTTPException(status_code=400, detail="Regra já existe para esta especialidade na sua clínica.")
-    
-    new_rule = SpecialtyRule(
-        specialty=rule.specialty,
-        clinic_id=current_user.clinic_id,
-        settings=rule.settings,
-        active=rule.active
-    )
-    db.add(new_rule)
-    db.commit()
-    db.refresh(new_rule)
-    return new_rule
+        # 1. ATUALIZAR: Se a regra já existe, apenas trocamos as chavinhas e salvamos! (Sem erro 400)
+        db_rule.settings = rule.settings
+        db_rule.active = rule.active
+        db.commit()
+        db.refresh(db_rule)
+        return db_rule
+    else:
+        # 2. CRIAR: Se é a primeira vez que clica em "Salvar Configurações", ele cria.
+        new_rule = SpecialtyRule(
+            specialty=rule.specialty,
+            clinic_id=current_user.clinic_id,
+            settings=rule.settings,
+            active=rule.active
+        )
+        db.add(new_rule)
+        db.commit()
+        db.refresh(new_rule)
+        return new_rule
 
+# Atualizar via ID (Mantido para compatibilidade)
 @router.put("/{rule_id}", response_model=RuleResponse)
 def update_rule(rule_id: int, rule_data: RuleUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     db_rule = db.query(SpecialtyRule).filter(

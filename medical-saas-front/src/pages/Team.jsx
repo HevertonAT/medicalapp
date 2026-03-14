@@ -3,10 +3,12 @@ import {
   Box, Button, Flex, Heading, Table, Thead, Tbody, Tr, Th, Td,
   IconButton, useDisclosure, Modal, ModalOverlay, ModalContent,
   ModalHeader, ModalBody, ModalCloseButton, useToast, Spinner, VStack, Text, 
-  HStack, Badge, FormControl, FormLabel, Input, ModalFooter, Select, useColorModeValue, Tooltip
+  HStack, Badge, FormControl, FormLabel, Input, ModalFooter, Select, useColorModeValue,
+  Tooltip
 } from '@chakra-ui/react';
 import { FaPlus, FaTrash, FaUserTie, FaUserCog, FaUserMd, FaConciergeBell } from 'react-icons/fa';
 import api from '../services/api';
+import { jwtDecode } from "jwt-decode"; // Adicionado para ler o token
 
 export default function Team() {
   const [team, setTeam] = useState([]);
@@ -27,14 +29,36 @@ export default function Team() {
   const textColor = useColorModeValue('gray.600', 'gray.200');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
 
+  // Pega os dados do usuário logado diretamente do token
+  const getLoggedUser = () => {
+    const token = localStorage.getItem('medical_token') || localStorage.getItem('token');
+    if (token) {
+        try { return jwtDecode(token); } catch (e) { return null; }
+    }
+    return null;
+  };
+
+  const loggedUser = getLoggedUser();
+
   const fetchTeam = async () => {
     try {
       setLoading(true);
       const response = await api.get('/users/');
-
+      
       const usersList = Array.isArray(response.data) ? response.data : [];
+      
+      // 1. Tira os pacientes da lista
+      let staff = usersList.filter(u => u.role !== 'patient' && u.role !== 'paciente');
+      
+      // 2. A MURALHA DE ISOLAMENTO
+      if (loggedUser && loggedUser.role !== 'superuser') {
+          // Se não for superuser, só vê quem é da mesma clínica e esconde os superusers
+          staff = staff.filter(u => 
+              u.clinic_id === loggedUser.clinic_id && 
+              u.role !== 'superuser'
+          );
+      }
 
-      const staff = response.data.filter(u => u.role !== 'patient' && u.role !== 'paciente');
       setTeam(staff);
     } catch (error) { 
         toast({ title: 'Erro ao carregar equipe.', status: 'error' });
@@ -53,7 +77,14 @@ export default function Team() {
     
     try {
         setIsSubmitting(true);
-        await api.post('/users/', newUser);
+        
+        // Garante que o usuário criado receba o ID da clínica de quem está criando
+        const payload = {
+            ...newUser,
+            clinic_id: loggedUser?.role !== 'superuser' ? loggedUser?.clinic_id : newUser.clinic_id
+        };
+
+        await api.post('/users/', payload);
         toast({ title: 'Membro adicionado com sucesso!', status: 'success' });
         onClose();
         setNewUser({ full_name: '', email: '', password: '', role: 'recepcionista' });
@@ -130,6 +161,9 @@ export default function Team() {
                     </Td>
                 </Tr>
             ))}
+            {team.length === 0 && !loading && (
+                <Tr><Td colSpan={4} textAlign="center" py={6} color="gray.500">Nenhum membro encontrado para esta clínica.</Td></Tr>
+            )}
             </Tbody>
         </Table>
       </Box>
@@ -160,12 +194,21 @@ export default function Team() {
 
               <FormControl isRequired>
                   <FormLabel fontSize="sm" color={textColor}>Cargo</FormLabel>
-                  <Select bg={inputBg} borderColor={borderColor} value={newUser.role} onChange={(e) => setNewUser({...newUser, role: e.target.value})}>
+                  <Select 
+                      bg={inputBg} 
+                      borderColor={borderColor} 
+                      value={newUser.role} 
+                      onChange={(e) => setNewUser({...newUser, role: e.target.value})}
+                  >
                       <option value="recepcionista">Recepcionista (Agenda e Pacientes)</option>
-                      <option value="admin">Administrador (Acesso Total)</option>
+                      
+                      {/* Apenas o Superuser consegue ver e criar outros Admins por aqui */}
+                      {loggedUser?.role === 'superuser' && (
+                          <option value="admin">Administrador (Acesso Total)</option>
+                      )}
                   </Select>
                   <Text fontSize="xs" color="gray.500" mt={2}>
-                      Nota: Médicos devem ser criados através do menu "Profissionais" para gerar a agenda e as comissões corretamente.
+                      Nota: Profissionais/Médicos devem ser criados no menu "Profissionais" para gerar agenda corretamente.
                   </Text>
               </FormControl>
 
