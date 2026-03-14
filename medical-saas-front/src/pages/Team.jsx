@@ -3,7 +3,7 @@ import {
   Box, Button, Flex, Heading, Table, Thead, Tbody, Tr, Th, Td,
   IconButton, useDisclosure, Modal, ModalOverlay, ModalContent,
   ModalHeader, ModalBody, ModalCloseButton, useToast, Spinner, VStack, Text, 
-  HStack, Badge, FormControl, FormLabel, Input, ModalFooter, Select, useColorModeValue
+  HStack, Badge, FormControl, FormLabel, Input, ModalFooter, Select, useColorModeValue, Tooltip
 } from '@chakra-ui/react';
 import { FaPlus, FaTrash, FaUserTie, FaUserCog, FaUserMd, FaConciergeBell } from 'react-icons/fa';
 import api from '../services/api';
@@ -31,7 +31,9 @@ export default function Team() {
     try {
       setLoading(true);
       const response = await api.get('/users/');
-      // Filtramos para não mostrar pacientes, apenas staff
+
+      const usersList = Array.isArray(response.data) ? response.data : [];
+
       const staff = response.data.filter(u => u.role !== 'patient' && u.role !== 'paciente');
       setTeam(staff);
     } catch (error) { 
