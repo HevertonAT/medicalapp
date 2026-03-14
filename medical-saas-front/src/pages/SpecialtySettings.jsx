@@ -42,7 +42,7 @@ export default function SpecialtySettings() {
   const itemActiveText = useColorModeValue("blue.700", "blue.200");
   const itemBorderActive = useColorModeValue("blue.500", "blue.300");
   const blockBg = useColorModeValue("gray.50", "whiteAlpha.50"); 
-
+  const inputBg = useColorModeValue("white", "gray.700");
   // 1. Descobrir quem está logado
   useEffect(() => {
       const token = localStorage.getItem('medical_token');
