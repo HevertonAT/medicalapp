@@ -420,9 +420,6 @@ export default function Agenda() {
       } catch (error) { toast({ title: 'Erro ao reagendar.', status: 'error' }); }
   };
 
-  // ==========================================
-  // A MURALHA VISUAL & FILTROS DE BUSCA
-  // ==========================================
   const filteredAppointments = appointments.filter(app => {
       // FILTRO DO SUPERUSER 
       if (currentUserRole === 'superuser') {
@@ -476,7 +473,7 @@ export default function Agenda() {
   return (
     <Box p={8} bg={bgPage} minH="100vh">
       <Flex justify="space-between" align="center" mb={6}>
-        <Heading size="lg" color={headingColor}>Agenda de Atendimentos</Heading>
+        <Heading size="lg" color={headingColor}>Agenda</Heading>
         <Button 
             leftIcon={<FaPlus />} 
             colorScheme="blue" 
@@ -498,7 +495,7 @@ export default function Agenda() {
           <Box bg={bgCard} borderColor={borderColor} borderWidth={1} borderRadius="md" p={4} mb={6} shadow="sm">
               <HStack spacing={4}>
                   <Icon as={FaBuilding} color="blue.500" w={5} h={5} />
-                  <Text fontWeight="bold" color={textColor}>Selecionar Cliente:</Text>
+                  <Text fontWeight="bold" color={textColor}>Selecionar Clinica:</Text>
                   <Select 
                       maxW="400px" 
                       bg={inputBg} 
@@ -530,14 +527,14 @@ export default function Agenda() {
         <Box bg={bgCard} shadow="sm" borderRadius="lg" overflowX="auto" border="1px solid" borderColor={borderColor}>
             <Table variant="simple" size="sm">
                 <Thead bg={headerBg}><Tr>
-                    <Th color={textColor}>Paciente</Th><Th color={textColor}>Idade</Th><Th color={textColor}>Data / Hora</Th><Th color={textColor}>Profissional</Th><Th color={textColor}>Obs</Th><Th color={textColor}>Status</Th><Th color={textColor} textAlign="center">Ações</Th>
+                    <Th color={textColor}>Paciente</Th><Th color={textColor}>Idade</Th><Th color={textColor}>Data / Hora</Th><Th color={textColor}>Profissional</Th><Th color={textColor}>Observações</Th><Th color={textColor}>Status</Th><Th color={textColor} textAlign="center">Ações</Th>
                 </Tr></Thead>
                 <Tbody>
                     {filteredAppointments.length === 0 ? (
                         <Tr>
                             <Td colSpan={7} textAlign="center" py={10} color="gray.500">
                                 {currentUserRole === 'superuser' && !selectedClinicId 
-                                    ? <Flex direction="column" align="center"><Icon as={FaCalendarAlt} w={8} h={8} mb={3} opacity={0.3} /> Selecione um cliente acima para ver a agenda.</Flex>
+                                    ? <Flex direction="column" align="center"><Icon as={FaCalendarAlt} w={8} h={8} mb={3} opacity={0.3} /> Selecione uma Clínica para ver a agenda.</Flex>
                                     : 'Nenhum agendamento encontrado.'
                                 }
                             </Td>
@@ -657,8 +654,8 @@ export default function Agenda() {
           </ModalHeader>
           <ModalCloseButton />
           <ModalBody>
-            <Text color={textColor}>O prontuário do paciente <strong>{currentAppointment?.patient_nome}</strong> foi salvo de forma segura no banco de dados.</Text>
-            <Text color={textColor} mt={4} fontWeight="bold">Deseja imprimir o receituário / resumo do atendimento agora?</Text>
+            <Text color={textColor}>O prontuário do paciente <strong>{currentAppointment?.patient_nome}</strong> foi salvo com sucesso.</Text>
+            <Text color={textColor} mt={4} fontWeight="bold">Deseja imprimir o receituário ?</Text>
           </ModalBody>
           <ModalFooter>
             <Button variant="ghost" size="sm" mr={3} onClick={onPrintModalClose}>Agora não</Button>
@@ -702,7 +699,7 @@ export default function Agenda() {
                             <FormLabel color={textColor} mb={0} fontWeight="bold">Evolução / Observações Livres:</FormLabel>
                             {minhasMacros.length > 0 && (
                               <Menu>
-                                <MenuButton as={Button} size="xs" colorScheme="yellow" variant="solid" leftIcon={<FaBolt />}>
+                                <MenuButton as={Button} size="xs" colorScheme="blue.700" variant="solid" leftIcon={<FaBolt />}>
                                   Inserir Atalho
                                 </MenuButton>
                                 <MenuList bg={bgCard} borderColor={borderColor}>

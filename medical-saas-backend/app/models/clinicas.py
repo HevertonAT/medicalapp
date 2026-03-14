@@ -28,8 +28,8 @@ class Clinic(Base):
     status_assinatura = Column(String, default="ativa")
     plano_id = Column(Integer, ForeignKey("planos.id"), nullable=True)
     is_active = Column(Boolean, default=True) 
-    criado_em = Column(DateTime(timezone=True), server_default=func.now())
-
+    criado_em = Column(DateTime(timezone=True), default=func.now(), server_default=func.now())
+    
     # --- RELACIONAMENTOS ---
     users = relationship("User", back_populates="clinic")
     patients = relationship("Patient", back_populates="clinic")
