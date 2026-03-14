@@ -3,10 +3,10 @@ import {
   Box, Button, Flex, Heading, Text, useToast, Spinner,
   Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalCloseButton,
   FormControl, FormLabel, Input, Select, ModalFooter, useDisclosure,
-  VStack, HStack, IconButton, Icon, Textarea, Tabs, TabList, TabPanels, Tab, TabPanel,
-  useColorModeValue, Table, Thead, Tbody, Tr, Th, Td, InputGroup, InputLeftElement,
-  SimpleGrid, Menu, MenuButton, MenuList, MenuItem,
-  Accordion, AccordionItem, AccordionButton, AccordionPanel, AccordionIcon
+  VStack, HStack, IconButton, Icon, Textarea, Accordion, AccordionItem, 
+  AccordionButton, AccordionPanel, AccordionIcon, useColorModeValue, 
+  Table, Thead, Tbody, Tr, Th, Td, InputGroup, InputLeftElement,
+  SimpleGrid, Menu, MenuButton, MenuList, MenuItem
 } from '@chakra-ui/react';
 import { 
   FaPlus, FaUserMd, FaSearch, FaPlay, FaCheckDouble, 
@@ -22,6 +22,7 @@ import SpecialtyFormRenderer from '../components/SpecialtyFormRenderer';
 import CidAutocomplete from '../components/profissionais/CidAutocomplete';
 
 export default function Agenda() {
+  // 1. TODOS OS HOOKS NO TOPO
   const [appointments, setAppointments] = useState([]);
   const [doctors, setDoctors] = useState([]);
   const [patients, setPatients] = useState([]);
@@ -31,7 +32,7 @@ export default function Agenda() {
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
 
   const [currentUserRole, setCurrentUserRole] = useState('');
-  const [loggedUser, setLoggedUser] = useState(null); // Guardamos o usuário completo aqui
+  const [loggedUser, setLoggedUser] = useState(null); 
   
   const [availableSlots, setAvailableSlots] = useState([]);
   const [rescheduleSlots, setRescheduleSlots] = useState([]);
@@ -62,6 +63,7 @@ export default function Agenda() {
   
   const [lastSavedRecord, setLastSavedRecord] = useState(null);
 
+  // --- O SEGREDO: TODAS AS CORES CHAKRA CARREGADAS NO TOPO ---
   const bgPage = useColorModeValue('gray.50', 'gray.900');
   const bgCard = useColorModeValue('white', 'gray.800');
   const modalBg = useColorModeValue('white', 'gray.800');
@@ -72,14 +74,27 @@ export default function Agenda() {
   const tabBg = useColorModeValue('blue.50', 'gray.900');
   const headerBg = useColorModeValue('gray.50', 'gray.700');
   const hoverTr = useColorModeValue('gray.50', 'gray.700');
+  
+  // Cores dinâmicas que estavam a quebrar o código (agora protegidas no topo)
+  const patientNameColor = useColorModeValue('gray.700', 'white');
+  const accordionExpandedBg = useColorModeValue('blue.50', 'gray.700');
+  const menuItemHoverBg = useColorModeValue('gray.100', 'gray.600');
 
+  // Cores dos Status carregadas no topo
+  const statusGreen = useColorModeValue('green.600', 'green.300');
+  const statusRed = useColorModeValue('red.600', 'red.300');
+  const statusOrange = useColorModeValue('orange.500', 'orange.300');
+  const statusCyan = useColorModeValue('cyan.600', 'cyan.300');
+  const statusBlue = useColorModeValue('blue.600', 'blue.300');
+
+  // Função limpa (não quebra mais o React, pois não chama Hooks internamente)
   const getStatusColor = (status) => {
     switch (status) {
-        case 'concluido': case 'REALIZADO': return useColorModeValue('green.600', 'green.300');
-        case 'cancelado': return useColorModeValue('red.600', 'red.300');
-        case 'em_andamento': return useColorModeValue('orange.500', 'orange.300');
-        case 'reagendado': return useColorModeValue('cyan.600', 'cyan.300');
-        default: return useColorModeValue('blue.600', 'blue.300');
+        case 'concluido': case 'REALIZADO': return statusGreen;
+        case 'cancelado': return statusRed;
+        case 'em_andamento': return statusOrange;
+        case 'reagendado': return statusCyan;
+        default: return statusBlue;
     }
   };
 
@@ -113,7 +128,6 @@ export default function Agenda() {
                 api.get('/doctors/me').then(res => {
                     if (res.data && res.data.id) {
                         setNewApp(prev => ({...prev, doctor_id: res.data.id}));
-                        // Salvamos o ID do médico no loggedUser para facilitar o filtro
                         setLoggedUser(prev => ({...prev, doctor_id: res.data.id})); 
                     }
                 }).catch(e => console.error(e));
@@ -405,13 +419,10 @@ export default function Agenda() {
   // 1. A MURALHA VISUAL & FILTROS DE BUSCA
   // ==========================================
   const filteredAppointments = appointments.filter(app => {
-      // Regra de Isolamento
       if (loggedUser) {
           if (currentUserRole === 'doctor' || currentUserRole === 'medico') {
-              // Médico só vê o que é dele
               if (String(app.doctor_id) !== String(loggedUser.doctor_id)) return false;
           } else if (currentUserRole !== 'superuser') {
-              // Admin/Recepção só vê a sua clínica (descobre a clínica através do médico)
               const doc = doctors.find(d => String(d.id) === String(app.doctor_id));
               if (String(app.clinic_id) !== String(loggedUser.clinic_id) && String(doc?.clinic_id) !== String(loggedUser.clinic_id)) {
                   return false;
@@ -419,7 +430,6 @@ export default function Agenda() {
           }
       }
 
-      // Filtro de Busca Super Inteligente (Busca por Nome do Paciente, CPF ou Nome do Médico)
       const searchLower = searchTerm.toLowerCase();
       const patient = patients.find(p => p.id === app.patient_id) || {};
       
@@ -428,16 +438,11 @@ export default function Agenda() {
       const doctorName = (app.doctor_nome || "").toLowerCase();
 
       const matchesSearch = patientName.includes(searchLower) || patientCpf.includes(searchLower) || doctorName.includes(searchLower);
-      
-      // 🔥 A MÁGICA DA DATA 🔥
-      // Se a barra de busca estiver vazia, filtra pela data selecionada. 
-      // Se houver qualquer coisa digitada, ignora a data e mostra todo o histórico!
       const matchesDate = (filterDate && searchTerm.trim() === '') ? app.data_horario.split('T')[0] === filterDate : true; 
       
       return matchesSearch && matchesDate;
   });
 
-  // Filtra as listas do Modal de Agendamento baseadas na Muralha
   const availableDoctors = doctors.filter(d => {
       if (!d.ativo) return false;
       if (currentUserRole === 'superuser') return true;
@@ -479,7 +484,7 @@ export default function Agenda() {
                 <Tbody>
                     {filteredAppointments.length === 0 ? <Tr><Td colSpan={7} textAlign="center" py={4}>Nenhum agendamento.</Td></Tr> : filteredAppointments.map((app) => (
                         <Tr key={app.id} _hover={{ bg: hoverTr }}>
-                            <Td fontWeight="bold" color={useColorModeValue('gray.700', 'white')}>{app.patient_nome}</Td>
+                            <Td fontWeight="bold" color={patientNameColor}>{app.patient_nome}</Td>
                             <Td>{calculateAge(app.patient_id)}</Td>
                             <Td fontWeight="medium">{formatDateTime(app.data_horario)}</Td>
                             <Td fontSize="xs">{app.doctor_nome}</Td>
@@ -491,7 +496,6 @@ export default function Agenda() {
                                         {app.status === 'agendado' && <IconButton icon={<FaTimes />} size="xs" colorScheme="red" variant="ghost" onClick={() => openCancelModal(app)} />}
                                         {app.status === 'agendado' && <IconButton icon={<FaRedo />} size="xs" colorScheme="blue" variant="ghost" onClick={() => openRescheduleModal(app)} />}
                                         
-                                        {/* Bloqueia botão de iniciar atendimento para Admins e Recepcionistas */}
                                         {(currentUserRole === 'doctor' || currentUserRole === 'medico' || currentUserRole === 'superuser') && (
                                             <Button leftIcon={app.status === 'em_andamento' ? <FaCheckDouble /> : <FaPlay />} size="xs" colorScheme={app.status === 'em_andamento' ? 'green' : 'blue'} onClick={() => handleStartConsultation(app)}>
                                                 {app.status === 'em_andamento' ? 'Retomar' : 'Iniciar'}
@@ -519,7 +523,6 @@ export default function Agenda() {
                     onChange={(e) => setNewApp({...newApp, doctor_id: e.target.value, hora: ''})}
                     isDisabled={currentUserRole === 'doctor' || currentUserRole === 'medico'}
                 >
-                    {/* AQUI A MURALHA FUNCIONA PARA O DROPDOWN */}
                     {availableDoctors.map(d => <option key={d.id} value={d.id}>{d.nome}</option>)}
                 </Select>
             </FormControl>
@@ -527,7 +530,6 @@ export default function Agenda() {
             <FormControl mb={4}>
                 <FormLabel>Paciente</FormLabel>
                 <Select bg={inputBg} size="sm" placeholder="Selecione o paciente..." value={newApp.patient_id} onChange={(e) => setNewApp({...newApp, patient_id: e.target.value})}>
-                    {/* AQUI A MURALHA FUNCIONA PARA O DROPDOWN DE PACIENTES */}
                     {availablePatients.map(p => <option key={p.id} value={p.id}>{p.nome_completo}</option>)}
                 </Select>
             </FormControl>
@@ -621,7 +623,7 @@ export default function Agenda() {
           <ModalBody py={6} overflowY="auto">
             <Accordion allowMultiple defaultIndex={[0]} w="100%">
                 <AccordionItem border="1px solid" borderColor={borderColor} borderRadius="md" mb={4} bg={bgCard}>
-                    <AccordionButton _expanded={{ bg: useColorModeValue('blue.50', 'gray.700') }} borderRadius="md" py={3}>
+                    <AccordionButton _expanded={{ bg: accordionExpandedBg }} borderRadius="md" py={3}>
                         <Box flex="1" textAlign="left" fontWeight="bold" color={textColor} display="flex" alignItems="center">
                             <Icon as={FaUserMd} mr={3} color="blue.500" /> Anamnese e Avaliação Específica
                         </Box>
@@ -648,7 +650,7 @@ export default function Agenda() {
                                     <MenuItem 
                                       key={macro.id} 
                                       bg={bgCard} 
-                                      _hover={{ bg: useColorModeValue('gray.100', 'gray.600') }}
+                                      _hover={{ bg: menuItemHoverBg }}
                                       onClick={() => {
                                         const textoAtual = consultData.anamnese;
                                         const novoTexto = textoAtual ? `${textoAtual}\n\n${macro.texto_padrao}` : macro.texto_padrao;
@@ -677,7 +679,7 @@ export default function Agenda() {
                 </AccordionItem>
 
                 <AccordionItem border="1px solid" borderColor={borderColor} borderRadius="md" mb={4} bg={bgCard}>
-                    <AccordionButton _expanded={{ bg: useColorModeValue('blue.50', 'gray.700') }} borderRadius="md" py={3}>
+                    <AccordionButton _expanded={{ bg: accordionExpandedBg }} borderRadius="md" py={3}>
                         <Box flex="1" textAlign="left" fontWeight="bold" color={textColor} display="flex" alignItems="center">
                             <Icon as={FaPrescriptionBottleAlt} mr={3} color="green.500" /> Prescrição e Diagnóstico (CID)
                         </Box>

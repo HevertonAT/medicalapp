@@ -17,6 +17,7 @@ const PLANOS_DISPONIVEIS = {
 };
 
 export default function PainelSaaS() {
+  // 1. TODOS OS HOOKS DEVEM FICAR AQUI NO TOPO (SEM IFs, SEM MAPs)
   const [data, setData] = useState({ metrics: {}, clinics: [] });
   const [loading, setLoading] = useState(true);
   
@@ -29,11 +30,17 @@ export default function PainelSaaS() {
   const [editingClinic, setEditingClinic] = useState(null);
 
   const toast = useToast();
+  
+  // Declaração de Cores do Tema (Chakra Hooks)
   const bgCard = useColorModeValue('white', 'gray.800');
   const textColor = useColorModeValue('gray.600', 'gray.200');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
   const inputBg = useColorModeValue('gray.50', 'gray.700');
+  const trHoverBg = useColorModeValue('gray.50', 'gray.700'); // <--- A SOLUÇÃO: A cor do hover da tabela subiu para cá!
+  const theadBg = useColorModeValue('gray.50', 'gray.800');
+  const headingColor = useColorModeValue("gray.700", "white");
 
+  // 2. FUNÇÕES E EFEITOS
   const fetchDashboard = async () => {
     try {
       setLoading(true);
@@ -112,29 +119,10 @@ export default function PainelSaaS() {
     }
   };
 
-  const changeStatusOnly = async (clinicId, newStatus) => {
-    try {
-      // Como a API exige todos os campos no PUT agora, buscamos a clínica atual
-      const clinicToUpdate = data.clinics.find(c => c.id === clinicId);
-      if(!clinicToUpdate) return;
-
-      await api.put(`/saas/clinica/${clinicId}`, {
-        plano: clinicToUpdate.plano || 'Plano Básico',
-        valor_mensalidade: clinicToUpdate.valor_mensalidade || 99.00,
-        dia_vencimento: clinicToUpdate.dia_vencimento || 10,
-        status_assinatura: newStatus
-      });
-      toast({ title: `Status alterado para ${newStatus.toUpperCase()}`, status: 'success' });
-      fetchDashboard();
-    } catch (error) {
-      toast({ title: "Erro ao alterar status", status: "error" });
-    }
-  };
-
   return (
     <Box p={8}>
       <Flex justify="space-between" align="center" mb={6}>
-        <Heading size="lg" color={useColorModeValue("gray.700", "white")}>Matriz SaaS (Administração)</Heading>
+        <Heading size="lg" color={headingColor}>Matriz SaaS (Administração)</Heading>
       </Flex>
 
       {loading ? <Flex justify="center" py={10}><Spinner size="xl" color="purple.500" /></Flex> : (
@@ -184,7 +172,7 @@ export default function PainelSaaS() {
 
           {/* TABELA DE ASSINATURAS ORDENÁVEL */}
           <Box bg={bgCard} shadow="sm" borderRadius="md" overflow="auto" border="1px" borderColor={borderColor}>
-            <Box p={4} borderBottom="1px" borderColor={borderColor} bg={useColorModeValue('gray.50', 'gray.800')}>
+            <Box p={4} borderBottom="1px" borderColor={borderColor} bg={theadBg}>
                 <Text fontWeight="bold" color={textColor}>Gestão de Assinaturas</Text>
             </Box>
             <Table variant="simple" style={{ userSelect: 'none' }}>
@@ -201,7 +189,7 @@ export default function PainelSaaS() {
               </Thead>
               <Tbody>
                 {sortedClinics.map((clinic) => (
-                  <Tr key={clinic.id} _hover={{ bg: useColorModeValue('gray.50', 'gray.700') }}>
+                  <Tr key={clinic.id} _hover={{ bg: trHoverBg }}> 
                     <Td fontWeight="bold" color="gray.500">#{clinic.id}</Td>
                     <Td fontWeight="bold">{clinic.nome}</Td>
                     <Td><Badge colorScheme="purple" variant="outline">{clinic.plano || 'Plano Básico'}</Badge></Td>

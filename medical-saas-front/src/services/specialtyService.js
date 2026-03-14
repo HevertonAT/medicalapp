@@ -27,22 +27,46 @@ export const MASTER_SPECIALTIES = [
 ];
 
 export async function getEffectiveRule(specialty) {
-  // Codifica a string para evitar erros com acentos na URL
-  const res = await api.get(`/specialties/effective/${encodeURIComponent(specialty)}`);
-  return res.data.settings || {};
+  if (!specialty) return {};
+  try {
+    // CORREÇÃO: Alinhado com o @router.get("/rules/{specialty_name}") do Python
+    const res = await api.get(`/specialties/rules/${encodeURIComponent(specialty)}`);
+    return res.data.settings || {};
+  } catch (error) {
+    console.error("Erro ao buscar regras ativas:", error);
+    return {};
+  }
 }
 
 export async function listRules() {
-  const res = await api.get("/specialties/");
-  return res.data;
+  try {
+    // CORREÇÃO: Volta a ser a raiz da rota, alinhado com o @router.get("/") do Python
+    const res = await api.get("/specialties/");
+    return res.data;
+  } catch (error) {
+    console.error("Erro ao listar todas as regras:", error);
+    return [];
+  }
 }
 
 export async function createRule(payload) {
-  const res = await api.post("/specialties/", payload);
-  return res.data;
+  try {
+    // Alinhado com o @router.post("/") do nosso Upsert
+    const res = await api.post("/specialties/", payload);
+    return res.data;
+  } catch (error) {
+    console.error("Erro ao criar regra:", error);
+    throw error;
+  }
 }
 
 export async function updateRule(id, payload) {
-  const res = await api.put(`/specialties/${id}`, payload);
-  return res.data;
+  try {
+    // Mantemos o PUT, pois o Back-end continua a suportar o @router.put("/{rule_id}")
+    const res = await api.put(`/specialties/${id}`, payload);
+    return res.data;
+  } catch (error) {
+    console.error("Erro ao atualizar regra:", error);
+    throw error;
+  }
 }
