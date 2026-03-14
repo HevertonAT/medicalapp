@@ -12,6 +12,7 @@ class DoctorBase(BaseModel):
 class DoctorCreate(DoctorBase):
     email: str
     senha: str
+    clinic_id: Optional[int] = None
 
 class DoctorUpdate(BaseModel):
     nome: Optional[str] = None
@@ -23,6 +24,7 @@ class DoctorUpdate(BaseModel):
 
 class DoctorResponse(DoctorBase):
     id: int
+    clinic_id: Optional[int] = None
     
     class Config:
         from_attributes = True

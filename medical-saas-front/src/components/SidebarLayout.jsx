@@ -156,11 +156,7 @@ export default function SidebarLayout() {
           </DrawerBody>
         </DrawerContent>
       </Drawer>
-
-      {/* ==========================================
-          SIDEBAR DESKTOP ORIGINAL 
-          (Só aparece em monitores: md: 'flex')
-      ========================================== */}
+      
       <Box 
         w={isSidebarOpen ? "250px" : "80px"} 
         bg={bgSidebar} 

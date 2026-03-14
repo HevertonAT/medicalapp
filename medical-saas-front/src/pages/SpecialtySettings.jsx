@@ -78,27 +78,36 @@ export default function SpecialtySettings() {
       }
   }, [selectedClinicId]);
 
-  async function loadClinicData(clinicId) {
+async function loadClinicData(clinicId) {
+    if (!clinicId) return;
     setLoading(true);
     try {
-      // Busca médicos daquela clínica
       const docRes = await api.get('/doctors/');
-      const clinicDoctors = docRes.data.filter(d => String(d.clinic_id) === String(clinicId));
+      const allDocs = Array.isArray(docRes.data) ? docRes.data : [];
       
-      // Extrai especialidades únicas dos médicos
+      console.log("Analisando Isabella:", allDocs[0]); // Veremos todos os campos dela aqui
+
+      const clinicDoctors = allDocs.filter(d => {
+          // Tenta todas as variações possíveis de nome de campo de vínculo
+          const idVinculo = d.clinic_id || d.clinica_id || d.id_clinica || d.clinic;
+          return String(idVinculo) === String(clinicId);
+      });
+
+      console.log("Médicos após filtro resiliente:", clinicDoctors);
+      
       const uniqueSpecs = [...new Set(clinicDoctors.map(d => {
-          let spec = d.especialidade || 'Clínico Geral';
-          return spec.charAt(0).toUpperCase() + spec.slice(1);
+          let spec = d.especialidade || d.specialty || '';
+          return spec.trim();
       }))];
 
-      // Filtra apenas as especialidades que existem na nossa MASTER LIST
-      const filteredSpecs = MASTER_SPECIALTIES.filter(masterSpec => uniqueSpecs.includes(masterSpec));
+      const filteredSpecs = MASTER_SPECIALTIES.filter(masterSpec => 
+          uniqueSpecs.some(u => u.toLowerCase() === masterSpec.toLowerCase())
+      );
       
       setAvailableSpecialties(filteredSpecs);
       if (filteredSpecs.length > 0) setSelectedSpec(filteredSpecs[0]);
       else setSelectedSpec("");
 
-      // Busca as regras passando a clínica na URL (Para o Superuser poder ver)
       const ruleRes = await api.get(`/specialties/?clinic_id=${clinicId}`);
       setRules(ruleRes.data || []);
 
@@ -108,7 +117,7 @@ export default function SpecialtySettings() {
       setLoading(false);
     }
   }
-
+  
   // 3. Atualizar o formulário quando a especialidade muda
   useEffect(() => {
     if (selectedSpec) {
@@ -154,7 +163,7 @@ export default function SpecialtySettings() {
           <Card bg={bgCard} borderColor={borderColor} variant="outline" p={4} mb={2}>
               <HStack spacing={4}>
                   <Icon as={FaBuilding} color="blue.500" w={5} h={5} />
-                  <Text fontWeight="bold" color={textColor}>Selecionar Cliente:</Text>
+                  <Text fontWeight="bold" color={textColor}>Selecionar Clinica:</Text>
                   <Select 
                       maxW="400px" 
                       bg={inputBg} 
