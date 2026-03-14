@@ -8,7 +8,7 @@ import {
 } from '@chakra-ui/react';
 import { FaPlus, FaTrash, FaUserTie, FaUserCog, FaUserMd, FaConciergeBell } from 'react-icons/fa';
 import api from '../services/api';
-import { jwtDecode } from "jwt-decode"; // Adicionado para ler o token
+import { jwtDecode } from "jwt-decode";
 
 export default function Team() {
   const [team, setTeam] = useState([]);
@@ -17,7 +17,7 @@ export default function Team() {
   
   const { isOpen, onOpen, onClose } = useDisclosure(); 
   
-  const [newUser, setNewUser] = useState({ full_name: '', email: '', password: '', role: 'recepcionista' });
+  const [newUser, setNewUser] = useState({ full_name: '', email: '', password: '', role: '' });
 
   const toast = useToast();
   
@@ -29,7 +29,6 @@ export default function Team() {
   const textColor = useColorModeValue('gray.600', 'gray.200');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
 
-  // Pega os dados do usuário logado diretamente do token
   const getLoggedUser = () => {
     const token = localStorage.getItem('medical_token') || localStorage.getItem('token');
     if (token) {
@@ -47,16 +46,20 @@ export default function Team() {
       
       const usersList = Array.isArray(response.data) ? response.data : [];
       
-      // 1. Tira os pacientes da lista
       let staff = usersList.filter(u => u.role !== 'patient' && u.role !== 'paciente');
       
-      // 2. A MURALHA DE ISOLAMENTO
-      if (loggedUser && loggedUser.role !== 'superuser') {
-          // Se não for superuser, só vê quem é da mesma clínica e esconde os superusers
-          staff = staff.filter(u => 
-              u.clinic_id === loggedUser.clinic_id && 
-              u.role !== 'superuser'
-          );
+      // A MURALHA DE ISOLAMENTO AJUSTADA
+      if (loggedUser) {
+          if (loggedUser.role === 'superuser') {
+              // O Dono do SaaS só vê a sua própria equipe interna
+              staff = staff.filter(u => u.role === 'superuser');
+          } else {
+              // Admin/Recepção só vê quem é da mesma clínica e não vê o Dono do SaaS
+              staff = staff.filter(u => 
+                  u.clinic_id === loggedUser.clinic_id && 
+                  u.role !== 'superuser'
+              );
+          }
       }
 
       setTeam(staff);
@@ -69,6 +72,13 @@ export default function Team() {
 
   useEffect(() => { fetchTeam(); }, []);
 
+  const handleOpenModal = () => {
+      // Define o cargo padrão com base em quem está a criar
+      const defaultRole = loggedUser?.role === 'superuser' ? 'superuser' : 'recepcionista';
+      setNewUser({ full_name: '', email: '', password: '', role: defaultRole });
+      onOpen();
+  };
+
   const handleSave = async () => {
     if (!newUser.full_name || !newUser.email || !newUser.password) {
         toast({ title: 'Preencha todos os campos.', status: 'warning' });
@@ -78,16 +88,14 @@ export default function Team() {
     try {
         setIsSubmitting(true);
         
-        // Garante que o usuário criado receba o ID da clínica de quem está criando
         const payload = {
             ...newUser,
-            clinic_id: loggedUser?.role !== 'superuser' ? loggedUser?.clinic_id : newUser.clinic_id
+            clinic_id: loggedUser?.role !== 'superuser' ? loggedUser?.clinic_id : null
         };
 
         await api.post('/users/', payload);
         toast({ title: 'Membro adicionado com sucesso!', status: 'success' });
         onClose();
-        setNewUser({ full_name: '', email: '', password: '', role: 'recepcionista' });
         fetchTeam();
     } catch (error) {
         const msg = error.response?.data?.detail || 'Erro ao criar usuário.';
@@ -118,7 +126,7 @@ export default function Team() {
   const getRoleBadge = (role) => {
       switch(role) {
           case 'admin': return <Badge colorScheme="blue"><HStack spacing={1}><FaUserTie/><Text>Admin</Text></HStack></Badge>;
-          case 'superuser': return <Badge colorScheme="purple"><HStack spacing={1}><FaUserCog/><Text>Dev</Text></HStack></Badge>;
+          case 'superuser': return <Badge colorScheme="purple"><HStack spacing={1}><FaUserCog/><Text>Dev SaaS</Text></HStack></Badge>;
           case 'doctor': return <Badge colorScheme="green"><HStack spacing={1}><FaUserMd/><Text>Profissional</Text></HStack></Badge>;
           case 'recepcionista': return <Badge colorScheme="pink"><HStack spacing={1}><FaConciergeBell/><Text>Recepção</Text></HStack></Badge>;
           default: return <Badge colorScheme="gray">{role}</Badge>;
@@ -128,8 +136,10 @@ export default function Team() {
   return (
     <Box p={8}>
       <Flex justify="space-between" align="center" mb={6}>
-        <Heading size="lg" color={useColorModeValue("gray.700", "white")}>Minha Equipe</Heading>
-        <Button leftIcon={<FaPlus />} colorScheme="blue" onClick={onOpen}>Novo Membro</Button>
+        <Heading size="lg" color={useColorModeValue("gray.700", "white")}>
+            {loggedUser?.role === 'superuser' ? 'Equipe SaaS (Interna)' : 'Minha Equipe'}
+        </Heading>
+        <Button leftIcon={<FaPlus />} colorScheme="blue" onClick={handleOpenModal}>Novo Membro</Button>
       </Flex>
 
       <Box bg={bgCard} shadow="sm" borderRadius="md" overflow="hidden" border="1px solid" borderColor={borderColor}>
@@ -162,7 +172,7 @@ export default function Team() {
                 </Tr>
             ))}
             {team.length === 0 && !loading && (
-                <Tr><Td colSpan={4} textAlign="center" py={6} color="gray.500">Nenhum membro encontrado para esta clínica.</Td></Tr>
+                <Tr><Td colSpan={4} textAlign="center" py={6} color="gray.500">Nenhum membro encontrado.</Td></Tr>
             )}
             </Tbody>
         </Table>
@@ -172,19 +182,21 @@ export default function Team() {
       <Modal isOpen={isOpen} onClose={onClose} size="md">
         <ModalOverlay />
         <ModalContent bg={modalBg}>
-          <ModalHeader color={textColor}>Cadastrar Membro da Equipe</ModalHeader>
+          <ModalHeader color={textColor}>
+              {loggedUser?.role === 'superuser' ? 'Cadastrar Membro SaaS' : 'Cadastrar Membro da Equipe'}
+          </ModalHeader>
           <ModalCloseButton />
           <ModalBody pb={4}>
             <VStack spacing={4} align="stretch">
               
               <FormControl isRequired>
                   <FormLabel fontSize="sm" color={textColor}>Nome Completo</FormLabel>
-                  <Input bg={inputBg} borderColor={borderColor} value={newUser.full_name} onChange={(e) => setNewUser({...newUser, full_name: e.target.value})} placeholder="Ex: Maria Secretária" />
+                  <Input bg={inputBg} borderColor={borderColor} value={newUser.full_name} onChange={(e) => setNewUser({...newUser, full_name: e.target.value})} placeholder="Ex: Maria" />
               </FormControl>
 
               <FormControl isRequired>
                   <FormLabel fontSize="sm" color={textColor}>E-mail de Login</FormLabel>
-                  <Input type="email" bg={inputBg} borderColor={borderColor} value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} placeholder="recepcao@clinica.com" />
+                  <Input type="email" bg={inputBg} borderColor={borderColor} value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} placeholder="email@dominio.com" />
               </FormControl>
 
               <FormControl isRequired>
@@ -200,16 +212,21 @@ export default function Team() {
                       value={newUser.role} 
                       onChange={(e) => setNewUser({...newUser, role: e.target.value})}
                   >
-                      <option value="recepcionista">Recepcionista (Agenda e Pacientes)</option>
-                      
-                      {/* Apenas o Superuser consegue ver e criar outros Admins por aqui */}
-                      {loggedUser?.role === 'superuser' && (
-                          <option value="admin">Administrador (Acesso Total)</option>
+                      {loggedUser?.role === 'superuser' ? (
+                          <option value="superuser">Superuser</option>
+                      ) : (
+                          <>
+                              <option value="recepcionista">Recepcionista</option>
+                              <option value="admin">Administrador da Clínica</option>
+                          </>
                       )}
                   </Select>
-                  <Text fontSize="xs" color="gray.500" mt={2}>
-                      Nota: Profissionais/Médicos devem ser criados no menu "Profissionais" para gerar agenda corretamente.
-                  </Text>
+                  
+                  {loggedUser?.role !== 'superuser' && (
+                      <Text fontSize="xs" color="gray.500" mt={2}>
+                          Nota: Profissionais de saúde devem ser criados no menu "Profissionais" para gerar agenda corretamente.
+                      </Text>
+                  )}
               </FormControl>
 
             </VStack>

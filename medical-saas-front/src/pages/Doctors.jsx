@@ -66,7 +66,7 @@ export default function Doctors() {
 
   const fetchRules = async () => {
     try {
-      const response = await api.get('/specialties/rules/');
+      const response = await api.get('/specialties/');
       setRules(Array.isArray(response.data) ? response.data : []);
     } catch (e) { 
       console.log('Regras não carregadas'); 

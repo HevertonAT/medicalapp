@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from typing import List
+from typing import List, Optional
 from app.db.base import get_db
 from app.models.regras_especialidades import SpecialtyRule
 from app.models.usuarios import User
@@ -10,10 +10,14 @@ from app.schemas.esquema_especialidades import RuleCreate, RuleUpdate, RuleRespo
 
 router = APIRouter()
 
-# Lista todas as regras da clínica
+# Lista todas as regras da clínica (com filtro opcional para o Superuser)
 @router.get("/", response_model=List[RuleResponse])
-def list_rules(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return db.query(SpecialtyRule).filter(SpecialtyRule.clinic_id == current_user.clinic_id).all()
+def list_rules(clinic_id: Optional[int] = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    # Se for superuser e ele enviou um clinic_id na URL, busca daquela clínica. 
+    # Senão, busca da clínica do próprio usuário logado.
+    target_clinic = clinic_id if (current_user.role == 'superuser' and clinic_id) else current_user.clinic_id
+    
+    return db.query(SpecialtyRule).filter(SpecialtyRule.clinic_id == target_clinic).all()
 
 # Busca a regra de uma especialidade específica (Usado pela Agenda na hora da consulta)
 @router.get("/rules/{specialty_name}")
@@ -36,9 +40,13 @@ def get_effective_rule(specialty_name: str, db: Session = Depends(get_db), curre
 @router.post("/rules", response_model=RuleResponse)
 @router.post("/rules/", response_model=RuleResponse)
 def create_or_update_rule(rule: RuleCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    
+    # Descobre de quem é a regra: se o superuser mandou um ID, usa ele. Se não, usa do próprio usuário.
+    target_clinic = rule.clinic_id if (current_user.role == 'superuser' and rule.clinic_id) else current_user.clinic_id
+
     db_rule = db.query(SpecialtyRule).filter(
         func.lower(SpecialtyRule.specialty) == rule.specialty.lower(),
-        SpecialtyRule.clinic_id == current_user.clinic_id
+        SpecialtyRule.clinic_id == target_clinic
     ).first()
     
     if db_rule:
@@ -52,7 +60,7 @@ def create_or_update_rule(rule: RuleCreate, db: Session = Depends(get_db), curre
         # 2. CRIAR: Se é a primeira vez que clica em "Salvar Configurações", ele cria.
         new_rule = SpecialtyRule(
             specialty=rule.specialty,
-            clinic_id=current_user.clinic_id,
+            clinic_id=target_clinic,
             settings=rule.settings,
             active=rule.active
         )

@@ -7,13 +7,14 @@ class RuleBase(BaseModel):
     active: bool = True
 
 class RuleCreate(RuleBase):
-    pass
+    clinic_id: Optional[int] = None # Será preenchido pelo Front-end se for Superuser
 
 class RuleUpdate(RuleBase):
     pass
 
 class RuleResponse(RuleBase):
     id: int
+    clinic_id: Optional[int] = None # Permite que o Front-end saiba a quem pertence a regra
     
     class Config:
         from_attributes = True
