@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List # <--- IMPORTANTE: Adicionado para listar
+from typing import List 
 import bcrypt 
 
 from app.db.base import get_db
@@ -40,27 +40,34 @@ def create_clinic(
     if db.query(User).filter(User.email == clinicas_data.email_admin).first():
         raise HTTPException(status_code=400, detail="O e-mail do administrador já está em uso por outro usuário.")
 
-    # 3. Cria o objeto da Clínica
+    # 3. Cria o objeto da Clínica com as NOVAS colunas
     nova_clinica = Clinic(
         nome=clinicas_data.nome, 
         cnpj=clinicas_data.cnpj,
         email=clinicas_data.email_clinica,
-        endereco=clinicas_data.endereco,
         telefone=clinicas_data.telefone,
+        plano_id=clinicas_data.plano_id,
+        cep=clinicas_data.cep,
+        logradouro=clinicas_data.logradouro,
+        numero=clinicas_data.numero,
+        bairro=clinicas_data.bairro,
+        cidade=clinicas_data.cidade,
+        estado=clinicas_data.estado,
+        complemento=clinicas_data.complemento,
         is_active=True
     )
 
     # 4. Salva a clínica no banco temporariamente para gerar o ID dela
     db.add(nova_clinica)
-    db.flush() # Gera o ID da clínica sem efetivar a transação, permitindo criar o admin com clinic_id correto
+    db.flush() 
 
     # 5. Cria o Usuário Admin usando o ID da clínica que acabou de nascer
     novo_admin = User(
         full_name=clinicas_data.nome_admin,
         email=clinicas_data.email_admin,
         hashed_password=get_password_hash(clinicas_data.senha_admin),
-        role="admin", # <-- Papel de Dono da Clínica
-        clinic_id=nova_clinica.id, # <-- MÁGICA: Vinculado à clínica nova
+        role="admin", 
+        clinic_id=nova_clinica.id, 
         is_active=True
     )
     db.add(novo_admin)
@@ -77,7 +84,6 @@ def list_clinics(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Superuser pode ver a lista de todos os seus clientes
     if current_user.role != 'superuser':
         raise HTTPException(status_code=403, detail="Acesso negado.")
         
@@ -97,15 +103,12 @@ def update_clinic(
     if not clinica:
         raise HTTPException(status_code=404, detail="Clínica não encontrada.")
 
-    # Atualiza apenas os campos que foram enviados no formulário
     update_data = clinic_data.dict(exclude_unset=True)
     
-    # Se o front enviar email_clinica, salvamos na coluna email do banco
     if 'email_clinica' in update_data:
         update_data['email'] = update_data.pop('email_clinica')
 
     for key, value in update_data.items():
-        # Verifica se a coluna existe no banco antes de salvar
         if hasattr(clinica, key):
             setattr(clinica, key, value)
 

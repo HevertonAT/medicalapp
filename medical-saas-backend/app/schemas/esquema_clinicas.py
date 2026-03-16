@@ -16,7 +16,6 @@ class CriarClinica(BaseModel):
     cidade: Optional[str] = None
     estado: Optional[str] = None
     complemento: Optional[str] = None
-    endereco: Optional[str] = None
     
     # --- DADOS DO ADMIN ---
     nome_admin: str
@@ -39,7 +38,6 @@ class AtualizarClinica(BaseModel):
     cidade: Optional[str] = None
     estado: Optional[str] = None
     complemento: Optional[str] = None
-    endereco: Optional[str] = None
 
 class RespostaClinica(BaseModel):
     id: int
@@ -58,5 +56,6 @@ class RespostaClinica(BaseModel):
     cidade: Optional[str] = None
     estado: Optional[str] = None
     complemento: Optional[str] = None
+    
     class Config:
         from_attributes = True
