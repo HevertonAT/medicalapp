@@ -89,6 +89,24 @@ def list_clinics(
         
     return db.query(Clinic).all()
 
+# --- ROTA 3: PEGAR DADOS DA PRÓPRIA CLÍNICA (USADA NAS CONFIGURAÇÕES) ---
+@router.get("/me", response_model=RespostaClinica)
+def get_my_clinic(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Verifica se o usuário pertence a alguma clínica
+    if not current_user.clinic_id:
+        raise HTTPException(status_code=404, detail="Usuário não está vinculado a nenhuma clínica.")
+        
+    clinica = db.query(Clinic).filter(Clinic.id == current_user.clinic_id).first()
+    
+    if not clinica:
+        raise HTTPException(status_code=404, detail="Clínica não encontrada.")
+        
+    return clinica
+
+# --- ROTA 4: ATUALIZAR DADOS DA CLÍNICA ---
 @router.put("/{clinic_id}", response_model=RespostaClinica)
 def update_clinic(
     clinic_id: int,
@@ -96,8 +114,8 @@ def update_clinic(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role != 'superuser':
-        raise HTTPException(status_code=403, detail="Acesso negado.")
+    if current_user.role != 'superuser' and current_user.clinic_id != clinic_id:
+        raise HTTPException(status_code=403, detail="Acesso negado. Você só pode editar sua própria clínica.")
 
     clinica = db.query(Clinic).filter(Clinic.id == clinic_id).first()
     if not clinica:

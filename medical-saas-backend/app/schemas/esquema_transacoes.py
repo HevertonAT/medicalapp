@@ -17,7 +17,7 @@ class TransactionResponse(BaseModel):
     valor: float
     forma_pagamento: Optional[str] = None
     parcelas: Optional[int] = 1 
-    criado_em: datetime
+    criado_em: Optional[datetime] = None
     
     class Config:
         from_attributes = True
