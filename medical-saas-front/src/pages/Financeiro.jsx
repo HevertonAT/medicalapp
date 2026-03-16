@@ -201,7 +201,7 @@ export default function Financial() {
               <Flex justify="space-between">
                 <Box>
                     <StatLabel color="gray.500">Faturamento no Período</StatLabel>
-                    <StatNumber fontSize="2xl" color="green.500">R$ {stats.period_revenue ? stats.period_revenue.toFixed(2) : "0.00"}</StatNumber>
+                    <StatNumber fontSize="2xl" color="green.500">R$ {stats?.period_revenue ? stats.period_revenue.toFixed(2) : "0.00"}</StatNumber>
                 </Box>
                 <Icon as={FaMoneyBillWave} w={8} h={8} color="green.200" />
               </Flex>
@@ -211,7 +211,7 @@ export default function Financial() {
               <Flex justify="space-between">
                 <Box>
                     <StatLabel color="gray.500">Total Acumulado (Geral)</StatLabel>
-                    <StatNumber fontSize="2xl" color="blue.500">R$ {stats.total_accumulated ? stats.total_accumulated.toFixed(2) : "0.00"}</StatNumber>
+                    <StatNumber fontSize="2xl" color="blue.500">R$ {stats?.total_accumulated ? stats.total_accumulated.toFixed(2) : "0.00"}</StatNumber>
                 </Box>
                 <Icon as={FaWallet} w={8} h={8} color="blue.200" />
               </Flex>
@@ -223,7 +223,8 @@ export default function Financial() {
                 <Heading size="md" mb={4} color={textColor}>Evolução Diária (Período)</Heading>
                 <Box flex="1" minH="0" w="100%">
                     <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={stats.chart_data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        {/* BLINDAGEM NO GRÁFICO */}
+                        <BarChart data={stats?.chart_data || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke={useColorModeValue("#eee", "#444")} />
                             <XAxis dataKey="name" stroke={textColor} fontSize={12} />
                             <YAxis stroke={textColor} fontSize={12} />
@@ -241,7 +242,9 @@ export default function Financial() {
                     <Flex justify="space-between" color="gray.500" fontSize="xs" fontWeight="bold" px={2}>
                         <Text flex="1">DATA</Text><Text flex="1">VALOR</Text><Text flex="1" textAlign="right">MÉTODO</Text>
                     </Flex>
-                    {stats.transactions && stats.transactions.map((t) => (
+                    
+                    {/* BLINDAGEM NA LISTA DE TRANSAÇÕES */}
+                    {stats?.transactions?.map((t) => (
                         <Flex key={t.id} justify="space-between" p={3} bg={inputBg} borderRadius="md" align="center" border="1px" borderColor={borderColor}>
                              <Text fontSize="sm" flex="1">{t.data_vencimento ? new Date(t.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</Text>
                              <Text fontSize="sm" flex="1" fontWeight="bold" color="green.500">R$ {Number(t.valor).toFixed(2)}</Text>
@@ -253,7 +256,9 @@ export default function Financial() {
                              </Box>
                         </Flex>
                     ))}
-                    {(!stats.transactions || stats.transactions.length === 0) && (
+                    
+                    {/* AVISO DE LISTA VAZIA PROTEGIDO */}
+                    {(!stats?.transactions || stats?.transactions?.length === 0) && (
                         <Text color="gray.500" textAlign="center" mt={4}>Nenhum lançamento no período.</Text>
                     )}
                 </Flex>

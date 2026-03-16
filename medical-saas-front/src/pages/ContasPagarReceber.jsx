@@ -74,7 +74,8 @@ export default function ContasPagarReceber() {
     fetchTransactions();
   }, [filters]); 
 
-  const filteredTransactions = transactions.filter((t) => {
+  // --- BLINDAGEM DE AÇO AQUI ---
+  const filteredTransactions = Array.isArray(transactions) ? transactions.filter((t) => {
     if (!searchTerm) return true; 
     const termo = searchTerm.toLowerCase();
     const dataFormatada = t.data_vencimento ? new Date(t.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '';
@@ -86,7 +87,7 @@ export default function ContasPagarReceber() {
       descricao.includes(termo) || categoria.includes(termo) ||
       valor.includes(termo) || dataFormatada.includes(termo)
     );
-  });
+  }) : [];
 
   const handleDarBaixa = async (id, tipo) => {
     const confirmMsg = tipo === 'entrada' ? 'Confirmar recebimento?' : 'Confirmar pagamento desta despesa?';
@@ -212,7 +213,7 @@ export default function ContasPagarReceber() {
         </VStack>
       </Box>
 
-      {/* TABELA DE LANÇAMENTOS (Modo Clean/Minimalista) */}
+      {/* TABELA DE LANÇAMENTOS */}
       <Box bg={bgCard} shadow="sm" borderRadius="md" overflow="auto" border="1px" borderColor={borderColor}>
         <Table variant="simple" size="sm">
           <Thead bg={useColorModeValue('gray.50', 'gray.700')}>
@@ -229,12 +230,13 @@ export default function ContasPagarReceber() {
             </Tr>
           </Thead>
           <Tbody>
+            {/* --- BLINDAGEM DE AÇO AQUI TAMBÉM --- */}
             {loading ? (
               <Tr><Td colSpan={9} textAlign="center" py={6}><Spinner color="blue.500" /></Td></Tr>
-            ) : filteredTransactions.length === 0 ? (
+            ) : filteredTransactions?.length === 0 ? (
               <Tr><Td colSpan={9} textAlign="center" py={6} color="gray.500">Nenhum lançamento encontrado.</Td></Tr>
             ) : (
-              filteredTransactions.map((t) => (
+              filteredTransactions?.map((t) => (
                 <Tr key={t.id} _hover={{ bg: hoverTr }}>
                   <Td py={3} fontSize="sm" color={textColor}>
                     {t.data_vencimento ? new Date(t.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
@@ -243,7 +245,6 @@ export default function ContasPagarReceber() {
                   <Td py={3} fontSize="sm" color={textColor}>{t.categoria || '-'}</Td>
                   <Td py={3} fontSize="sm" color={textColor}>{t.tipo === 'entrada' ? 'Receita' : 'Despesa'}</Td>
                   
-                  {/* Apenas o VALOR ganha cor de destaque */}
                   <Td py={3} isNumeric fontWeight="bold" color={t.tipo === 'entrada' ? 'green.500' : 'red.500'}>
                     R$ {Number(t.valor).toFixed(2)}
                   </Td>
@@ -252,12 +253,10 @@ export default function ContasPagarReceber() {
                     {t.forma_pagamento ? `${t.forma_pagamento}${t.forma_pagamento === 'Cartão de Crédito' && t.parcelas > 1 ? ` (${t.parcelas}x)` : ''}` : '-'}
                   </Td>
 
-                  {/* Status inteligente sem a palavra Pendente */}
                   <Td py={3} textAlign="center" fontSize="sm" color={textColor}>
                     {t.status === 'pago' ? (t.tipo === 'entrada' ? 'Recebido' : 'Pago') : (t.tipo === 'entrada' ? 'A Receber' : 'A Pagar')}
                   </Td>
 
-                  {/* NF-e Clicável (Modo texto com hover) */}
                   <Td py={3} textAlign="center">
                     {t.tipo === 'entrada' ? (
                         <Tooltip label="Clique para Gerenciar Nota Fiscal">
