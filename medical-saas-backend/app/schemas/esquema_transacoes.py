@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from decimal import Decimal
 from typing import Optional
 from datetime import date, datetime
+
 class TransactionCreate(BaseModel):
     appointment_id: Optional[int] = None 
     tipo: str = "entrada"
@@ -15,6 +16,7 @@ class TransactionResponse(BaseModel):
     tipo: str
     valor: float
     forma_pagamento: Optional[str] = None
+    parcelas: Optional[int] = 1 
     criado_em: datetime
     
     class Config:
@@ -31,6 +33,7 @@ class TransactionCompleteBase(BaseModel):
     data_pagamento: Optional[date] = None
     status: Optional[str] = "pendente"
     forma_pagamento: Optional[str] = None
+    parcelas: Optional[int] = 1 
     status_nfe: Optional[str] = "pendente"
     link_nfe: Optional[str] = None
 
@@ -46,5 +49,6 @@ class TransactionCompleteUpdate(BaseModel):
     data_pagamento: Optional[date] = None
     status: Optional[str] = None
     forma_pagamento: Optional[str] = None
+    parcelas: Optional[int] = None 
     status_nfe: Optional[str] = None
     link_nfe: Optional[str] = None
