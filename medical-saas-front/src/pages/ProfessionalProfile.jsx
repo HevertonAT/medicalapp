@@ -6,7 +6,7 @@ import {
 import { FaSave } from 'react-icons/fa';
 import api from '../services/api';
 import AgendaConfigFields from '../components/profissionais/AgendaConfigFields';
-import MacroManager from '../components/profissionais/MacroManager'; // IMPORTAMOS O GERENCIADOR
+import MacroManager from '../components/profissionais/MacroManager';
 
 export default function ProfessionalProfile() {
   const [loading, setLoading] = useState(true);
@@ -35,8 +35,9 @@ export default function ProfessionalProfile() {
     const fetchProfile = async () => {
       try {
         const response = await api.get('/doctors/me');
-        if (response.data) {
+        if (response && response.data) {
           setDoctorData(response.data);
+          // Blinda para só sobrescrever a agenda se ela existir e for válida
           if (response.data.agenda_config) {
             setAgendaConfig(response.data.agenda_config);
           }
@@ -85,7 +86,8 @@ export default function ProfessionalProfile() {
             
             <Divider borderColor={borderColor} />
 
-            {agendaConfig && (
+            {/* Renderização condicional segura */}
+            {agendaConfig ? (
               <AgendaConfigFields 
                 config={agendaConfig} 
                 setConfig={setAgendaConfig} 
@@ -93,7 +95,7 @@ export default function ProfessionalProfile() {
                 bgInput={inputBg}
                 borderColor={borderColor}
               />
-            )}
+            ) : null}
 
             <Button leftIcon={<FaSave />} colorScheme="blue" onClick={handleSave} isLoading={saving} size="lg" mt={4}>
               Salvar Minha Agenda

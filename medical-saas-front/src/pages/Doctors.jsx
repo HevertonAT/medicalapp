@@ -158,7 +158,7 @@ export default function Doctors() {
   const filteredDoctors = safeDoctors.filter(doc => {
       // 1. Filtro de Clínica
       if (loggedUser?.role === 'superuser') {
-          if (!selectedClinicId) return false; // Se o superuser não escolheu clínica, mostra nada
+          if (!selectedClinicId) return false; 
           const docClinicId = String(doc.clinic_id || doc.clinica_id || doc.id_clinica || doc.clinic);
           if (docClinicId !== String(selectedClinicId)) return false;
       }
@@ -170,7 +170,7 @@ export default function Doctors() {
   });
 
   const handleInactivate = async (id) => {
-    if (!confirm('Inativar este profissional?')) return;
+    if (!window.confirm('Inativar este profissional?')) return;
     try {
       await api.delete(`/doctors/${id}`);
       toast({ title: 'Inativado.', status: 'warning' });
@@ -179,7 +179,7 @@ export default function Doctors() {
   };
 
   const handleReactivate = async (id) => {
-    if (!confirm('Reativar este profissional?')) return;
+    if (!window.confirm('Reativar este profissional?')) return;
     try {
       await api.patch(`/doctors/${id}/reactivate`);
       toast({ title: 'Profissional reativado!', status: 'success' });
@@ -208,7 +208,8 @@ export default function Doctors() {
                       value={selectedClinicId}
                       onChange={(e) => setSelectedClinicId(e.target.value)}
                   >
-                      {allClinics.map(c => (
+                      {/* BLINDAGEM DE TITÂNIO NAS CLÍNICAS */}
+                      {(allClinics || []).map(c => (
                           <option key={c.id} value={c.id}>{c.nome}</option>
                       ))}
                   </Select>
@@ -235,7 +236,8 @@ export default function Doctors() {
               </Tr>
             </Thead>
             <Tbody>
-              {filteredDoctors.map((doc) => (
+              {/* BLINDAGEM DE TITÂNIO NOS MÉDICOS */}
+              {(filteredDoctors || []).map((doc) => (
                 <Tr key={doc.id} opacity={doc.ativo ? 1 : 0.6} _hover={{ bg: hoverTr }}>
                   <Td fontWeight="bold" color={textColor}>{doc.nome}</Td>
                   <Td color={textColor}>{doc.especialidade}</Td>
@@ -259,7 +261,8 @@ export default function Doctors() {
                   </Td>
                 </Tr>
               ))}
-              {filteredDoctors.length === 0 && (
+              {/* AVISO PROTEGIDO PARA LISTAS VAZIAS */}
+              {(!filteredDoctors || filteredDoctors.length === 0) && (
                  <Tr>
                      <Td colSpan={5} textAlign="center" py={10} color="gray.500">
                          {loggedUser?.role === 'superuser' && !selectedClinicId 
@@ -352,7 +355,8 @@ export default function Doctors() {
                       onChange={(e) => setCurrentDoctor({...currentDoctor, especialidade: e.target.value})} 
                       placeholder="Selecione"
                     >
-                      {MASTER_SPECIALTIES.map(spec => (
+                      {/* BLINDAGEM DE TITÂNIO NAS ESPECIALIDADES */}
+                      {(MASTER_SPECIALTIES || []).map(spec => (
                         <option key={spec} value={spec}>{spec}</option>
                       ))}
                     </Select>
@@ -373,13 +377,16 @@ export default function Doctors() {
 
               <Divider />
 
-              <AgendaConfigFields 
-                config={agendaConfig} 
-                setConfig={setAgendaConfig} 
-                textColor={textColor}
-                bgInput={inputBg}
-                borderColor={borderColor}
-              />
+              {/* Só exibe o componente de agenda se o agendaConfig estiver pronto */}
+              {agendaConfig && (
+                <AgendaConfigFields 
+                  config={agendaConfig} 
+                  setConfig={setAgendaConfig} 
+                  textColor={textColor}
+                  bgInput={inputBg}
+                  borderColor={borderColor}
+                />
+              )}
             </VStack>
           </ModalBody>
 
