@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  Box, Flex, Heading, Button, Table, Thead, Tbody, Tr, Th, Td, Badge,
+  Box, Flex, Heading, Button, Table, Thead, Tbody, Tr, Th, Td,
   Select, IconButton, useToast, Spinner, useColorModeValue, Text, Tooltip,
   HStack, Input, SimpleGrid, useDisclosure, Modal, ModalOverlay,
   ModalContent, ModalHeader, ModalBody, ModalFooter, ModalCloseButton,
@@ -29,10 +29,11 @@ export default function ContasPagarReceber() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newTx, setNewTx] = useState({
     descricao: '', valor: '', tipo: 'entrada', categoria: '', 
-    data_vencimento: '', status: 'pendente', status_nfe: 'pendente'
+    data_vencimento: '', status: 'pendente', status_nfe: 'pendente', link_nfe: '',
+    forma_pagamento: '', parcelas: 1
   });
 
-  // --- NOVO: Controle do Modal de NF-e ---
+  // Controle do Modal de NF-e
   const { isOpen: isNfeOpen, onOpen: onNfeOpen, onClose: onNfeClose } = useDisclosure();
   const [selectedTx, setSelectedTx] = useState(null);
   const [nfeStatusToUpdate, setNfeStatusToUpdate] = useState('');
@@ -87,7 +88,6 @@ export default function ContasPagarReceber() {
     );
   });
 
-  // --- AÇÕES DA TABELA ---
   const handleDarBaixa = async (id, tipo) => {
     const confirmMsg = tipo === 'entrada' ? 'Confirmar recebimento?' : 'Confirmar pagamento desta despesa?';
     if (!window.confirm(confirmMsg)) return;
@@ -121,11 +121,16 @@ export default function ContasPagarReceber() {
     try {
       await api.post('/financial/full', {
         ...newTx,
-        valor: parseFloat(newTx.valor)
+        valor: parseFloat(newTx.valor),
+        link_nfe: newTx.status_nfe === 'emitida' ? newTx.link_nfe : null,
+        parcelas: newTx.forma_pagamento === 'Cartão de Crédito' ? parseInt(newTx.parcelas) : 1
       });
       toast({ title: 'Lançamento registrado!', status: 'success' });
       onClose();
-      setNewTx({ descricao: '', valor: '', tipo: 'entrada', categoria: '', data_vencimento: '', status: 'pendente', status_nfe: 'pendente' });
+      setNewTx({ 
+          descricao: '', valor: '', tipo: 'entrada', categoria: '', data_vencimento: '', 
+          status: 'pendente', status_nfe: 'pendente', link_nfe: '', forma_pagamento: '', parcelas: 1 
+      });
       fetchTransactions();
     } catch (error) {
       toast({ title: 'Erro ao salvar', status: 'error' });
@@ -134,7 +139,6 @@ export default function ContasPagarReceber() {
     }
   };
 
-  // --- NOVO: FUNÇÕES DE NF-E ---
   const openNfeModal = (tx) => {
     setSelectedTx(tx);
     setNfeStatusToUpdate(tx.status_nfe || 'pendente');
@@ -145,9 +149,9 @@ export default function ContasPagarReceber() {
   const handleSaveNfe = async () => {
     if (!selectedTx) return;
     try {
-      await api.put(`/financial/${selectedTx.id}`, { 
-          status_nfe: nfeStatusToUpdate,
-          link_nfe: nfeStatusToUpdate === 'emitida' ? nfeLinkToUpdate : null
+      await api.patch(`/financial/${selectedTx.id}/nota`, { 
+          status_nota: nfeStatusToUpdate,
+          numero_nota: nfeStatusToUpdate === 'emitida' ? nfeLinkToUpdate : null
       });
       toast({ title: 'Status da Nota Fiscal atualizado!', status: 'success' });
       onNfeClose();
@@ -186,7 +190,7 @@ export default function ContasPagarReceber() {
                 <FormControl>
                     <FormLabel fontSize="xs" color="gray.500">Tipo</FormLabel>
                     <Select bg={inputBg} borderColor={borderColor} value={filters.tipo} onChange={(e) => setFilters({...filters, tipo: e.target.value})}>
-                        <option value="">Entradas e Saídas</option>
+                        <option value="">Todos</option>
                         <option value="entrada">Receitas (Entradas)</option>
                         <option value="saida">Despesas (Saídas)</option>
                     </Select>
@@ -195,8 +199,8 @@ export default function ContasPagarReceber() {
                     <FormLabel fontSize="xs" color="gray.500">Status Financeiro</FormLabel>
                     <Select bg={inputBg} borderColor={borderColor} value={filters.status} onChange={(e) => setFilters({...filters, status: e.target.value})}>
                         <option value="">Todos</option>
-                        <option value="pendente">Pendentes</option>
-                        <option value="pago">Pagos/Recebidos</option>
+                        <option value="pendente">Em Aberto</option>
+                        <option value="pago">Finalizados</option>
                     </Select>
                 </FormControl>
             </SimpleGrid>
@@ -208,7 +212,7 @@ export default function ContasPagarReceber() {
         </VStack>
       </Box>
 
-      {/* TABELA COM A NOVA COLUNA DE NF-E */}
+      {/* TABELA DE LANÇAMENTOS (Modo Clean/Minimalista) */}
       <Box bg={bgCard} shadow="sm" borderRadius="md" overflow="auto" border="1px" borderColor={borderColor}>
         <Table variant="simple" size="sm">
           <Thead bg={useColorModeValue('gray.50', 'gray.700')}>
@@ -218,6 +222,7 @@ export default function ContasPagarReceber() {
               <Th color={textColor} py={3}>Categoria</Th>
               <Th color={textColor} py={3}>Tipo</Th>
               <Th color={textColor} py={3} isNumeric>Valor</Th>
+              <Th color={textColor} py={3} textAlign="center">Forma</Th>
               <Th color={textColor} py={3} textAlign="center">Status</Th>
               <Th color={textColor} py={3} textAlign="center">Nota (NF-e)</Th>
               <Th color={textColor} py={3} textAlign="center">Ações</Th>
@@ -225,47 +230,50 @@ export default function ContasPagarReceber() {
           </Thead>
           <Tbody>
             {loading ? (
-              <Tr><Td colSpan={8} textAlign="center" py={6}><Spinner color="blue.500" /></Td></Tr>
+              <Tr><Td colSpan={9} textAlign="center" py={6}><Spinner color="blue.500" /></Td></Tr>
             ) : filteredTransactions.length === 0 ? (
-              <Tr><Td colSpan={8} textAlign="center" py={6} color="gray.500">Nenhum lançamento encontrado.</Td></Tr>
+              <Tr><Td colSpan={9} textAlign="center" py={6} color="gray.500">Nenhum lançamento encontrado.</Td></Tr>
             ) : (
               filteredTransactions.map((t) => (
                 <Tr key={t.id} _hover={{ bg: hoverTr }}>
-                  <Td py={3} fontWeight="bold" fontSize="sm">
+                  <Td py={3} fontSize="sm" color={textColor}>
                     {t.data_vencimento ? new Date(t.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
                   </Td>
-                  <Td py={3} fontSize="sm">{t.descricao}</Td>
-                  <Td py={3} fontSize="xs">{t.categoria ? <Badge colorScheme="purple" variant="outline">{t.categoria}</Badge> : '-'}</Td>
-                  <Td py={3}>
-                    <Badge colorScheme={t.tipo === 'entrada' ? 'green' : 'red'} variant="subtle">
-                      {t.tipo === 'entrada' ? 'RECEITA' : 'DESPESA'}
-                    </Badge>
-                  </Td>
+                  <Td py={3} fontSize="sm" color={textColor}>{t.descricao}</Td>
+                  <Td py={3} fontSize="sm" color={textColor}>{t.categoria || '-'}</Td>
+                  <Td py={3} fontSize="sm" color={textColor}>{t.tipo === 'entrada' ? 'Receita' : 'Despesa'}</Td>
+                  
+                  {/* Apenas o VALOR ganha cor de destaque */}
                   <Td py={3} isNumeric fontWeight="bold" color={t.tipo === 'entrada' ? 'green.500' : 'red.500'}>
                     R$ {Number(t.valor).toFixed(2)}
                   </Td>
-                  <Td py={3} textAlign="center">
-                    <Badge colorScheme={t.status === 'pago' ? 'blue' : 'yellow'}>
-                      {t.status === 'pago' ? (t.tipo === 'entrada' ? 'RECEBIDO' : 'PAGO') : 'PENDENTE'}
-                    </Badge>
+                  
+                  <Td py={3} textAlign="center" fontSize="sm" color={textColor}>
+                    {t.forma_pagamento ? `${t.forma_pagamento}${t.forma_pagamento === 'Cartão de Crédito' && t.parcelas > 1 ? ` (${t.parcelas}x)` : ''}` : '-'}
                   </Td>
 
-                  {/* NOVO: BOTÃO/SELO DA NF-E */}
+                  {/* Status inteligente sem a palavra Pendente */}
+                  <Td py={3} textAlign="center" fontSize="sm" color={textColor}>
+                    {t.status === 'pago' ? (t.tipo === 'entrada' ? 'Recebido' : 'Pago') : (t.tipo === 'entrada' ? 'A Receber' : 'A Pagar')}
+                  </Td>
+
+                  {/* NF-e Clicável (Modo texto com hover) */}
                   <Td py={3} textAlign="center">
                     {t.tipo === 'entrada' ? (
-                        <Tooltip label="Gerenciar Nota Fiscal">
-                            <Badge 
-                                as="button"
+                        <Tooltip label="Clique para Gerenciar Nota Fiscal">
+                            <Text 
+                                as="span"
                                 onClick={() => openNfeModal(t)}
-                                colorScheme={t.status_nfe === 'emitida' ? 'green' : t.status_nfe === 'dispensada' ? 'gray' : 'red'}
                                 cursor="pointer"
-                                px={2} py={1} borderRadius="md"
+                                fontSize="sm"
+                                color={t.status_nfe === 'emitida' ? 'blue.500' : textColor}
+                                _hover={{ textDecoration: 'underline', color: 'blue.400' }}
                             >
-                                {t.status_nfe === 'emitida' ? 'EMITIDA' : t.status_nfe === 'dispensada' ? 'DISPENSADA' : 'PENDENTE'}
-                            </Badge>
+                                {t.status_nfe === 'emitida' ? 'Emitida' : t.status_nfe === 'dispensada' ? 'Dispensada' : 'Aguardando'}
+                            </Text>
                         </Tooltip>
                     ) : (
-                        <Text fontSize="xs" color="gray.400">-</Text>
+                        <Text fontSize="sm" color="gray.400">-</Text>
                     )}
                   </Td>
 
@@ -289,7 +297,7 @@ export default function ContasPagarReceber() {
       </Box>
 
       {/* MODAL DE NOVO LANÇAMENTO */}
-      <Modal isOpen={isOpen} onClose={onClose} size="lg">
+      <Modal isOpen={isOpen} onClose={onClose} size="xl">
         <ModalOverlay />
         <ModalContent bg={bgCard} border="1px" borderColor={borderColor}>
           <ModalHeader color={textColor}>Novo Lançamento</ModalHeader>
@@ -301,11 +309,11 @@ export default function ContasPagarReceber() {
                 <Input bg={inputBg} borderColor={borderColor} value={newTx.descricao} onChange={(e) => setNewTx({...newTx, descricao: e.target.value})} placeholder="Ex: Consulta João, Aluguel..." />
               </FormControl>
               <FormControl isRequired>
-                <FormLabel color={textColor}>Valor (R$)</FormLabel>
+                <FormLabel color={textColor}>Valor Total (R$)</FormLabel>
                 <Input type="number" step="0.01" bg={inputBg} borderColor={borderColor} value={newTx.valor} onChange={(e) => setNewTx({...newTx, valor: e.target.value})} />
               </FormControl>
               <FormControl isRequired>
-                <FormLabel color={textColor}>Vencimento</FormLabel>
+                <FormLabel color={textColor}>Vencimento Inicial</FormLabel>
                 <Input type="date" bg={inputBg} borderColor={borderColor} value={newTx.data_vencimento} onChange={(e) => setNewTx({...newTx, data_vencimento: e.target.value})} />
               </FormControl>
               <FormControl isRequired>
@@ -317,23 +325,59 @@ export default function ContasPagarReceber() {
               </FormControl>
               <FormControl>
                 <FormLabel color={textColor}>Categoria</FormLabel>
-                <Input bg={inputBg} borderColor={borderColor} value={newTx.categoria} onChange={(e) => setNewTx({...newTx, categoria: e.target.value})} placeholder="Ex: Aluguel, Equipamentos..." />
+                <Input bg={inputBg} borderColor={borderColor} value={newTx.categoria} onChange={(e) => setNewTx({...newTx, categoria: e.target.value})} placeholder="Ex: Aluguel, Consultas..." />
               </FormControl>
+              
               <FormControl>
-                <FormLabel color={textColor}>Status Pgto</FormLabel>
-                <Select bg={inputBg} borderColor={borderColor} value={newTx.status} onChange={(e) => setNewTx({...newTx, status: e.target.value})}>
-                  <option value="pendente">A Pagar/Receber (Pendente)</option>
-                  <option value="pago">Já Pago / Recebido</option>
+                <FormLabel color={textColor}>Forma de Pagamento</FormLabel>
+                <Select bg={inputBg} borderColor={borderColor} value={newTx.forma_pagamento} onChange={(e) => setNewTx({...newTx, forma_pagamento: e.target.value, parcelas: 1})}>
+                  <option value="">Não Informada</option>
+                  <option value="PIX">PIX</option>
+                  <option value="Cartão de Crédito">Cartão de Crédito</option>
+                  <option value="Cartão de Débito">Cartão de Débito</option>
+                  <option value="Dinheiro">Dinheiro (Espécie)</option>
+                  <option value="Cheque">Cheque</option>
+                  <option value="Transferência">Transferência Bancária</option>
                 </Select>
               </FormControl>
+
+              {newTx.forma_pagamento === 'Cartão de Crédito' && (
+                  <FormControl>
+                    <FormLabel color={textColor}>Parcelamento</FormLabel>
+                    <Select bg={inputBg} borderColor={borderColor} value={newTx.parcelas} onChange={(e) => setNewTx({...newTx, parcelas: e.target.value})}>
+                        {[...Array(12)].map((_, i) => (
+                            <option key={i+1} value={i+1}>{i+1}x</option>
+                        ))}
+                    </Select>
+                  </FormControl>
+              )}
+              {newTx.forma_pagamento !== 'Cartão de Crédito' && (
+                  <Box></Box> 
+              )}
+
+              <FormControl>
+                <FormLabel color={textColor}>Status Pagamento</FormLabel>
+                <Select bg={inputBg} borderColor={borderColor} value={newTx.status} onChange={(e) => setNewTx({...newTx, status: e.target.value})}>
+                  <option value="pendente">{newTx.tipo === 'entrada' ? 'A Receber' : 'A Pagar'}</option>
+                  <option value="pago">{newTx.tipo === 'entrada' ? 'Já Recebido' : 'Já Pago'}</option>
+                </Select>
+              </FormControl>
+              
               <FormControl>
                 <FormLabel color={textColor}>Status NF-e</FormLabel>
-                <Select bg={inputBg} borderColor={borderColor} value={newTx.status_nfe} onChange={(e) => setNewTx({...newTx, status_nfe: e.target.value})}>
-                  <option value="pendente">Pendente de Emissão</option>
+                <Select bg={inputBg} borderColor={borderColor} value={newTx.status_nfe} onChange={(e) => setNewTx({...newTx, status_nfe: e.target.value, link_nfe: ''})}>
+                  <option value="pendente">Aguardando Emissão</option>
                   <option value="emitida">Já Emitida</option>
                   <option value="dispensada">Dispensada</option>
                 </Select>
               </FormControl>
+
+              {newTx.status_nfe === 'emitida' && (
+                <FormControl colSpan={2} gridColumn="span 2">
+                  <FormLabel color={textColor} fontSize="sm">Anotações / Link ou Número da Nota (Opcional)</FormLabel>
+                  <Input bg={inputBg} borderColor={borderColor} placeholder="Ex: https://nfs... ou nº 1234" value={newTx.link_nfe} onChange={(e) => setNewTx({...newTx, link_nfe: e.target.value})} />
+                </FormControl>
+              )}
             </SimpleGrid>
           </ModalBody>
           <ModalFooter>
@@ -357,26 +401,16 @@ export default function ContasPagarReceber() {
             </Text>
             <FormControl>
               <FormLabel color={textColor}>Status da NF-e</FormLabel>
-              <Select 
-                bg={inputBg} borderColor={borderColor} 
-                value={nfeStatusToUpdate} 
-                onChange={(e) => setNfeStatusToUpdate(e.target.value)}
-              >
-                <option value="pendente">Pendente de Emissão</option>
+              <Select bg={inputBg} borderColor={borderColor} value={nfeStatusToUpdate} onChange={(e) => setNfeStatusToUpdate(e.target.value)}>
+                <option value="pendente">Aguardando Emissão</option>
                 <option value="emitida">Emitida com Sucesso</option>
-                <option value="dispensada">Dispensada / Sem Nota</option>
+                <option value="dispensada">Dispensada (Sem Nota)</option>
               </Select>
             </FormControl>
             {nfeStatusToUpdate === 'emitida' && (
                 <FormControl mt={4}>
                     <FormLabel color={textColor} fontSize="sm">Anotações / Link da Nota (Opcional)</FormLabel>
-                    <Input 
-                        bg={inputBg} 
-                        borderColor={borderColor} 
-                        placeholder="Ex: https://nfs... ou nº 1234" 
-                        value={nfeLinkToUpdate} // <-- CONECTA O VALOR
-                        onChange={(e) => setNfeLinkToUpdate(e.target.value)} // <-- ATUALIZA AO DIGITAR
-                    />
+                    <Input bg={inputBg} borderColor={borderColor} placeholder="Ex: https://nfs... ou nº 1234" value={nfeLinkToUpdate} onChange={(e) => setNfeLinkToUpdate(e.target.value)} />
                     <Text fontSize="xs" color="gray.400" mt={1}>Apenas para seu controle interno.</Text>
                 </FormControl>
             )}

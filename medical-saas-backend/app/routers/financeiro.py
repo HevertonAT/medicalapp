@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, extract
 from datetime import date, datetime
 from typing import Optional, List
+from pydantic import BaseModel # <-- Importante para a rota da NF-e
+
 from app.db.base import get_db
 from app.models.usuarios import User
 from app.models.transacoes import Transaction 
@@ -18,6 +20,11 @@ router = APIRouter()
 
 # --- DEFINIÇÃO DE SEGURANÇA ---
 allow_only_admin = RoleChecker(["admin", "superuser"])
+
+# Schema rápido para atualização da Nota Fiscal pela Tabela
+class UpdateNotaFiscal(BaseModel):
+    status_nota: str
+    numero_nota: Optional[str] = None
 
 @router.get("/stats")
 def get_financial_stats(
@@ -47,7 +54,7 @@ def get_financial_stats(
         func.date(Transaction.criado_em) <= end_date
     ).scalar() or 0.0
 
-    # Total Despesa no Período (Novo)
+    # Total Despesa no Período
     period_expense = db.query(func.sum(Transaction.valor)).filter(
         *base_filter,
         Transaction.tipo == "saida",
@@ -63,6 +70,19 @@ def get_financial_stats(
 
     # 3. Lista de Transações Recentes
     recent_transactions = db.query(Transaction).filter(*base_filter).order_by(desc(Transaction.criado_em)).limit(50).all()
+
+    # MÁGICA: Mapeia as transações forçando a devolução da forma de pagamento e parcelas para o React
+    transactions_data = [
+        {
+            "id": t.id,
+            "descricao": t.descricao,
+            "valor": t.valor,
+            "data_vencimento": t.data_vencimento,
+            "criado_em": t.criado_em,
+            "forma_pagamento": getattr(t, 'forma_pagamento', None),
+            "parcelas": getattr(t, 'parcelas', 1)
+        } for t in recent_transactions
+    ]
 
     # 4. Dados para o Gráfico (Somando Entradas por Dia)
     chart_data = []
@@ -89,9 +109,10 @@ def get_financial_stats(
         "period_revenue": period_revenue,
         "period_expense": period_expense,
         "total_accumulated": total_accumulated,
-        "transactions": recent_transactions,
+        "transactions": transactions_data, # <-- Envia os dados completos
         "chart_data": chart_data
     }
+
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 def create_quick_transaction(
@@ -121,8 +142,9 @@ def create_quick_transaction(
     
     return {"message": "Lançamento realizado com sucesso!", "id": new_trans.id}
 
+
 # =========================================================================
-# 2. ROTAS COMPLETAS (Para a nova tela de Contas a Pagar/Receber)
+# 2. ROTAS COMPLETAS E ATUALIZAÇÕES RÁPIDAS
 # =========================================================================
 
 @router.get("/all")
@@ -148,6 +170,7 @@ def get_all_transactions(
 
     return query.order_by(Transaction.data_vencimento.desc()).all()
 
+
 @router.post("/full", status_code=status.HTTP_201_CREATED)
 def create_full_transaction(
     transacao: TransactionCompleteCreate, 
@@ -160,23 +183,26 @@ def create_full_transaction(
 
     new_tx = Transaction(
         clinic_id=target_clinic_id if target_clinic_id else 1,
-        patient_id=transacao.patient_id,
-        appointment_id=transacao.appointment_id,
+        patient_id=getattr(transacao, 'patient_id', None),
+        appointment_id=getattr(transacao, 'appointment_id', None),
         descricao=transacao.descricao,
         valor=transacao.valor,
         tipo=transacao.tipo,
-        categoria=transacao.categoria,
+        categoria=getattr(transacao, 'categoria', None),
         data_vencimento=transacao.data_vencimento,
-        data_pagamento=transacao.data_pagamento,
+        data_pagamento=getattr(transacao, 'data_pagamento', None),
         status=transacao.status,
-        forma_pagamento=transacao.forma_pagamento,
-        status_nfe=transacao.status_nfe
+        forma_pagamento=getattr(transacao, 'forma_pagamento', None),
+        parcelas=getattr(transacao, 'parcelas', 1), # Garante as parcelas
+        status_nfe=getattr(transacao, 'status_nfe', 'pendente'),
+        link_nfe=getattr(transacao, 'link_nfe', None) # Garante o link da nota
     )
     
     db.add(new_tx)
     db.commit()
     db.refresh(new_tx)
     return new_tx
+
 
 @router.put("/{tx_id}")
 def update_transaction(
@@ -202,6 +228,32 @@ def update_transaction(
     db.commit()
     db.refresh(db_tx)
     return db_tx
+
+
+# --- ROTA NOVA: Atualização Rápida de NF-e ---
+@router.patch("/{tx_id}/nota")
+def update_nota_status(
+    tx_id: int,
+    nota_data: UpdateNotaFiscal,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(allow_only_admin)
+):
+    query = db.query(Transaction).filter(Transaction.id == tx_id)
+    
+    if current_user.role != 'superuser':
+        query = query.filter(Transaction.clinic_id == current_user.clinic_id)
+        
+    transaction = query.first()
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Lançamento não encontrado.")
+
+    # Atualiza o status e o link/numero da nota
+    transaction.status_nfe = nota_data.status_nota
+    transaction.link_nfe = nota_data.numero_nota
+
+    db.commit()
+    return {"message": "Nota atualizada com sucesso"}
+
 
 @router.delete("/{tx_id}")
 def delete_transaction(

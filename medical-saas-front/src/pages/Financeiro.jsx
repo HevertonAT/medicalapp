@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Box, Heading, SimpleGrid, Stat, StatLabel, StatNumber,
   Flex, Icon, Select, FormControl, FormLabel, Input, Button,
-  useToast, Spinner, useColorModeValue, Text
+  useToast, Spinner, useColorModeValue, Text, Badge
 } from '@chakra-ui/react';
 import { FaMoneyBillWave, FaWallet, FaFilePdf, FaListUl } from 'react-icons/fa';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -70,7 +70,7 @@ export default function Financial() {
     setDateRange({ start, end });
   };
 
-  // --- GERADOR DE RELATÓRIO PDF ---
+  // --- GERADOR DE RELATÓRIO PDF (Com Formas de Pagamento e Parcelas) ---
   const handlePrintPDF = () => {
     const dataInicio = dateRange.start ? new Date(dateRange.start + 'T00:00:00').toLocaleDateString('pt-BR') : 'Início do Mês';
     const dataFim = dateRange.end ? new Date(dateRange.end + 'T00:00:00').toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
@@ -127,9 +127,14 @@ export default function Financial() {
                 <tbody>
                     ${stats.transactions && stats.transactions.length > 0 ? stats.transactions.map(t => `
                         <tr>
-                            <td>${t.criado_em ? new Date(t.criado_em).toLocaleDateString('pt-BR') : '-'}</td>
+                            <td>${t.data_vencimento ? new Date(t.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</td>
                             <td>${t.descricao || 'Receita Avulsa'}</td>
-                            <td><span class="method-badge">${t.forma_pagamento ? t.forma_pagamento.toUpperCase() : '-'}</span></td>
+                            <td>
+                                <span class="method-badge">
+                                    ${t.forma_pagamento ? t.forma_pagamento.toUpperCase() : '-'}
+                                    ${t.forma_pagamento === 'Cartão de Crédito' && t.parcelas > 1 ? `(${t.parcelas}x)` : ''}
+                                </span>
+                            </td>
                             <td class="amount" style="text-align: right;">R$ ${Number(t.valor).toFixed(2)}</td>
                         </tr>
                     `).join('') : '<tr><td colspan="4" style="text-align: center; padding: 30px; color: #A0AEC0;">Nenhum lançamento encontrado.</td></tr>'}
@@ -160,7 +165,6 @@ export default function Financial() {
       <Flex justify="space-between" align="center" mb={6} direction={{ base: 'column', md: 'row' }} gap={4}>
         <Heading size="lg" color={useColorModeValue("gray.700", "white")}>Dashboard Caixa</Heading>
         <Flex gap={2}>
-            {/* O BOTÃO AGORA REDIRECIONA PARA A TELA DE CONTAS */}
             <Button leftIcon={<FaListUl />} colorScheme="blue" onClick={() => navigate('/contas')}>
                 Gerenciar Contas
             </Button>
@@ -239,12 +243,13 @@ export default function Financial() {
                     </Flex>
                     {stats.transactions && stats.transactions.map((t) => (
                         <Flex key={t.id} justify="space-between" p={3} bg={inputBg} borderRadius="md" align="center" border="1px" borderColor={borderColor}>
-                             <Text fontSize="sm" flex="1">{t.criado_em ? new Date(t.criado_em).toLocaleDateString('pt-BR') : '-'}</Text>
+                             <Text fontSize="sm" flex="1">{t.data_vencimento ? new Date(t.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</Text>
                              <Text fontSize="sm" flex="1" fontWeight="bold" color="green.500">R$ {Number(t.valor).toFixed(2)}</Text>
                              <Box flex="1" display="flex" justifyContent="flex-end">
-                                <Text fontSize="xs" fontWeight="bold" bg="gray.200" color="black" px={2} py={1} borderRadius="md" w="fit-content">
-                                    {t.forma_pagamento ? t.forma_pagamento.toUpperCase() : 'N/A'}
-                                </Text>
+                                <Badge colorScheme="teal" variant="outline" textTransform="none">
+                                    {t.forma_pagamento ? t.forma_pagamento : 'N/A'}
+                                    {t.forma_pagamento === 'Cartão de Crédito' && t.parcelas > 1 ? ` (${t.parcelas}x)` : ''}
+                                </Badge>
                              </Box>
                         </Flex>
                     ))}
