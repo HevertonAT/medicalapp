@@ -38,8 +38,18 @@ def login_for_access_token(
     
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     
+    # --- ALTERAÇÃO AQUI: Buscando o ID da clínica de forma segura ---
+    # O getattr tenta pegar a propriedade. Se não existir no modelo do usuário, retorna None.
+    # Coloquei as variações mais comuns para garantir que vai achar a sua coluna do banco!
+    clinica_do_usuario = getattr(user, 'clinic_id', getattr(user, 'clinica_id', getattr(user, 'id_clinica', None)))
+    
+    # Criando o token agora com o clinic_id embutido
     access_token = create_access_token(
-        data={"sub": user.email, "role": user.role}, 
+        data={
+            "sub": user.email, 
+            "role": user.role,
+            "clinic_id": clinica_do_usuario  # <--- INJETADO NO TOKEN!
+        }, 
         expires_delta=access_token_expires
     )
     

@@ -43,18 +43,30 @@ export default function SpecialtySettings() {
   const itemBorderActive = useColorModeValue("blue.500", "blue.300");
   const blockBg = useColorModeValue("gray.50", "whiteAlpha.50"); 
   const inputBg = useColorModeValue("white", "gray.700");
-  // 1. Descobrir quem está logado
+
+  // 1. Descobrir quem está logado (Ajustado para resiliência no token do Admin)
   useEffect(() => {
       const token = localStorage.getItem('medical_token');
       if (token) {
           const decoded = jwtDecode(token);
+          
+          // LOG ADICIONADO AQUI:
+          console.log("CONTEÚDO DO TOKEN:", decoded);
+          
           setLoggedUser(decoded);
           
           if (decoded.role === 'superuser') {
               fetchClinicsForSuperuser();
           } else {
-              // Se for admin, já carrega a própria clínica
-              setSelectedClinicId(decoded.clinic_id);
+              // Garante que vai pegar o ID da clínica independente do nome da propriedade no token
+              const idDaClinica = decoded.clinic_id || decoded.clinica_id || decoded.id_clinica || decoded.clinic;
+              
+              if (idDaClinica) {
+                  setSelectedClinicId(idDaClinica);
+              } else {
+                  console.error("ID da clínica não encontrado no token do Admin!", decoded);
+                  // Opcional: Você pode disparar um toast de erro aqui se quiser
+              }
           }
       }
   }, []);
@@ -85,15 +97,11 @@ async function loadClinicData(clinicId) {
       const docRes = await api.get('/doctors/');
       const allDocs = Array.isArray(docRes.data) ? docRes.data : [];
       
-      console.log("Analisando Isabella:", allDocs[0]); // Veremos todos os campos dela aqui
-
       const clinicDoctors = allDocs.filter(d => {
           // Tenta todas as variações possíveis de nome de campo de vínculo
           const idVinculo = d.clinic_id || d.clinica_id || d.id_clinica || d.clinic;
           return String(idVinculo) === String(clinicId);
       });
-
-      console.log("Médicos após filtro resiliente:", clinicDoctors);
       
       const uniqueSpecs = [...new Set(clinicDoctors.map(d => {
           let spec = d.especialidade || d.specialty || '';
@@ -142,6 +150,7 @@ async function loadClinicData(clinicId) {
         specialty: selectedSpec,
         settings: currentSettings,
         active: true,
+        // Mantido o seu padrão: superuser manda o ID, admin manda null (assumindo que o back-end injeta)
         clinic_id: loggedUser?.role === 'superuser' ? parseInt(selectedClinicId) : null
       };
 
@@ -297,12 +306,21 @@ async function loadClinicData(clinicId) {
                 )}
               </CardBody>
           ) : (
-              <Flex flex={1} justify="center" align="center" direction="column" color={subTextColor}>
+              // --------------------------------------------------------
+              // MENSAGENS DE TELA VAZIA INTELIGENTES (Ajustadas)
+              // --------------------------------------------------------
+              <Flex flex={1} justify="center" align="center" direction="column" color={subTextColor} textAlign="center" p={6}>
                   <Icon as={FaStethoscope} w={12} h={12} mb={4} opacity={0.3} />
-                  {selectedClinicId 
-                      ? <Text>Selecione uma especialidade na lista à esquerda.</Text>
-                      : <Text>Por favor, selecione uma clínica no menu superior.</Text>
-                  }
+                  
+                  {!selectedClinicId ? (
+                      loggedUser?.role === 'superuser' 
+                          ? <Text>Por favor, selecione uma clínica no menu superior.</Text>
+                          : <Text color="red.500">Erro: Vínculo com a clínica não encontrado no seu perfil. Faça login novamente.</Text>
+                  ) : availableSpecialties.length === 0 ? (
+                      <Text>Nenhuma especialidade detectada para configurar.<br/>Cadastre os médicos da clínica primeiro.</Text>
+                  ) : (
+                      <Text>Selecione uma especialidade na lista à esquerda.</Text>
+                  )}
               </Flex>
           )}
         </Card>
