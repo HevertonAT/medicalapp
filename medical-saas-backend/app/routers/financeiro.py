@@ -147,7 +147,7 @@ def create_quick_transaction(
 # 2. ROTAS COMPLETAS E ATUALIZAÇÕES RÁPIDAS
 # =========================================================================
 
-@router.get("/all")
+@router.get("/all", response_model=List[TransactionResponse])
 def get_all_transactions(
     mes: Optional[int] = None,
     ano: Optional[int] = None,

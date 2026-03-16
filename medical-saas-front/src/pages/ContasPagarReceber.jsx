@@ -74,8 +74,8 @@ export default function ContasPagarReceber() {
     fetchTransactions();
   }, [filters]); 
 
-  // --- BLINDAGEM DE AÇO AQUI ---
-  const filteredTransactions = Array.isArray(transactions) ? transactions.filter((t) => {
+  // --- BLINDAGEM DE TITÂNIO AQUI ---
+  const filteredTransactions = (transactions || []).filter((t) => {
     if (!searchTerm) return true; 
     const termo = searchTerm.toLowerCase();
     const dataFormatada = t.data_vencimento ? new Date(t.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '';
@@ -87,7 +87,7 @@ export default function ContasPagarReceber() {
       descricao.includes(termo) || categoria.includes(termo) ||
       valor.includes(termo) || dataFormatada.includes(termo)
     );
-  }) : [];
+  });
 
   const handleDarBaixa = async (id, tipo) => {
     const confirmMsg = tipo === 'entrada' ? 'Confirmar recebimento?' : 'Confirmar pagamento desta despesa?';
@@ -230,7 +230,6 @@ export default function ContasPagarReceber() {
             </Tr>
           </Thead>
           <Tbody>
-            {/* --- BLINDAGEM DE AÇO AQUI TAMBÉM --- */}
             {loading ? (
               <Tr><Td colSpan={9} textAlign="center" py={6}><Spinner color="blue.500" /></Td></Tr>
             ) : filteredTransactions?.length === 0 ? (
