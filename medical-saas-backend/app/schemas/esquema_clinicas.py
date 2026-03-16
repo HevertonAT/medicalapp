@@ -46,7 +46,9 @@ class RespostaClinica(BaseModel):
     email: Optional[str] = None
     telefone: Optional[str] = None
     plano_id: Optional[int] = None
-    is_active: bool
+    
+    # MÁGICA 1: O Pydantic não vai mais surtar se a clínica for antiga e estiver sem "True" ou "False" no is_active
+    is_active: Optional[bool] = True 
     
     # --- ENDEREÇO ---
     cep: Optional[str] = None
@@ -56,6 +58,10 @@ class RespostaClinica(BaseModel):
     cidade: Optional[str] = None
     estado: Optional[str] = None
     complemento: Optional[str] = None
+    
+    # MÁGICA 2: Para o Dashboard puxar dados do banco de dados antigo sem quebrar
+    plano: Optional[str] = "Pro"
+    status_assinatura: Optional[str] = "ativa"
     
     class Config:
         from_attributes = True
