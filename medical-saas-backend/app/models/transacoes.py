@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Float, Dat
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.db.base import Base
+
 class Transaction(Base):
     __tablename__ = "transacoes" 
 
@@ -30,4 +31,4 @@ class Transaction(Base):
     # --- RELACIONAMENTOS ---
     clinic = relationship("Clinic")
     patient = relationship("Patient")
-    appointment = relationship("Appointment", back_populates="transaction")
+    appointment = relationship("Appointment") # <-- CORRIGIDO: Removido o back_populates
