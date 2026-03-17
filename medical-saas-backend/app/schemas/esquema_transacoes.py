@@ -25,7 +25,7 @@ class TransactionResponse(BaseModel):
 class TransactionCompleteBase(BaseModel):
     patient_id: Optional[int] = None
     appointment_id: Optional[int] = None
-    descricao: str
+    descricao: Optional[str] = None 
     valor: float
     tipo: str # 'entrada' ou 'saida'
     categoria: Optional[str] = None

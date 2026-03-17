@@ -125,10 +125,15 @@ export default function Financial() {
                     </tr>
                 </thead>
                 <tbody>
-                    ${stats.transactions && stats.transactions.length > 0 ? stats.transactions.map(t => `
+                    ${stats.transactions && stats.transactions.length > 0 ? stats.transactions.map(t => {
+                        // Garantia de fallback para os dados da tabela PDF
+                        const dataVenc = t.data_vencimento || t.due_date;
+                        const desc = t.descricao || t.description || 'Receita Avulsa';
+                        
+                        return `
                         <tr>
-                            <td>${t.data_vencimento ? new Date(t.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</td>
-                            <td>${t.descricao || 'Receita Avulsa'}</td>
+                            <td>${dataVenc ? new Date(dataVenc + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</td>
+                            <td>${desc}</td>
                             <td>
                                 <span class="method-badge">
                                     ${t.forma_pagamento ? t.forma_pagamento.toUpperCase() : '-'}
@@ -137,7 +142,7 @@ export default function Financial() {
                             </td>
                             <td class="amount" style="text-align: right;">R$ ${Number(t.valor).toFixed(2)}</td>
                         </tr>
-                    `).join('') : '<tr><td colspan="4" style="text-align: center; padding: 30px; color: #A0AEC0;">Nenhum lançamento encontrado.</td></tr>'}
+                    `}).join('') : '<tr><td colspan="4" style="text-align: center; padding: 30px; color: #A0AEC0;">Nenhum lançamento encontrado.</td></tr>'}
                 </tbody>
             </table>
             <div class="footer">Documento gerado em ${new Date().toLocaleString('pt-BR')}</div>
@@ -244,9 +249,13 @@ export default function Financial() {
                     </Flex>
                     
                     {/* BLINDAGEM NA LISTA DE TRANSAÇÕES */}
-                    {stats?.transactions?.map((t) => (
+                    {stats?.transactions?.map((t) => {
+                        // Garantia de fallback para os dados da lista
+                        const dataVenc = t.data_vencimento || t.due_date;
+                        
+                        return (
                         <Flex key={t.id} justify="space-between" p={3} bg={inputBg} borderRadius="md" align="center" border="1px" borderColor={borderColor}>
-                             <Text fontSize="sm" flex="1">{t.data_vencimento ? new Date(t.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</Text>
+                             <Text fontSize="sm" flex="1">{dataVenc ? new Date(dataVenc + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</Text>
                              <Text fontSize="sm" flex="1" fontWeight="bold" color="green.500">R$ {Number(t.valor).toFixed(2)}</Text>
                              <Box flex="1" display="flex" justifyContent="flex-end">
                                 <Badge colorScheme="teal" variant="outline" textTransform="none">
@@ -255,7 +264,7 @@ export default function Financial() {
                                 </Badge>
                              </Box>
                         </Flex>
-                    ))}
+                    )})}
                     
                     {/* AVISO DE LISTA VAZIA PROTEGIDO */}
                     {(!stats?.transactions || stats?.transactions?.length === 0) && (

@@ -74,17 +74,21 @@ export default function ContasPagarReceber() {
     fetchTransactions();
   }, [filters]); 
 
-  // --- BLINDAGEM DE TITÂNIO AQUI ---
+  // --- BLINDAGEM DE TITÂNIO ATUALIZADA (Lê português e inglês) ---
   const filteredTransactions = (transactions || []).filter((t) => {
     if (!searchTerm) return true; 
     const termo = searchTerm.toLowerCase();
-    const dataFormatada = t.data_vencimento ? new Date(t.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '';
-    const descricao = t.descricao?.toLowerCase() || '';
-    const categoria = t.categoria?.toLowerCase() || '';
+    
+    // Fallbacks para propriedades que podem vir do back-end em inglês
+    const dataVenc = t.data_vencimento || t.due_date;
+    const desc = (t.descricao || t.description || '').toLowerCase();
+    const cat = (t.categoria || t.category || '').toLowerCase();
+    
+    const dataFormatada = dataVenc ? new Date(dataVenc + 'T00:00:00').toLocaleDateString('pt-BR') : '';
     const valor = t.valor?.toString() || '';
 
     return (
-      descricao.includes(termo) || categoria.includes(termo) ||
+      desc.includes(termo) || cat.includes(termo) ||
       valor.includes(termo) || dataFormatada.includes(termo)
     );
   });
@@ -120,12 +124,17 @@ export default function ContasPagarReceber() {
     }
     setIsSubmitting(true);
     try {
+      // Injetamos as variáveis em inglês no payload também para garantir que o back-end capture
       await api.post('/financial/full', {
         ...newTx,
+        description: newTx.descricao,
+        category: newTx.categoria,
+        due_date: newTx.data_vencimento,
         valor: parseFloat(newTx.valor),
         link_nfe: newTx.status_nfe === 'emitida' ? newTx.link_nfe : null,
         parcelas: newTx.forma_pagamento === 'Cartão de Crédito' ? parseInt(newTx.parcelas) : 1
       });
+      
       toast({ title: 'Lançamento registrado!', status: 'success' });
       onClose();
       setNewTx({ 
@@ -235,60 +244,67 @@ export default function ContasPagarReceber() {
             ) : filteredTransactions?.length === 0 ? (
               <Tr><Td colSpan={9} textAlign="center" py={6} color="gray.500">Nenhum lançamento encontrado.</Td></Tr>
             ) : (
-              filteredTransactions?.map((t) => (
-                <Tr key={t.id} _hover={{ bg: hoverTr }}>
-                  <Td py={3} fontSize="sm" color={textColor}>
-                    {t.data_vencimento ? new Date(t.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
-                  </Td>
-                  <Td py={3} fontSize="sm" color={textColor}>{t.descricao}</Td>
-                  <Td py={3} fontSize="sm" color={textColor}>{t.categoria || '-'}</Td>
-                  <Td py={3} fontSize="sm" color={textColor}>{t.tipo === 'entrada' ? 'Receita' : 'Despesa'}</Td>
-                  
-                  <Td py={3} isNumeric fontWeight="bold" color={t.tipo === 'entrada' ? 'green.500' : 'red.500'}>
-                    R$ {Number(t.valor).toFixed(2)}
-                  </Td>
-                  
-                  <Td py={3} textAlign="center" fontSize="sm" color={textColor}>
-                    {t.forma_pagamento ? `${t.forma_pagamento}${t.forma_pagamento === 'Cartão de Crédito' && t.parcelas > 1 ? ` (${t.parcelas}x)` : ''}` : '-'}
-                  </Td>
+              filteredTransactions?.map((t) => {
+                // Preparando as variáveis de forma resiliente
+                const dataVencimentoReal = t.data_vencimento || t.due_date;
+                const descricaoReal = t.descricao || t.description;
+                const categoriaReal = t.categoria || t.category;
 
-                  <Td py={3} textAlign="center" fontSize="sm" color={textColor}>
-                    {t.status === 'pago' ? (t.tipo === 'entrada' ? 'Recebido' : 'Pago') : (t.tipo === 'entrada' ? 'A Receber' : 'A Pagar')}
-                  </Td>
+                return (
+                  <Tr key={t.id} _hover={{ bg: hoverTr }}>
+                    <Td py={3} fontSize="sm" color={textColor}>
+                      {dataVencimentoReal ? new Date(dataVencimentoReal + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
+                    </Td>
+                    <Td py={3} fontSize="sm" color={textColor}>{descricaoReal || '-'}</Td>
+                    <Td py={3} fontSize="sm" color={textColor}>{categoriaReal || '-'}</Td>
+                    <Td py={3} fontSize="sm" color={textColor}>{t.tipo === 'entrada' ? 'Receita' : 'Despesa'}</Td>
+                    
+                    <Td py={3} isNumeric fontWeight="bold" color={t.tipo === 'entrada' ? 'green.500' : 'red.500'}>
+                      R$ {Number(t.valor).toFixed(2)}
+                    </Td>
+                    
+                    <Td py={3} textAlign="center" fontSize="sm" color={textColor}>
+                      {t.forma_pagamento ? `${t.forma_pagamento}${t.forma_pagamento === 'Cartão de Crédito' && t.parcelas > 1 ? ` (${t.parcelas}x)` : ''}` : '-'}
+                    </Td>
 
-                  <Td py={3} textAlign="center">
-                    {t.tipo === 'entrada' ? (
-                        <Tooltip label="Clique para Gerenciar Nota Fiscal">
-                            <Text 
-                                as="span"
-                                onClick={() => openNfeModal(t)}
-                                cursor="pointer"
-                                fontSize="sm"
-                                color={t.status_nfe === 'emitida' ? 'blue.500' : textColor}
-                                _hover={{ textDecoration: 'underline', color: 'blue.400' }}
-                            >
-                                {t.status_nfe === 'emitida' ? 'Emitida' : t.status_nfe === 'dispensada' ? 'Dispensada' : 'Aguardando'}
-                            </Text>
-                        </Tooltip>
-                    ) : (
-                        <Text fontSize="sm" color="gray.400">-</Text>
-                    )}
-                  </Td>
+                    <Td py={3} textAlign="center" fontSize="sm" color={textColor}>
+                      {t.status === 'pago' ? (t.tipo === 'entrada' ? 'Recebido' : 'Pago') : (t.tipo === 'entrada' ? 'A Receber' : 'A Pagar')}
+                    </Td>
 
-                  <Td py={3} textAlign="center">
-                    <HStack justify="center" spacing={2}>
-                      {t.status === 'pendente' && (
-                        <Tooltip label={t.tipo === 'entrada' ? 'Confirmar Recebimento' : 'Confirmar Pagamento'}>
-                          <IconButton icon={<FaCheckCircle />} size="sm" colorScheme="green" variant="ghost" onClick={() => handleDarBaixa(t.id, t.tipo)} />
-                        </Tooltip>
+                    <Td py={3} textAlign="center">
+                      {t.tipo === 'entrada' ? (
+                          <Tooltip label="Clique para Gerenciar Nota Fiscal">
+                              <Text 
+                                  as="span"
+                                  onClick={() => openNfeModal(t)}
+                                  cursor="pointer"
+                                  fontSize="sm"
+                                  color={t.status_nfe === 'emitida' ? 'blue.500' : textColor}
+                                  _hover={{ textDecoration: 'underline', color: 'blue.400' }}
+                              >
+                                  {t.status_nfe === 'emitida' ? 'Emitida' : t.status_nfe === 'dispensada' ? 'Dispensada' : 'Aguardando'}
+                              </Text>
+                          </Tooltip>
+                      ) : (
+                          <Text fontSize="sm" color="gray.400">-</Text>
                       )}
-                      <Tooltip label="Excluir Lançamento">
-                        <IconButton icon={<FaTrash />} size="sm" colorScheme="red" variant="ghost" onClick={() => handleDelete(t.id)} />
-                      </Tooltip>
-                    </HStack>
-                  </Td>
-                </Tr>
-              ))
+                    </Td>
+
+                    <Td py={3} textAlign="center">
+                      <HStack justify="center" spacing={2}>
+                        {t.status === 'pendente' && (
+                          <Tooltip label={t.tipo === 'entrada' ? 'Confirmar Recebimento' : 'Confirmar Pagamento'}>
+                            <IconButton icon={<FaCheckCircle />} size="sm" colorScheme="green" variant="ghost" onClick={() => handleDarBaixa(t.id, t.tipo)} />
+                          </Tooltip>
+                        )}
+                        <Tooltip label="Excluir Lançamento">
+                          <IconButton icon={<FaTrash />} size="sm" colorScheme="red" variant="ghost" onClick={() => handleDelete(t.id)} />
+                        </Tooltip>
+                      </HStack>
+                    </Td>
+                  </Tr>
+                );
+              })
             )}
           </Tbody>
         </Table>
@@ -395,7 +411,7 @@ export default function ContasPagarReceber() {
           <ModalCloseButton />
           <ModalBody pb={6}>
             <Text mb={4} fontSize="sm" color="gray.500">
-              Atualize o status da nota fiscal para o lançamento: <b>{selectedTx?.descricao}</b> (R$ {selectedTx?.valor})
+              Atualize o status da nota fiscal para o lançamento: <b>{selectedTx?.descricao || selectedTx?.description}</b> (R$ {selectedTx?.valor})
             </Text>
             <FormControl>
               <FormLabel color={textColor}>Status da NF-e</FormLabel>
