@@ -28,6 +28,7 @@ def create_patient(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # A Recepcionista, Admin ou Doctor passarão o clinic_id automaticamente
     target_clinic_id = current_user.clinic_id
     if current_user.role == "superuser" and hasattr(patient, "clinic_id") and patient.clinic_id:
         target_clinic_id = patient.clinic_id

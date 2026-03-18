@@ -50,7 +50,11 @@ export default function Financial() {
   };
 
   useEffect(() => {
-    fetchFinancialData();
+    const tempoEspera = setTimeout(() => {
+      fetchFinancialData();
+    }, 600);
+
+    return () => clearTimeout(tempoEspera);
   }, [dateRange]);
 
   const handleQuickFilter = (type) => {
@@ -168,7 +172,7 @@ export default function Financial() {
   return (
     <Box p={8}>
       <Flex justify="space-between" align="center" mb={6} direction={{ base: 'column', md: 'row' }} gap={4}>
-        <Heading size="lg" color={useColorModeValue("gray.700", "white")}>Dashboard Caixa</Heading>
+        <Heading size="lg" color={useColorModeValue("gray.700", "white")}>Relatório Financeiro</Heading>
         <Flex gap={2}>
             <Button leftIcon={<FaListUl />} colorScheme="blue" onClick={() => navigate('/contas')}>
                 Gerenciar Contas
@@ -225,7 +229,7 @@ export default function Financial() {
 
           <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
             <Flex direction="column" bg={bgCard} p={5} shadow="sm" borderRadius="lg" h="400px" border="1px" borderColor={borderColor}>
-                <Heading size="md" mb={4} color={textColor}>Evolução Diária (Período)</Heading>
+                <Heading size="md" mb={4} color={textColor}>Evolução Diária</Heading>
                 <Box flex="1" minH="0" w="100%">
                     <ResponsiveContainer width="100%" height="100%">
                         {/* BLINDAGEM NO GRÁFICO */}
@@ -242,7 +246,7 @@ export default function Financial() {
             </Flex>
 
             <Box bg={bgCard} p={5} shadow="sm" borderRadius="lg" border="1px" borderColor={borderColor} overflowY="auto" maxH="400px">
-                <Heading size="md" mb={4} color={textColor}>Últimos Lançamentos (Visualização)</Heading>
+                <Heading size="md" mb={4} color={textColor}>Últimos Lançamentos</Heading>
                 <Flex direction="column" gap={3}>
                     <Flex justify="space-between" color="gray.500" fontSize="xs" fontWeight="bold" px={2}>
                         <Text flex="1">DATA</Text><Text flex="1">VALOR</Text><Text flex="1" textAlign="right">MÉTODO</Text>

@@ -40,6 +40,24 @@ export default function Dashboard() {
     }
   };
 
+  // --- TRAVA DE ANO MÁXIMO (Hoje + 4 anos) ---
+  const maxYear = new Date().getFullYear() + 4;
+  const maxDateLimit = `${maxYear}-12-31`;
+
+  const enforceDateLimit = (dateString) => {
+      if (!dateString) return dateString;
+      const partes = dateString.split('-');
+      // Corta para não passar de 4 dígitos no ano
+      if (partes[0].length > 4) {
+          partes[0] = partes[0].slice(0, 4);
+      }
+      // Se o ano for maior que a data atual + 4, ele trava no ano máximo
+      if (parseInt(partes[0]) > maxYear) {
+          partes[0] = maxYear.toString();
+      }
+      return partes.join('-');
+  };
+
   const updateDatesByPeriod = useCallback((selectedPeriod) => {
     const today = new Date();
     let start = new Date();
@@ -79,10 +97,14 @@ export default function Dashboard() {
     }
   }, [navigate, period, startDate, endDate]);
 
-  useEffect(() => {
-    if (startDate && endDate) {
-        fetchDashboardData();
-    }
+    useEffect(() => {
+      const tempoEspera = setTimeout(() => {
+        if (startDate && endDate) {
+            fetchDashboardData();
+        }
+    }, 600);
+
+    return () => clearTimeout(tempoEspera);
   }, [fetchDashboardData, startDate, endDate]);
 
   const formatDate = (dateString) => {
@@ -97,14 +119,6 @@ export default function Dashboard() {
     if (period === 'custom') return 'Período';
     return '';
   };
-
-  if (loading && !stats.total_patients) {
-    return (
-      <Flex justify="center" align="center" h="40vh">
-        <Spinner size="xl" color="blue.500" thickness='4px' />
-      </Flex>
-    );
-  }
 
   return (
     <Box p={8}>
@@ -133,22 +147,30 @@ export default function Dashboard() {
                 <FormLabel fontSize="sm" color={textColor}>Data Inicial</FormLabel>
                 <Input 
                     type="date" 
+                    max={maxDateLimit} // Nova trava nativa do navegador
                     bg={inputBg} 
                     borderColor={borderColor}
                     color={textColor}
                     value={startDate} 
-                    onChange={(e) => { setPeriod('custom'); setStartDate(e.target.value); }} 
+                    onChange={(e) => { 
+                        setPeriod('custom'); 
+                        setStartDate(enforceDateLimit(e.target.value)); // Função de segurança
+                    }} 
                 />
             </FormControl>
             <FormControl w="180px">
                 <FormLabel fontSize="sm" color={textColor}>Data Final</FormLabel>
                 <Input 
                     type="date" 
+                    max={maxDateLimit} // Nova trava nativa do navegador
                     bg={inputBg} 
                     borderColor={borderColor}
                     color={textColor}
                     value={endDate} 
-                    onChange={(e) => { setPeriod('custom'); setEndDate(e.target.value); }} 
+                    onChange={(e) => { 
+                        setPeriod('custom'); 
+                        setEndDate(enforceDateLimit(e.target.value)); // Função de segurança
+                    }} 
                 />
             </FormControl>
         </Flex>

@@ -48,18 +48,18 @@ export default function Team() {
       
       let staff = usersList.filter(u => u.role !== 'patient' && u.role !== 'paciente');
       
-      // A MURALHA DE ISOLAMENTO AJUSTADA
+      // A MURALHA DE ISOLAMENTO
       if (loggedUser) {
-          if (loggedUser.role === 'superuser') {
-              // O Dono do SaaS só vê a sua própria equipe interna
-              staff = staff.filter(u => u.role === 'superuser');
-          } else {
-              // Admin/Recepção só vê quem é da mesma clínica e não vê o Dono do SaaS
-              staff = staff.filter(u => 
-                  u.clinic_id === loggedUser.clinic_id && 
-                  u.role !== 'superuser'
-              );
-          }
+        if (loggedUser.role === 'superuser') {
+            // O Dono do SaaS só vê a sua própria equipe interna
+            staff = staff.filter(u => u.role === 'superuser');
+        } else {
+            // Admin/Recepção só vê quem é da mesma clínica e não vê o Dono do SaaS
+            staff = staff.filter(u => 
+                u.clinic_id === loggedUser.clinic_id && 
+                u.role !== 'superuser'
+            );
+        }
       }
 
       setTeam(staff);
@@ -111,7 +111,7 @@ export default function Team() {
         return;
     }
 
-    if (confirm('Deseja realmente remover o acesso deste membro da equipe?')) {
+    if (window.confirm('Deseja realmente remover o acesso deste membro da equipe?')) {
         try {
             await api.delete(`/users/${id}`);
             toast({ title: 'Membro removido.', status: 'success' });
@@ -155,7 +155,7 @@ export default function Team() {
             <Tbody>
             {loading ? (
                 <Tr><Td colSpan={4} textAlign="center" py={6}><Spinner color="blue.500" /></Td></Tr>
-            ) : team.map((member) => (
+            ) : (team || []).map((member) => (
                 <Tr key={member.id} _hover={{ bg: hoverTr }}>
                     <Td fontWeight="bold" color={textColor}>{member.full_name}</Td>
                     <Td color={textColor}>{member.email}</Td>
@@ -171,7 +171,7 @@ export default function Team() {
                     </Td>
                 </Tr>
             ))}
-            {team.length === 0 && !loading && (
+            {(!team || team.length === 0) && !loading && (
                 <Tr><Td colSpan={4} textAlign="center" py={6} color="gray.500">Nenhum membro encontrado.</Td></Tr>
             )}
             </Tbody>

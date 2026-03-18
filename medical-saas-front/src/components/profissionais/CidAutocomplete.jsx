@@ -39,10 +39,10 @@ export default function CidAutocomplete({ value, onChange, specialty }) {
   useEffect(() => {
     const fetchCids = async () => {
       if (inputValue.length < 2) {
-        // Se estiver vazio, traz as sugestões da especialidade
+        // Se estiver vazio, traz as sugestões gerais mais comuns
         try {
           setLoading(true);
-          const res = await api.get(`/cids/sugestoes?especialidade=${specialty || ''}`);
+          const res = await api.get(`/cids/sugestoes`);
           setResults(res.data);
         } catch (error) {
           console.error(error);
@@ -70,7 +70,7 @@ export default function CidAutocomplete({ value, onChange, specialty }) {
     }, 300);
 
     return () => clearTimeout(timerId);
-  }, [inputValue, specialty, isOpen]);
+  }, [inputValue, isOpen]);
 
   // Quando clica em uma doença da lista
   const handleSelect = (cid) => {
@@ -128,16 +128,9 @@ export default function CidAutocomplete({ value, onChange, specialty }) {
               borderBottom={idx !== results.length - 1 ? '1px solid' : 'none'}
               borderColor={borderColor}
             >
-              <Flex justify="space-between" align="center">
-                <Box>
-                    <Text fontWeight="bold" fontSize="sm" color="blue.500">{cid.codigo}</Text>
-                    <Text fontSize="sm">{cid.descricao}</Text>
-                </Box>
-                {cid.especialidade && (
-                    <Text fontSize="2xs" color="gray.500" bg={useColorModeValue('gray.100', 'gray.700')} px={2} py={1} borderRadius="full">
-                        {cid.especialidade}
-                    </Text>
-                )}
+              <Flex direction="column">
+                  <Text fontWeight="bold" fontSize="sm" color="blue.500">{cid.codigo}</Text>
+                  <Text fontSize="sm" color={useColorModeValue('gray.700', 'gray.200')}>{cid.descricao}</Text>
               </Flex>
             </ListItem>
           ))}

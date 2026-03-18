@@ -71,8 +71,30 @@ export default function ContasPagarReceber() {
   };
 
   useEffect(() => {
-    fetchTransactions();
+    const tempoEspera = setTimeout(() => {
+      fetchTransactions();
+    }, 600);
+    
+    return () => clearTimeout(tempoEspera);
   }, [filters]); 
+
+  // --- TRAVA DE ANO MÁXIMO (Hoje + 4 anos) ---
+  const maxYear = new Date().getFullYear() + 4;
+  const maxDateLimit = `${maxYear}-12-31`;
+
+  const enforceDateLimit = (dateString) => {
+      if (!dateString) return dateString;
+      const partes = dateString.split('-');
+      // Corta para não passar de 4 dígitos no ano
+      if (partes[0].length > 4) {
+          partes[0] = partes[0].slice(0, 4);
+      }
+      // Se o ano for maior que a data atual + 4, ele trava no ano máximo
+      if (parseInt(partes[0]) > maxYear) {
+          partes[0] = maxYear.toString();
+      }
+      return partes.join('-');
+  };
 
   // --- BLINDAGEM DE TITÂNIO ATUALIZADA (Lê português e inglês) ---
   const filteredTransactions = (transactions || []).filter((t) => {
@@ -195,7 +217,17 @@ export default function ContasPagarReceber() {
                 </FormControl>
                 <FormControl>
                     <FormLabel fontSize="xs" color="gray.500">Ano</FormLabel>
-                    <Input type="number" bg={inputBg} borderColor={borderColor} value={filters.ano} onChange={(e) => setFilters({...filters, ano: e.target.value})} />
+                    <Input 
+                        type="number" 
+                        bg={inputBg} 
+                        borderColor={borderColor} 
+                        value={filters.ano} 
+                        onChange={(e) => {
+                            // Trava de 4 dígitos!
+                            const anoLimitado = e.target.value.slice(0, 4);
+                            setFilters({...filters, ano: anoLimitado});
+                        }} 
+                    />
                 </FormControl>
                 <FormControl>
                     <FormLabel fontSize="xs" color="gray.500">Tipo</FormLabel>
@@ -328,7 +360,14 @@ export default function ContasPagarReceber() {
               </FormControl>
               <FormControl isRequired>
                 <FormLabel color={textColor}>Vencimento Inicial</FormLabel>
-                <Input type="date" bg={inputBg} borderColor={borderColor} value={newTx.data_vencimento} onChange={(e) => setNewTx({...newTx, data_vencimento: e.target.value})} />
+                <Input 
+                    type="date" 
+                    max={maxDateLimit} // Nova trava nativa do navegador
+                    bg={inputBg} 
+                    borderColor={borderColor} 
+                    value={newTx.data_vencimento} 
+                    onChange={(e) => setNewTx({...newTx, data_vencimento: enforceDateLimit(e.target.value)})} 
+                />
               </FormControl>
               <FormControl isRequired>
                 <FormLabel color={textColor}>Tipo</FormLabel>

@@ -250,7 +250,8 @@ def update_appointment_status(
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role not in ['doctor', 'admin', 'superuser', 'medico']:
+    # AQUI ESTÁ A MÁGICA: Recepcionista adicionada à lista de permissão!
+    if current_user.role not in ['doctor', 'admin', 'superuser', 'medico', 'recepcionista']:
         raise HTTPException(status_code=403, detail="Sem permissão para alterar status.")
 
     app_db = db.query(Appointment).filter(Appointment.id == appointment_id).first()

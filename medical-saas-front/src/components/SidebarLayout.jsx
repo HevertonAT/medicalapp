@@ -49,6 +49,8 @@ export default function SidebarLayout() {
     }
   }, []);
 
+  // --- CONTROLE DE ACESSO DO MENU ---
+  // A recepcionista não vê: Dashboard, Configurações, Profissionais, Financeiro e Equipe.
   const menuItems = [
     { name: 'Painel', icon: FaHome, path: '/dashboard', roles: ['admin', 'doctor'] },
     { name: 'Cadastro de Clinicas', icon: FaBuilding, path: '/clinicas', roles: ['superuser'] },
@@ -57,7 +59,7 @@ export default function SidebarLayout() {
     { name: 'Configurações', icon: FaClock, path: '/minha-agenda', roles: ['doctor', 'admin'] },
     { name: 'Profissionais', icon: FaUserMd, path: '/doctors', roles: ['superuser', 'admin'] },
     { name: 'Especialidades', icon: FaCode, path: '/specialties', roles: ['superuser', 'admin'] },
-    { name: 'Dashboard Caixa', icon: FaChartPie, path: '/financial', roles: ['admin'] },
+    { name: 'Relatório Financeiro', icon: FaChartPie, path: '/financial', roles: ['admin'] },
     { name: 'Contas (Pagar/Receber)', icon: FaFileInvoiceDollar, path: '/contas', roles: ['admin'] }, 
     { name: 'Painel SaaS', icon: FaBuilding, path: '/saas', roles: ['superuser'] },
     { name: 'Área Dev', icon: FaCode, path: '/dev-tools', roles: ['superuser'] },
@@ -81,13 +83,9 @@ export default function SidebarLayout() {
   };
 
   return (
-    // Adicionado direction para organizar a barra mobile em cima do conteúdo
     <Flex h="100vh" bg={bgMain} direction={{ base: 'column', md: 'row' }}>
       
-      {/* ==========================================
-          BARRA SUPERIOR MOBILE
-          Só aparece no celular (base: 'flex', md: 'none')
-      ========================================== */}
+      {/* BARRA SUPERIOR MOBILE */}
       <Flex 
         display={{ base: 'flex', md: 'none' }} 
         w="full" p={4} align="center" justify="space-between" 
@@ -104,9 +102,7 @@ export default function SidebarLayout() {
         </Flex>
       </Flex>
 
-      {/* ==========================================
-          MENU GAVETA MOBILE (Desliza da esquerda)
-      ========================================== */}
+      {/* MENU GAVETA MOBILE */}
       <Drawer isOpen={isOpen} placement="left" onClose={onClose}>
         <DrawerOverlay />
         <DrawerContent bg={bgSidebar}>
@@ -131,7 +127,6 @@ export default function SidebarLayout() {
 
                 const isActive = location.pathname === item.path;
                 return (
-                  // onClick={onClose} faz o menu fechar automaticamente ao clicar no link
                   <Link to={item.path} key={item.name} onClick={onClose}>
                     <Flex 
                       align="center" p={3} borderRadius="md" 
@@ -157,6 +152,7 @@ export default function SidebarLayout() {
         </DrawerContent>
       </Drawer>
       
+      {/* SIDEBAR DESKTOP */}
       <Box 
         w={isSidebarOpen ? "250px" : "80px"} 
         bg={bgSidebar} 
@@ -248,9 +244,7 @@ export default function SidebarLayout() {
         </Button>
       </Box>
 
-      {/* ==========================================
-          CONTEÚDO PRINCIPAL (TELAS)
-      ========================================== */}
+      {/* CONTEÚDO PRINCIPAL (TELAS) */}
       <Box flex="1" p={0} overflowY="auto" w="full">
         <Outlet />
       </Box>

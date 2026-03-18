@@ -18,8 +18,8 @@ registerLocale('pt-BR', ptBR);
 
 export default function PatientArea() {
   const dataLimiteObj = new Date();
-  // Limita o agendamento para no máximo 1 ano a partir de hoje
-  dataLimiteObj.setFullYear(dataLimiteObj.getFullYear() + 1);
+  // Limita o agendamento para no máximo 4 anos a partir de hoje
+  dataLimiteObj.setFullYear(dataLimiteObj.getFullYear() + 4);
 
   const [appointments, setAppointments] = useState([]);
   const [doctors, setDoctors] = useState([]); 
@@ -50,9 +50,48 @@ export default function PatientArea() {
   const inputBg = useColorModeValue('gray.50', 'gray.700'); 
   const inputBorder = useColorModeValue('gray.300', 'gray.600');
   const textColor = useColorModeValue('gray.800', 'white');
-  const subTextColor = useColorModeValue('gray.600', 'gray.300');
+  const subTextColor = useColorModeValue('gray.600', 'gray.400');
   const labelColor = useColorModeValue('gray.700', 'gray.300');
   const highlightColor = useColorModeValue('blue.600', 'blue.300');
+
+  // --- MÁGICA DO MODO ESCURO PARA O CALENDÁRIO ---
+  const hoverDayBg = useColorModeValue('gray.200', 'gray.600');
+  const mutedTextColor = useColorModeValue('gray.400', 'gray.500');
+  
+  const datePickerStyles = {
+    '.react-datepicker-wrapper': { width: '100%' },
+    '.react-datepicker': {
+      backgroundColor: bgCard,
+      borderColor: borderColor,
+      fontFamily: 'inherit',
+      boxShadow: 'md',
+    },
+    '.react-datepicker__header': {
+      backgroundColor: inputBg,
+      borderColor: borderColor,
+    },
+    '.react-datepicker__current-month, .react-datepicker__day-name': {
+      color: textColor,
+    },
+    '.react-datepicker__day': {
+      color: textColor,
+      '&:hover': {
+        backgroundColor: hoverDayBg,
+      },
+    },
+    '.react-datepicker__day--disabled': {
+      color: mutedTextColor,
+      '&:hover': { backgroundColor: 'transparent' }
+    },
+    '.react-datepicker__day--selected, .react-datepicker__day--keyboard-selected': {
+      backgroundColor: 'blue.500',
+      color: 'white',
+      '&:hover': { backgroundColor: 'blue.600' }
+    },
+    '.react-datepicker__triangle': {
+      display: 'none' // Removemos o triângulo que buga a cor no modo escuro
+    }
+  };
 
   const isWeekdayValid = (date, docId) => {
     if (!docId) return false; 
@@ -324,7 +363,8 @@ export default function PatientArea() {
                     
                     <FormControl isRequired>
                       <FormLabel color={labelColor}>Data</FormLabel>
-                      <Box sx={{ '.react-datepicker-wrapper': { width: '100%' } }}>
+                      {/* O CALENDÁRIO AGORA RECEBE O OBJETO DE ESTILOS CSS-IN-JS */}
+                      <Box sx={datePickerStyles}>
                         <DatePicker
                           locale="pt-BR"
                           dateFormat="dd/MM/yyyy"
@@ -341,8 +381,8 @@ export default function PatientArea() {
                           customInput={
                             <Input 
                               bg={inputBg} color={textColor} border="1px solid" borderColor={inputBorder}
-                              isReadOnly // <-- A MÁGICA FINAL: IMPEDE DIGITAÇÃO E AUTOCOMPLETAR
-                              cursor="pointer" // Mostra a "mãozinha" indicando que é clicável
+                              isReadOnly
+                              cursor="pointer"
                               _disabled={{ opacity: 0.6, cursor: 'not-allowed' }}
                             />
                           }
@@ -428,7 +468,8 @@ export default function PatientArea() {
             <VStack spacing={4}>
               <FormControl isRequired>
                 <FormLabel color={labelColor}>Nova Data</FormLabel>
-                <Box sx={{ '.react-datepicker-wrapper': { width: '100%' } }}>
+                {/* AQUI TAMBÉM RECEBE OS ESTILOS CSS-IN-JS */}
+                <Box sx={datePickerStyles}>
                   <DatePicker
                     locale="pt-BR"
                     dateFormat="dd/MM/yyyy"
@@ -444,7 +485,7 @@ export default function PatientArea() {
                     customInput={
                       <Input 
                         bg={inputBg} color={textColor} border="1px solid" borderColor={inputBorder} 
-                        isReadOnly // <-- BLOQUEIO DE DIGITAÇÃO NO REAGENDAR TAMBÉM
+                        isReadOnly 
                         cursor="pointer"
                       />
                     }

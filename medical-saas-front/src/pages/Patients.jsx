@@ -8,6 +8,7 @@ import {
 } from '@chakra-ui/react';
 import { FaPlus, FaFileMedical, FaHistory, FaPrescriptionBottleAlt, FaEdit, FaBan, FaCheck, FaPrint, FaSearch } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
+import { jwtDecode } from "jwt-decode"; // <-- IMPORTAÇÃO ADICIONADA AQUI
 
 import api from '../services/api';
 
@@ -15,6 +16,9 @@ export default function Patients() {
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   
+  // --- ESTADO PARA SABER QUEM ESTÁ LOGADO ---
+  const [currentUserRole, setCurrentUserRole] = useState('');
+
   const { isOpen, onOpen, onClose } = useDisclosure(); 
   const { isOpen: isRecordOpen, onOpen: onRecordOpen, onClose: onRecordClose } = useDisclosure(); 
 
@@ -50,6 +54,22 @@ export default function Patients() {
   const anamneseBg = useColorModeValue('gray.50', 'gray.700');
   const prescricaoBg = useColorModeValue('orange.50', 'orange.900');
   const prescricaoText = useColorModeValue('orange.800', 'orange.100');
+
+  // --- TRAVA DE ANO MÁXIMO (Hoje + 4 anos) ---
+  const maxYear = new Date().getFullYear() + 4;
+  const maxDateLimit = `${maxYear}-12-31`;
+
+  const enforceDateLimit = (dateString) => {
+      if (!dateString) return dateString;
+      const partes = dateString.split('-');
+      if (partes[0].length > 4) {
+          partes[0] = partes[0].slice(0, 4);
+      }
+      if (parseInt(partes[0]) > maxYear) {
+          partes[0] = maxYear.toString();
+      }
+      return partes.join('-');
+  };
 
   const calculateAge = (dataNascimento) => {
     if (!dataNascimento) return '-';
@@ -129,7 +149,19 @@ export default function Patients() {
     }
   };
 
-  useEffect(() => { fetchPatients(); }, []);
+  // --- BUSCA OS PACIENTES E IDENTIFICA QUEM ESTÁ LOGADO ---
+  useEffect(() => { 
+      const token = localStorage.getItem('medical_token');
+      if (token) {
+          try {
+              const decoded = jwtDecode(token);
+              setCurrentUserRole(decoded.role || localStorage.getItem('user_role'));
+          } catch (e) {
+              console.error("Erro ao decodificar token", e);
+          }
+      }
+      fetchPatients(); 
+  }, []);
 
   const filteredPatients = patients.filter(p => {
     if (filter === 'ativos') return p.ativo === true;
@@ -175,7 +207,7 @@ export default function Patients() {
   };
 
   const handleInactivate = async (id) => {
-    if (confirm('Inativar este paciente?')) {
+    if (window.confirm('Inativar este paciente?')) {
         try {
             await api.delete(`/patients/${id}`);
             toast({ title: 'Inativado.', status: 'warning' });
@@ -185,7 +217,7 @@ export default function Patients() {
   };
 
   const handleReactivate = async (id) => {
-    if (confirm('Reativar este paciente?')) {
+    if (window.confirm('Reativar este paciente?')) {
         try {
             await api.patch(`/patients/${id}/reactivate`, {});
             toast({ title: 'Paciente reativado!', status: 'success' });
@@ -232,7 +264,6 @@ export default function Patients() {
     } catch (error) { console.error("Erro prontuário"); }
   };
 
-  // --- O TRADUTOR INTELIGENTE DE ESPECIALIDADE POR GÊNERO ---
   const formatDoctorInfo = (name, specialtyArea, gender) => {
     const isMale = gender === 'Masculino' || gender === 'M' || gender === 'masculino' || gender === 'm';
     const isFemale = gender === 'Feminino' || gender === 'F' || gender === 'feminino' || gender === 'f';
@@ -274,14 +305,8 @@ export default function Patients() {
     }
 
     const patientAge = calculateAge(currentPatient.data_nascimento);
-    
-    // --- CORREÇÃO AQUI: Tenta buscar o CR de várias propriedades possíveis ---
     const docReg = record.doctor_document || record.doctor_crm || record.crm || "CR não informado";
-    
-    // Mágica acontecendo aqui:
     const docInfo = formatDoctorInfo(record.doctor_nome, record.doctor_specialty, record.doctor_gender);
-    
-    // Formata o ID do Prontuário para 9 dígitos ex: 000000152
     const recordIdFormatted = record.id ? String(record.id).padStart(9, '0') : "000000000";
 
     const html = `
@@ -291,23 +316,16 @@ export default function Patients() {
             <title>Evolução - ${currentPatient.nome_completo}</title>
             <style>
                 body { font-family: 'Arial', sans-serif; padding: 40px; color: #333; line-height: 1.5; }
-                
-                /* CABEÇALHO PADRÃO */
                 .header-container { border: 1px solid #ccc; padding: 15px; margin-bottom: 25px; border-radius: 5px; font-size: 14px; background-color: #fff;}
                 .header-title { text-align: center; font-size: 20px; font-weight: bold; text-transform: uppercase; margin-bottom: 20px; background-color: #e2e8f0; padding: 8px; border: 1px solid #cbd5e0; color: #2d3748; letter-spacing: 2px;}
                 .info-row { margin-bottom: 5px; }
-                
-                /* CAIXA DE TEXTOS */
                 .section { margin-bottom: 25px; page-break-inside: avoid; border: 1px solid #e2e8f0; padding: 15px; border-radius: 5px;}
                 .title { font-size: 14px; font-weight: bold; margin-bottom: 10px; color: #4a5568;}
                 .content { white-space: pre-wrap; font-size: 14px; }
-                
-                /* ASSINATURA CENTRALIZADA E DETALHADA */
                 .signature-box { margin-top: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; page-break-inside: avoid; }
                 .signature-line { border-top: 1px solid #000; width: 350px; margin-bottom: 5px; }
                 .signature-text { margin: 2px 0; font-size: 14px; }
                 .signature-name { font-weight: bold; font-size: 15px; text-transform: uppercase;}
-                
                 .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
             </style>
         </head>
@@ -419,12 +437,16 @@ export default function Patients() {
 
                 <Td py={2}>
                     <HStack justify="center" spacing={1}>
-                    <Button 
-                        size="xs" leftIcon={<FaFileMedical />} colorScheme="teal" 
-                        onClick={() => handleOpenRecord(p)}
-                    >
-                        Prontuário
-                    </Button>
+                    
+                    {/* --- A MÁGICA: O botão só aparece se não for recepcionista --- */}
+                    {currentUserRole !== 'recepcionista' && (
+                        <Button 
+                            size="xs" leftIcon={<FaFileMedical />} colorScheme="teal" 
+                            onClick={() => handleOpenRecord(p)}
+                        >
+                            Prontuário
+                        </Button>
+                    )}
                     
                     <IconButton 
                         icon={<FaEdit />} size="xs" colorScheme="yellow" variant="ghost"
@@ -494,9 +516,13 @@ export default function Patients() {
                 <FormControl>
                     <FormLabel fontSize="sm">Data de Nascimento</FormLabel>
                     <Input 
-                        size="sm" type="date" bg={inputBg} borderColor={borderColor} 
+                        size="sm" 
+                        type="date" 
+                        max={maxDateLimit}
+                        bg={inputBg} 
+                        borderColor={borderColor} 
                         value={currentPatient.data_nascimento} 
-                        onChange={(e) => setCurrentPatient({...currentPatient, data_nascimento: e.target.value})} 
+                        onChange={(e) => setCurrentPatient({...currentPatient, data_nascimento: enforceDateLimit(e.target.value)})} 
                     />
                 </FormControl>
               </HStack>
