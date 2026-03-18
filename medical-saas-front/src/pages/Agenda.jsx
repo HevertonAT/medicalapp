@@ -474,7 +474,7 @@ export default function Agenda() {
                 <p class="signature-text">${docReg}</p>
             </div>
 
-            <div class="footer">Gerado de forma segura por MedicalSaaS</div>
+            <div class="footer">Gerado de forma segura por VezzCare</div>
         </body>
         </html>
     `;
