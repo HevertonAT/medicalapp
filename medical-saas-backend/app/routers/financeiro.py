@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session
-from sqlalchemy import func, desc, extract
+from sqlalchemy import func, desc, extract, or_
 from datetime import date, datetime
 from typing import Optional, List
 from pydantic import BaseModel # <-- Importante para a rota da NF-e
@@ -26,6 +26,7 @@ class UpdateNotaFiscal(BaseModel):
 def get_financial_stats(
     start_date: Optional[str] = None, 
     end_date: Optional[str] = None,
+    nf_status: Optional[str] = None,  # <-- O parâmetro que o React envia
     db: Session = Depends(get_db),
     current_user: User = Depends(allow_only_admin) 
 ):
@@ -42,30 +43,43 @@ def get_financial_stats(
 
     base_filter = [Transaction.clinic_id == current_user.clinic_id] if current_user.role != 'superuser' else []
 
-    # 1. Total Receita no Período
-    period_revenue = db.query(func.sum(Transaction.valor)).filter(
-        *base_filter,
-        Transaction.tipo == "entrada",
+    period_filter = base_filter + [
         func.date(Transaction.criado_em) >= start_date,
         func.date(Transaction.criado_em) <= end_date
+    ]
+
+    # --- O USO DO "OR_" ESTÁ AQUI (Isso faz a linha amarela sumir) ---
+    if nf_status == 'emitida':
+        period_filter.append(Transaction.status_nfe.in_(['emitida', 'emitido', 'concluída']))
+    elif nf_status == 'pendente':
+        period_filter.append(or_(
+            Transaction.status_nfe == 'pendente', 
+            Transaction.status_nfe.is_(None),
+            Transaction.status_nfe == ''
+        ))
+    elif nf_status == 'dispensada':
+        period_filter.append(Transaction.status_nfe.in_(['dispensada', 'não se aplica', 'nao_se_aplica']))
+
+    # 1. Total Receita no Período
+    period_revenue = db.query(func.sum(Transaction.valor)).filter(
+        *period_filter,
+        Transaction.tipo == "entrada"
     ).scalar() or 0.0
 
     # Total Despesa no Período
     period_expense = db.query(func.sum(Transaction.valor)).filter(
-        *base_filter,
-        Transaction.tipo == "saida",
-        func.date(Transaction.criado_em) >= start_date,
-        func.date(Transaction.criado_em) <= end_date
+        *period_filter,
+        Transaction.tipo == "saida"
     ).scalar() or 0.0
 
-    # 2. Total Geral Acumulado (Entradas)
+    # 2. Total Geral Acumulado (Entradas - Ignora o filtro de NF para mostrar o saldo real da clínica)
     total_accumulated = db.query(func.sum(Transaction.valor)).filter(
         *base_filter,
         Transaction.tipo == "entrada"
     ).scalar() or 0.0
 
     # 3. Lista de Transações Recentes
-    recent_transactions = db.query(Transaction).filter(*base_filter).order_by(desc(Transaction.criado_em)).limit(50).all()
+    recent_transactions = db.query(Transaction).filter(*period_filter).order_by(desc(Transaction.criado_em)).limit(50).all()
 
     # MÁGICA: Mapeia as transações forçando a devolução da forma de pagamento e parcelas para o React
     transactions_data = [
@@ -82,25 +96,33 @@ def get_financial_stats(
         } for t in recent_transactions
     ]
 
-    # 4. Dados para o Gráfico (Somando Entradas por Dia)
+    # 4. Dados para o Gráfico (Somando Entradas por Dia e separando por cor)
     chart_data = []
     daily_sums = {}
     
-    entradas_recentes = db.query(Transaction).filter(
-        *base_filter,
-        Transaction.tipo == "entrada",
-        func.date(Transaction.criado_em) >= start_date,
-        func.date(Transaction.criado_em) <= end_date
-    ).all()
+    entradas_recentes = db.query(Transaction).filter(*period_filter, Transaction.tipo == "entrada").all()
 
     for t in entradas_recentes:
         if t.criado_em:
-             day_str = t.criado_em.strftime("%d/%m")
-             daily_sums[day_str] = daily_sums.get(day_str, 0) + t.valor
+            day_str = t.criado_em.strftime("%d/%m")
+            
+            # Cria o "esqueleto" do dia se não existir
+            if day_str not in daily_sums:
+                daily_sums[day_str] = {"name": day_str, "emitida": 0.0, "pendente": 0.0, "dispensada": 0.0}
+            
+            # Identifica o status real
+            status_raw = str(t.status_nfe).lower().strip() if t.status_nfe else 'pendente'
+            
+            # Soma o valor na "caixinha" correta daquele dia
+            if status_raw in ['emitida', 'emitido', 'concluída']:
+                daily_sums[day_str]["emitida"] += t.valor
+            elif status_raw in ['dispensada', 'não se aplica', 'nao_se_aplica']:
+                daily_sums[day_str]["dispensada"] += t.valor
+            else:
+                daily_sums[day_str]["pendente"] += t.valor
     
-    for day, val in daily_sums.items():
-        chart_data.append({"name": day, "valor": val})
-    
+    # Transforma o dicionário em lista e ordena pela data
+    chart_data = list(daily_sums.values())
     chart_data = sorted(chart_data, key=lambda x: x['name'])
 
     return {
