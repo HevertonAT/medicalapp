@@ -23,6 +23,7 @@ from app.models.unidades import Unit
 from app.models.cargos import Role
 from app.models.logs_auditoria import AuditLog
 from app.models.regras_especialidades import SpecialtyRule
+from app.models.cids import Cid
 
 # --- IMPORTAÇÃO DAS ROTAS ---
 from app.routers import (
@@ -42,8 +43,9 @@ from app.routers import (
     relatorios,
     saas,
     usuarios 
-    
 )
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="VezzCare", 
