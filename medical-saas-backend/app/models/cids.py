@@ -1,5 +1,4 @@
-# app/models/cids.py
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, Text
 from app.db.base import Base
 
 class Cid(Base):
@@ -7,4 +6,4 @@ class Cid(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     codigo = Column(String(10), unique=True, index=True)
-    descricao = Column(String(255), index=True)
+    descricao = Column(Text, index=True)
