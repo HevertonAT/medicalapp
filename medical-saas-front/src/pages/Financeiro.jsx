@@ -17,7 +17,7 @@ export default function Financial() {
   });
   
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
-  const [nfFilter, setNfFilter] = useState('');
+  const [nfFilter, setNfFilter] = useState(''); // Estado para o filtro de NF
 
   const toast = useToast();
   const navigate = useNavigate();
@@ -34,7 +34,7 @@ export default function Financial() {
       let query = '?';
       if (dateRange.start) query += `start_date=${dateRange.start}&`;
       if (dateRange.end) query += `end_date=${dateRange.end}&`;
-      if (nfFilter) query += `nf_status=${nfFilter}`;
+      if (nfFilter) query += `nf_status=${nfFilter}`; // Envia o filtro para o back-end
 
       const response = await api.get(`/financial/stats${query}`, {
         headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache', 'Expires': '0' }
@@ -118,7 +118,7 @@ export default function Financial() {
             <div class="header">
                 <h1>Relatório Financeiro da Clínica</h1>
                 <p>Período de apuração: <strong>${dataInicio}</strong> até <strong>${dataFim}</strong></p>
-                ${nfFilter ? `<p>Filtro: <strong>${nfFilter === 'emitida' ? 'Apenas Notas Emitidas' : nfFilter === 'dispensada' ? 'Apenas Dispensadas' : 'Apenas Notas Pendentes'}</strong></p>` : ''}
+                ${nfFilter ? `<p>Filtro Aplicado: <strong>${nfFilter === 'emitida' ? 'Apenas Notas Emitidas' : nfFilter === 'dispensada' ? 'Apenas Dispensadas' : 'Apenas Notas Pendentes'}</strong></p>` : ''}
             </div>
             <div class="summary">
                 <div class="summary-box">
@@ -145,15 +145,17 @@ export default function Financial() {
                 <tbody>
                     ${stats.transactions && stats.transactions.length > 0 ? stats.transactions.map(t => {
                         const dataVenc = t.data_vencimento || t.criado_em;
-                        const desc = t.descricao || 'Receita Avulsa';
-                        const numeroNF = t.link_nfe || '-';
-                        const statusReal = t.status_nfe ? String(t.status_nfe).toLowerCase().trim() : 'pendente';
+                        const desc = t.descricao || t.description || 'Receita Avulsa';
                         
-                        let statusNfText = 'Pendente'; let statusNfClass = 'badge-danger';
-                        if (['emitida', 'emitido', 'concluída'].includes(statusReal)) {
-                            statusNfText = 'Emitida'; statusNfClass = 'badge-success';
-                        } else if (['dispensada', 'não se aplica', 'nao_se_aplica'].includes(statusReal)) {
-                            statusNfText = 'Dispensada'; statusNfClass = 'badge-gray';
+                        const numeroNF = t.link_nfe || t.numero_nota || t.numero_nf || '-';
+                        const statusOriginal = t.status_nfe ? String(t.status_nfe).toLowerCase().trim() : 'pendente';
+                        
+                        // Lógica exata para bater com a tela de Contas a Pagar/Receber
+                        let statusNfText = 'Pendente'; let statusNfClass = 'badge-danger'; // Vermelho/Amarelo
+                        if (statusOriginal === 'emitida' || statusOriginal === 'emitido' || statusOriginal === 'concluída') {
+                            statusNfText = 'Emitida'; statusNfClass = 'badge-success'; // Verde
+                        } else if (statusOriginal === 'não se aplica' || statusOriginal === 'nao_se_aplica' || statusOriginal === 'dispensada') {
+                            statusNfText = 'Dispensada'; statusNfClass = 'badge-gray'; // Cinza
                         }
 
                         return `
@@ -258,9 +260,7 @@ export default function Financial() {
 
           <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
             <Flex direction="column" bg={bgCard} p={5} shadow="sm" borderRadius="lg" h="400px" border="1px" borderColor={borderColor}>
-                <Heading size="md" mb={4} color={textColor}>
-                    Evolução Diária
-                </Heading>
+                <Heading size="md" mb={4} color={textColor}>Evolução Diária</Heading>
                 <Box flex="1" minH="0" w="100%">
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={stats?.chart_data || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -270,15 +270,15 @@ export default function Financial() {
                             <Tooltip contentStyle={{ backgroundColor: chartTooltipBg, borderColor: borderColor, borderRadius: '8px' }} itemStyle={{ color: useColorModeValue('#000', '#fff') }} />
                             <Legend wrapperStyle={{ paddingTop: '10px' }} />
                             
-                            {/* LÓGICA DAS BARRAS EMPILHADAS E SEPARADAS POR CORES */}
+                            {/* **LÓGICA DE CLÚSTER (Side-by-Side): Barras separadas e com cores independentes** */}
                             {(!nfFilter || nfFilter === 'emitida') && (
-                                <Bar dataKey="emitida" stackId="a" fill="#48BB78" name="NF Emitida" />
+                                <Bar dataKey="emitida" fill="#48BB78" name="NF Emitida" />
                             )}
                             {(!nfFilter || nfFilter === 'pendente') && (
-                                <Bar dataKey="pendente" stackId="a" fill="#F56565" name="NF Pendente" />
+                                <Bar dataKey="pendente" fill="#F56565" name="NF Pendente" />
                             )}
                             {(!nfFilter || nfFilter === 'dispensada') && (
-                                <Bar dataKey="dispensada" stackId="a" fill="#A0AEC0" name="NF Dispensada" />
+                                <Bar dataKey="dispensada" fill="#A0AEC0" name="Dispensada" />
                             )}
                         </BarChart>
                     </ResponsiveContainer>
@@ -296,13 +296,13 @@ export default function Financial() {
                         const dataVenc = t.data_vencimento || t.criado_em;
                         const statusReal = t.status_nfe ? String(t.status_nfe).toLowerCase().trim() : 'pendente';
                         
+                        // LÓGICA DE DETECÇÃO CELEBRANDO O STATUS DISPENSADA
                         const isNfEmitida = ['emitida', 'emitido', 'concluída'].includes(statusReal);
                         const isNfDispensada = ['dispensada', 'não se aplica', 'nao_se_aplica'].includes(statusReal);
                         
                         let badgeConfig = { color: 'red', text: 'NF Pendente', tip: 'Aguardando Emissão', bgTip: 'red.500' };
-                        
                         if (isNfEmitida) {
-                            badgeConfig = { color: 'green', text: 'NF Emitida', tip: `Nº da NF: ${t.link_nfe || '-'}`, bgTip: 'green.600' };
+                            badgeConfig = { color: 'green', text: 'NF Emitida', tip: `Nº da NF: ${t.link_nfe || t.numero_nota || t.numero_nf || '-'}`, bgTip: 'green.600' };
                         } else if (isNfDispensada) {
                             badgeConfig = { color: 'gray', text: 'Dispensada', tip: 'Emissão não exigida', bgTip: 'gray.600' };
                         }
@@ -311,15 +311,14 @@ export default function Financial() {
                         <Flex key={t.id} justify="space-between" p={3} bg={inputBg} borderRadius="md" align="center" border="1px" borderColor={borderColor}>
                              <Box flex="1">
                                 <Text fontSize="sm">{dataVenc ? new Date(dataVenc + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</Text>
+                                {/* TOOLTIP MÁGICO AQUI - Agora responde ao Dispensada! */}
                                 <ChakraTooltip label={badgeConfig.tip} hasArrow placement="top" bg={badgeConfig.bgTip}>
                                     <Badge colorScheme={badgeConfig.color} variant="subtle" cursor="pointer" mt={1} fontSize="0.65rem">
                                         {badgeConfig.text}
                                     </Badge>
                                 </ChakraTooltip>
                              </Box>
-
                              <Text fontSize="sm" flex="1" textAlign="center" fontWeight="bold" color="green.500">R$ {Number(t.valor).toFixed(2)}</Text>
-                             
                              <Box flex="1" display="flex" justifyContent="flex-end">
                                 <Badge colorScheme="teal" variant="outline" textTransform="none">
                                     {t.forma_pagamento ? t.forma_pagamento : 'N/A'}
@@ -328,7 +327,6 @@ export default function Financial() {
                              </Box>
                         </Flex>
                     )})}
-                    
                     {(!stats?.transactions || stats?.transactions?.length === 0) && (
                         <Text color="gray.500" textAlign="center" mt={4}>Nenhum lançamento no período.</Text>
                     )}
