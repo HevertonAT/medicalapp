@@ -74,10 +74,19 @@ export default function Financial() {
     setDateRange({ start, end });
   };
 
-  // --- GERADOR DE RELATÓRIO PDF (Com Formas de Pagamento e Parcelas) ---
+  // --- GERADOR DE RELATÓRIO PDF (Sincronizado com DB Transacoes) ---
   const handlePrintPDF = () => {
-    const dataInicio = dateRange.start ? new Date(dateRange.start + 'T00:00:00').toLocaleDateString('pt-BR') : 'Início do Mês';
-    const dataFim = dateRange.end ? new Date(dateRange.end + 'T00:00:00').toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
+    const todayForPDF = new Date();
+    const firstDayOfMonth = new Date(todayForPDF.getFullYear(), todayForPDF.getMonth(), 1);
+    
+    // Calcula a data de início real se não houver filtro
+    const dataInicio = dateRange.start 
+        ? new Date(dateRange.start + 'T00:00:00').toLocaleDateString('pt-BR') 
+        : firstDayOfMonth.toLocaleDateString('pt-BR');
+        
+    const dataFim = dateRange.end 
+        ? new Date(dateRange.end + 'T00:00:00').toLocaleDateString('pt-BR') 
+        : todayForPDF.toLocaleDateString('pt-BR');
 
     const html = `
         <!DOCTYPE html>
@@ -95,10 +104,12 @@ export default function Financial() {
                 .summary-box p { margin: 0; font-size: 28px; font-weight: bold; }
                 .val-green { color: #48BB78; }
                 .val-blue { color: #3182CE; }
-                table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
-                th, td { border-bottom: 1px solid #E2E8F0; padding: 12px 15px; text-align: left; }
-                th { background-color: #EDF2F7; color: #4A5568; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+                th, td { border-bottom: 1px solid #E2E8F0; padding: 12px 10px; text-align: left; }
+                th { background-color: #EDF2F7; color: #4A5568; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
                 .method-badge { background: #E2E8F0; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; color: #4A5568; }
+                .badge-success { background: #C6F6D5; color: #22543D; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+                .badge-danger { background: #FED7D7; color: #822727; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
                 .amount { color: #48BB78; font-weight: bold; }
                 .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #A0AEC0; border-top: 1px solid #E2E8F0; padding-top: 20px; }
             </style>
@@ -125,14 +136,24 @@ export default function Financial() {
                         <th>Data</th>
                         <th>Descrição</th>
                         <th>Método</th>
+                        <th style="text-align: center;">Nota Fiscal</th>
+                        <th style="text-align: center;">Status NF</th>
                         <th style="text-align: right;">Valor (R$)</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${stats.transactions && stats.transactions.length > 0 ? stats.transactions.map(t => {
-                        // Garantia de fallback para os dados da tabela PDF
-                        const dataVenc = t.data_vencimento || t.due_date;
-                        const desc = t.descricao || t.description || 'Receita Avulsa';
+                        const dataVenc = t.data_vencimento || t.criado_em;
+                        const desc = t.descricao || 'Receita Avulsa';
+                        
+                        // Busca do número da NF (link_nfe) e tratamento do Status
+                        const numeroNF = t.link_nfe || '-';
+                        const statusReal = t.status_nfe ? t.status_nfe.toLowerCase() : 'pendente';
+                        const isNfEmitida = statusReal === 'emitida' || statusReal === 'emitido' || statusReal === 'concluída';
+                        
+                        // Capitaliza a primeira letra do status para ficar bonito (ex: pendente -> Pendente)
+                        const statusNfText = t.status_nfe ? t.status_nfe.charAt(0).toUpperCase() + t.status_nfe.slice(1) : 'Pendente';
+                        const statusNfClass = isNfEmitida ? 'badge-success' : 'badge-danger';
                         
                         return `
                         <tr>
@@ -144,9 +165,13 @@ export default function Financial() {
                                     ${t.forma_pagamento === 'Cartão de Crédito' && t.parcelas > 1 ? `(${t.parcelas}x)` : ''}
                                 </span>
                             </td>
+                            <td style="text-align: center;"><strong>${numeroNF}</strong></td>
+                            <td style="text-align: center;">
+                                <span class="${statusNfClass}">${statusNfText}</span>
+                            </td>
                             <td class="amount" style="text-align: right;">R$ ${Number(t.valor).toFixed(2)}</td>
                         </tr>
-                    `}).join('') : '<tr><td colspan="4" style="text-align: center; padding: 30px; color: #A0AEC0;">Nenhum lançamento encontrado.</td></tr>'}
+                    `}).join('') : '<tr><td colspan="6" style="text-align: center; padding: 30px; color: #A0AEC0;">Nenhum lançamento encontrado.</td></tr>'}
                 </tbody>
             </table>
             <div class="footer">Documento gerado em ${new Date().toLocaleString('pt-BR')}</div>
@@ -232,7 +257,6 @@ export default function Financial() {
                 <Heading size="md" mb={4} color={textColor}>Evolução Diária</Heading>
                 <Box flex="1" minH="0" w="100%">
                     <ResponsiveContainer width="100%" height="100%">
-                        {/* BLINDAGEM NO GRÁFICO */}
                         <BarChart data={stats?.chart_data || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke={useColorModeValue("#eee", "#444")} />
                             <XAxis dataKey="name" stroke={textColor} fontSize={12} />
@@ -252,10 +276,8 @@ export default function Financial() {
                         <Text flex="1">DATA</Text><Text flex="1">VALOR</Text><Text flex="1" textAlign="right">MÉTODO</Text>
                     </Flex>
                     
-                    {/* BLINDAGEM NA LISTA DE TRANSAÇÕES */}
                     {stats?.transactions?.map((t) => {
-                        // Garantia de fallback para os dados da lista
-                        const dataVenc = t.data_vencimento || t.due_date;
+                        const dataVenc = t.data_vencimento || t.criado_em;
                         
                         return (
                         <Flex key={t.id} justify="space-between" p={3} bg={inputBg} borderRadius="md" align="center" border="1px" borderColor={borderColor}>
@@ -270,7 +292,6 @@ export default function Financial() {
                         </Flex>
                     )})}
                     
-                    {/* AVISO DE LISTA VAZIA PROTEGIDO */}
                     {(!stats?.transactions || stats?.transactions?.length === 0) && (
                         <Text color="gray.500" textAlign="center" mt={4}>Nenhum lançamento no período.</Text>
                     )}

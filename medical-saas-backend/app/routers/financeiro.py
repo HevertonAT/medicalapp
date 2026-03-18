@@ -76,7 +76,9 @@ def get_financial_stats(
             "data_vencimento": t.data_vencimento,
             "criado_em": t.criado_em,
             "forma_pagamento": getattr(t, 'forma_pagamento', None),
-            "parcelas": getattr(t, 'parcelas', 1)
+            "parcelas": getattr(t, 'parcelas', 1),
+            "status_nfe": getattr(t, 'status_nfe', 'pendente'),
+            "link_nfe": getattr(t, 'link_nfe', None)
         } for t in recent_transactions
     ]
 
