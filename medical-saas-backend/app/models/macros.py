@@ -3,14 +3,14 @@ from sqlalchemy.orm import relationship
 from app.db.base import Base
 
 class Macro(Base):
-    __tablename__ = "macros_profissionais"
+    __tablename__ = "macros"
 
     # ID Inteiro (Serial)
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     
     doctor_id = Column(Integer, ForeignKey("profissionais.id"), nullable=False)
     
-    titulo = Column(String, nullable=False) # Ex: "Evolução Fono", "Anamnese Inicial"
+    titulo = Column(String, nullable=False) # Ex: "Evolução X", "Anamnese Inicial"
     texto_padrao = Column(Text, nullable=False)
 
     # Relacionamento 

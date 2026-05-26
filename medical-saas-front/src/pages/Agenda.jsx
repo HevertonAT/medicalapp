@@ -871,7 +871,7 @@ export default function Agenda() {
                             <FormLabel color={textColor} mb={0} fontWeight="bold">Evolução / Observações Livres:</FormLabel>
                             {minhasMacros.length > 0 && (
                               <Menu>
-                                <MenuButton as={Button} size="xs" colorScheme="blue.700" variant="solid" leftIcon={<FaBolt />}>
+                                <MenuButton as={Button} size="xs" colorScheme="blue" variant="solid" leftIcon={<FaBolt />}>
                                   Inserir Atalho
                                 </MenuButton>
                                 <MenuList bg={bgCard} borderColor={borderColor}>
