@@ -60,6 +60,7 @@ origins = [
     "http://localhost:3000", 
     "http://localhost:5173", 
     "https://medicalappfront.vercel.app",
+    "https://medical-saas-front-production.up.railway.app",
 ]
 
 app.add_middleware(

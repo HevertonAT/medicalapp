@@ -186,7 +186,7 @@ export default function Agenda() {
 
   const getStatusColor = (status) => {
     switch (status) {
-        case 'concluido': case 'REALIZADO': return statusGreen;
+        case 'realizado': return statusGreen;
         case 'cancelado': return statusRed;
         case 'em_andamento': return statusOrange;
         case 'reagendado': return statusCyan;
@@ -637,7 +637,7 @@ export default function Agenda() {
                         <Tr>
                             <Td colSpan={7} textAlign="center" py={10} color="gray.500">
                                 {currentUserRole === 'superuser' && !selectedClinicId 
-                                    ? <Flex direction="column" align="center"><Icon as={FaCalendarAlt} w={8} h={8} mb={3} opacity={0.3} /> Selecione uma Clínica para ver a agenda.</Flex>
+                                    ? <Flex direction="column" align="center"><Icon as={FaCalendarAlt} w={8} h={8} mb={3} opacity={0.3} />Selecione uma Clínica para ver a agenda.</Flex>
                                     : 'Nenhum agendamento encontrado.'
                                 }
                             </Td>
@@ -683,7 +683,7 @@ export default function Agenda() {
                                         })()}
                                     </>
                                 )}
-                                {(app.status === 'concluido' || app.status === 'REALIZADO' || app.status === 'cancelado' || app.status === 'reagendado') && <Icon as={FaHistory} color="gray.300" />}
+                                {(app.status === 'realizado' || app.status === 'cancelado' || app.status === 'reagendado') && <Icon as={FaHistory} color="gray.300" />}
                             </HStack></Td>
                         </Tr>
                     ))}
