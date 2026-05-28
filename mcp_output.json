@@ -1,0 +1,8 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"success\": true,\n  \"saved\": true,\n  \"data\": {\n    \"id\": \"vWrY0r0Ao46nLppt\",\n    \"name\": \"Agente IA Recepcionista - WhatsApp\",\n    \"active\": false,\n    \"nodeCount\": 13,\n    \"operationsApplied\": 1\n  },\n  \"message\": \"Workflow \\\"Agente IA Recepcionista - WhatsApp\\\" updated successfully. Applied 1 operations. Use n8n_get_workflow with mode 'structure' to verify current state.\",\n  \"details\": {}\n}"
+    }
+  ]
+}

@@ -1,0 +1,312 @@
+{
+  "name": "Agente IA Recepcionista - WhatsApp",
+  "nodes": [
+    {
+      "id": "whatsapp-trigger",
+      "name": "WhatsApp Trigger",
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "parameters": {
+        "updates": ["messages"]
+      }
+    },
+    {
+      "id": "switch-node",
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [250, 0],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.message.type }}",
+                    "rightValue": "text",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Text"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.message.type }}",
+                    "rightValue": "audio",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Audio"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "http-download-audio",
+      "name": "Download Audio (Meta API)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 250],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://graph.facebook.com/v19.0/' + $json.message.audio.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "whatsAppApi",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "openai-whisper",
+      "name": "OpenAI Whisper",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.1,
+      "position": [650, 250],
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "binaryPropertyName": "data"
+      }
+    },
+    {
+      "id": "ai-agent",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [900, 0],
+      "parameters": {
+        "text": "={{ $json.message && $json.message.text ? $json.message.text.body : $json.text }}",
+        "sessionId": "={{ $('WhatsApp Trigger').item.json.contacts[0].wa_id }}",
+        "promptType": "define",
+        "options": {
+          "systemMessage": "Você é a recepcionista virtual de uma clínica. Seu tom deve ser altamente humanizado, empático, acolhedor e claro.\n\nHoje é {{ $now.setZone('America/Sao_Paulo').toFormat('dd/MM/yyyy') }} e o fuso horário atual é America/Sao_Paulo. Baseie todas as suas respostas relacionadas a tempo neste fuso horário.\n\nPREVENÇÃO DE ALUCINAÇÃO: Você é estritamente proibida de inventar, deduzir ou supor horários disponíveis. Antes de oferecer qualquer opção de horário para o paciente, você DEVE obrigatoriamente acionar a ferramenta de 'Consultar Horários'. Só ofereça horários que foram explicitamente retornados pela API."
+        }
+      }
+    },
+    {
+      "id": "llm-chat",
+      "name": "Chat OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [850, 250],
+      "parameters": {
+        "model": "gpt-4o-mini"
+      }
+    },
+    {
+      "id": "memory",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.2,
+      "position": [1000, 250],
+      "parameters": {}
+    },
+    {
+      "id": "tool-consultar",
+      "name": "Consultar Horários",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [1150, 250],
+      "parameters": {
+        "method": "GET",
+        "url": "https://medical-saas-backend-production-0866.up.railway.app/api/horarios",
+        "description": "Busca horários disponíveis para agendamento. Retorna os horários livres na clínica."
+      }
+    },
+    {
+      "id": "tool-agendar",
+      "name": "Agendar Consulta",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [1300, 250],
+      "parameters": {
+        "method": "POST",
+        "url": "https://medical-saas-backend-production-0866.up.railway.app/api/agendamentos",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"paciente_id\": \"{{ $('WhatsApp Trigger').item.json.contacts[0].wa_id }}\",\n  \"data_hora\": \"{{ $parameter.data_hora }}\"\n}",
+        "description": "Agenda uma consulta. Parâmetros: data_hora (formato ISO)"
+      }
+    },
+    {
+      "id": "tool-reagendar",
+      "name": "Reagendar",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [1450, 250],
+      "parameters": {
+        "method": "PUT",
+        "url": "https://medical-saas-backend-production-0866.up.railway.app/api/agendamentos/reagendar",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"paciente_id\": \"{{ $('WhatsApp Trigger').item.json.contacts[0].wa_id }}\",\n  \"nova_data_hora\": \"{{ $parameter.nova_data_hora }}\"\n}",
+        "description": "Altera a data/hora de um agendamento existente."
+      }
+    },
+    {
+      "id": "tool-confirmar",
+      "name": "Confirmar Consulta",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [1600, 250],
+      "parameters": {
+        "method": "PUT",
+        "url": "https://medical-saas-backend-production-0866.up.railway.app/api/agendamentos/confirmar",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"paciente_id\": \"{{ $('WhatsApp Trigger').item.json.contacts[0].wa_id }}\"\n}",
+        "description": "Confirma uma consulta pendente do paciente."
+      }
+    },
+    {
+      "id": "tool-cancelar",
+      "name": "Cancelar Agendamento",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [1750, 250],
+      "parameters": {
+        "method": "PUT",
+        "url": "https://medical-saas-backend-production-0866.up.railway.app/api/agendamentos/cancelar",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"paciente_id\": \"{{ $('WhatsApp Trigger').item.json.contacts[0].wa_id }}\"\n}",
+        "description": "Cancela um agendamento do paciente."
+      }
+    },
+    {
+      "id": "whatsapp-send",
+      "name": "WhatsApp",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [1300, 0],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "={{ $('WhatsApp Trigger').item.json.metadata.phone_number_id }}",
+        "recipientPhoneNumber": "={{ $('WhatsApp Trigger').item.json.contacts[0].wa_id }}",
+        "text": "={{ $json.output }}"
+      }
+    }
+  ],
+  "connections": {
+    "WhatsApp Trigger": {
+      "main": [
+        [
+          { "node": "Switch", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          { "node": "AI Agent", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Download Audio (Meta API)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Download Audio (Meta API)": {
+      "main": [
+        [
+          { "node": "OpenAI Whisper", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "OpenAI Whisper": {
+      "main": [
+        [
+          { "node": "AI Agent", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          { "node": "WhatsApp", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Chat OpenAI": {
+      "ai_languageModel": [
+        [
+          { "node": "AI Agent", "type": "ai_languageModel", "index": 0 }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          { "node": "AI Agent", "type": "ai_memory", "index": 0 }
+        ]
+      ]
+    },
+    "Consultar Horários": {
+      "ai_tool": [
+        [
+          { "node": "AI Agent", "type": "ai_tool", "index": 0 }
+        ]
+      ]
+    },
+    "Agendar Consulta": {
+      "ai_tool": [
+        [
+          { "node": "AI Agent", "type": "ai_tool", "index": 0 }
+        ]
+      ]
+    },
+    "Reagendar": {
+      "ai_tool": [
+        [
+          { "node": "AI Agent", "type": "ai_tool", "index": 0 }
+        ]
+      ]
+    },
+    "Confirmar Consulta": {
+      "ai_tool": [
+        [
+          { "node": "AI Agent", "type": "ai_tool", "index": 0 }
+        ]
+      ]
+    },
+    "Cancelar Agendamento": {
+      "ai_tool": [
+        [
+          { "node": "AI Agent", "type": "ai_tool", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "timezone": "America/Sao_Paulo",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}

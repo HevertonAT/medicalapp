@@ -5,8 +5,7 @@ import {
   FormControl, FormLabel, Input, Select, ModalFooter, useDisclosure,
   VStack, HStack, IconButton, Icon, Textarea, Accordion, AccordionItem, 
   AccordionButton, AccordionPanel, AccordionIcon, useColorModeValue, 
-  Table, Thead, Tbody, Tr, Th, Td, InputGroup, InputLeftElement,
-  SimpleGrid, Menu, MenuButton, MenuList, MenuItem
+  InputGroup, InputLeftElement, SimpleGrid, Menu, MenuButton, MenuList, MenuItem
 } from '@chakra-ui/react';
 import { 
   FaPlus, FaUserMd, FaSearch, FaPlay, FaCheckDouble, 
@@ -17,10 +16,15 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { jwtDecode } from "jwt-decode"; 
 
-// --- IMPORTAÇÕES DO CALENDÁRIO ---
+// --- IMPORTAÇÕES DO DATEPICKER ---
 import DatePicker, { registerLocale } from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import ptBR from 'date-fns/locale/pt-BR';
+
+// --- IMPORTAÇÕES DO CALENDÁRIO GRID ---
+import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+import { format, parse, startOfWeek, getDay } from 'date-fns';
 
 import api from '../services/api';
 import SpecialtyFormRenderer from '../components/SpecialtyFormRenderer';
@@ -28,9 +32,20 @@ import CidAutocomplete from '../components/profissionais/CidAutocomplete';
 
 registerLocale('pt-BR', ptBR);
 
+// Configuração do idioma para a Grade do Calendário
+const locales = {
+  'pt-BR': ptBR,
+};
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek,
+  getDay,
+  locales,
+});
+
 export default function Agenda() {
   const dataLimiteObj = new Date();
-  // Limita o agendamento para no máximo 4 anos a partir de hoje
   dataLimiteObj.setFullYear(dataLimiteObj.getFullYear() + 4);
 
   const [appointments, setAppointments] = useState([]);
@@ -40,11 +55,12 @@ export default function Agenda() {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentView, setCurrentView] = useState('work_week');
 
   const [currentUserRole, setCurrentUserRole] = useState('');
   const [loggedUser, setLoggedUser] = useState(null); 
   
-  // --- ESTADOS DO SUPERUSER ---
   const [allClinics, setAllClinics] = useState([]);
   const [selectedClinicId, setSelectedClinicId] = useState("");
 
@@ -77,6 +93,7 @@ export default function Agenda() {
   
   const [lastSavedRecord, setLastSavedRecord] = useState(null);
 
+  // --- PALETA DE CORES / MODO NOTURNO ---
   const bgPage = useColorModeValue('gray.50', 'gray.900');
   const bgCard = useColorModeValue('white', 'gray.800');
   const modalBg = useColorModeValue('white', 'gray.800');
@@ -98,10 +115,39 @@ export default function Agenda() {
   const statusCyan = useColorModeValue('cyan.600', 'cyan.300');
   const statusBlue = useColorModeValue('blue.600', 'blue.300');
 
-  // --- MÁGICA DO MODO ESCURO PARA O CALENDÁRIO ---
   const hoverDayBg = useColorModeValue('gray.200', 'gray.600');
   const mutedTextColor = useColorModeValue('gray.400', 'gray.500');
-  
+
+  // --- ESTILIZAÇÃO MÁGICA DA GRADE PARA SUPORTAR MODO ESCURO ---
+  const calendarStyles = {
+    '.rbc-calendar': { fontFamily: 'inherit', color: textColor, minHeight: '650px' },
+    '.rbc-header': { bg: headerBg, borderColor: borderColor, color: textColor, py: 2, fontWeight: 'bold' },
+    '.rbc-time-view': { borderColor: borderColor, bg: bgCard, borderRadius: 'md', overflow: 'hidden' },
+    '.rbc-time-header': { bg: headerBg, color: textColor },
+    '.rbc-time-content': { borderTopColor: borderColor },
+    '.rbc-timeslot-group': { borderColor: borderColor },
+    '.rbc-day-bg': { borderColor: borderColor },
+    '.rbc-day-slot .rbc-time-slot': { borderColor: borderColor },
+    '.rbc-time-gutter .rbc-timeslot-group': { borderColor: borderColor, bg: headerBg },
+    '.rbc-label': { color: textColor, px: 2 },
+    '.rbc-event': { border: 'none', padding: '2px', borderRadius: '4px' },
+    '.rbc-today': { bg: useColorModeValue('blue.50', 'gray.700') },
+    '.rbc-allday-cell': { display: 'none' },
+    '.rbc-time-header-content': { borderLeftColor: borderColor },
+    '.rbc-day-slot .rbc-event-label': { display: 'none' }, // Oculta a tag de horário padrão para caber os botões
+    '.rbc-toolbar': { mb: 4, color: textColor },
+    '.rbc-btn-group button': {
+         color: textColor,
+         borderColor: borderColor,
+         bg: bgCard,
+         _hover: { bg: headerBg },
+         _active: { bg: useColorModeValue('gray.200', 'gray.600'), boxShadow: 'none' }
+    },
+    '.rbc-toolbar button.rbc-active': { bg: useColorModeValue('gray.200', 'gray.600'), color: textColor },
+    '.rbc-off-range-bg': { background: useColorModeValue('gray.100', 'gray.900') },
+    '.rbc-off-range .rbc-button-link': { color: mutedTextColor }, // Deixa os números dos dias mais apagados
+  };
+
   const datePickerStyles = {
     '.react-datepicker-wrapper': { width: '100%' },
     '.react-datepicker': {
@@ -137,7 +183,6 @@ export default function Agenda() {
     }
   };
 
-  // --- FUNÇÕES DO CALENDÁRIO (CÃO DE GUARDA) ---
   const isWeekdayValid = (date, docId) => {
     if (!docId || !date) return false; 
     const day = date.getDay(); 
@@ -172,7 +217,6 @@ export default function Agenda() {
     return new Date(y, m - 1, d);
   };
 
-  // --- TRAVA DE ANO MÁXIMO PARA OS FILTROS NATIVOS ---
   const maxYear = new Date().getFullYear() + 4;
   const maxDateLimit = `${maxYear}-12-31`;
 
@@ -182,16 +226,6 @@ export default function Agenda() {
       if (partes[0].length > 4) partes[0] = partes[0].slice(0, 4);
       if (parseInt(partes[0]) > maxYear) partes[0] = maxYear.toString();
       return partes.join('-');
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-        case 'realizado': return statusGreen;
-        case 'cancelado': return statusRed;
-        case 'em_andamento': return statusOrange;
-        case 'reagendado': return statusCyan;
-        default: return statusBlue;
-    }
   };
 
   const fetchData = useCallback(async () => {
@@ -226,7 +260,6 @@ export default function Agenda() {
                 setSelectedClinicId(decoded.clinic_id);
             }
             
-            // CORREÇÃO 1: Adicionado o 'admin' para ele também puxar o perfil de médico, se houver.
             if (role === 'doctor' || role === 'medico' || role === 'admin') {
                 api.get('/doctors/me').then(res => {
                     if (res.data && res.data.id) {
@@ -269,11 +302,6 @@ export default function Agenda() {
     const m = today.getMonth() - birthDate.getMonth();
     if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
     return age + ' anos';
-  };
-
-  const formatDateTime = (dateString) => {
-    const date = new Date(dateString);
-    return `${date.toLocaleDateString('pt-BR')}, ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
   };
 
   const resetNewAppForm = () => {
@@ -543,9 +571,8 @@ export default function Agenda() {
       const doctorName = (app.doctor_nome || "").toLowerCase();
 
       const matchesSearch = patientName.includes(searchLower) || patientCpf.includes(searchLower) || doctorName.includes(searchLower);
-      const matchesDate = (filterDate && searchTerm.trim() === '') ? app.data_horario.split('T')[0] === filterDate : true; 
       
-      return matchesSearch && matchesDate;
+      return matchesSearch;
   });
 
   const availableDoctors = doctors.filter(d => {
@@ -564,6 +591,43 @@ export default function Agenda() {
       }
       return String(p.clinic_id) === String(loggedUser?.clinic_id);
   });
+
+  // --- TRANSFORMAÇÃO DOS DADOS PARA O CALENDÁRIO ---
+  const calendarEvents = filteredAppointments.map((app) => {
+    const startDate = new Date(app.data_horario);
+    const endDate = new Date(startDate.getTime() + (app.duracao || 40) * 60000); 
+
+    return {
+      id: app.id,
+      title: app.patient_nome,
+      start: startDate,
+      end: endDate,
+      resource: app, 
+    };
+  });
+
+  const eventStyleGetter = (event) => {
+    const status = event.resource.status;
+    let backgroundColor = '#3182ce'; // blue.500
+
+    if (status === 'realizado') backgroundColor = '#38a169'; // green.500
+    if (status === 'cancelado') backgroundColor = '#e53e3e'; // red.500
+    if (status === 'em_andamento') backgroundColor = '#dd6b20'; // orange.500
+    if (status === 'reagendado') backgroundColor = '#00b5d8'; // cyan.500
+
+    return {
+      style: {
+        backgroundColor,
+        color: 'white',
+        border: 'none',
+        display: 'block',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+        minHeight: currentView === 'month' ? 'auto' : '85px',
+        zIndex: 5,         // Garante que, se expandir, fique por cima das linhas de baixo
+        overflow: 'hidden' // Evita que o conteúdo vaze para fora das bordas arredondadas
+      }
+    };
+  };
 
   return (
     <Box p={8} bg={bgPage} minH="100vh">
@@ -612,83 +676,124 @@ export default function Agenda() {
             <InputLeftElement pointerEvents="none" children={<FaSearch color="gray.300" />} />
             <Input bg={bgCard} border="1px solid" borderColor={borderColor} placeholder="Buscar paciente, CPF ou médico..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
         </InputGroup>
+        
+        {/* Desabilitado pois o DatePicker no calendário já fará a navegação principal, mantendo apenas para buscar um dia específico longe */}
         <InputGroup maxW={{ base: '100%', md: '200px' }}>
              <InputLeftElement pointerEvents="none" children={<FaCalendarAlt color="gray.300" />} />
-             <Input 
-                type="date" 
-                max={maxDateLimit} 
-                bg={bgCard} 
-                border="1px solid" 
-                borderColor={borderColor} 
-                value={filterDate} 
-                onChange={(e) => setFilterDate(enforceDateLimit(e.target.value))} 
-             />
+                <Input 
+                    type="date" 
+                    max={maxDateLimit} 
+                    bg={bgCard} 
+                    border="1px solid" 
+                    borderColor={borderColor} 
+                    value={filterDate} 
+                    // ---> SUBSTITUA O SEU ONCHANGE POR ESTE:
+                    onChange={(e) => {
+                    const newDateStr = enforceDateLimit(e.target.value);
+                    setFilterDate(newDateStr);
+                    const parsed = parseLocalDate(newDateStr);
+                    if(parsed) setCurrentDate(parsed);
+                    }} 
+                />
         </InputGroup>
       </Flex>
 
       {loading ? <Spinner size="xl" color="blue.500" /> : (
-        <Box bg={bgCard} shadow="sm" borderRadius="lg" overflowX="auto" border="1px solid" borderColor={borderColor}>
-            <Table variant="simple" size="sm">
-                <Thead bg={headerBg}><Tr>
-                    <Th color={textColor}>Paciente</Th><Th color={textColor}>Idade</Th><Th color={textColor}>Data / Hora</Th><Th color={textColor}>Profissional</Th><Th color={textColor}>Observações</Th><Th color={textColor}>Status</Th><Th color={textColor} textAlign="center">Ações</Th>
-                </Tr></Thead>
-                <Tbody>
-                    {filteredAppointments.length === 0 ? (
-                        <Tr>
-                            <Td colSpan={7} textAlign="center" py={10} color="gray.500">
-                                {currentUserRole === 'superuser' && !selectedClinicId 
-                                    ? <Flex direction="column" align="center"><Icon as={FaCalendarAlt} w={8} h={8} mb={3} opacity={0.3} />Selecione uma Clínica para ver a agenda.</Flex>
-                                    : 'Nenhum agendamento encontrado.'
-                                }
-                            </Td>
-                        </Tr>
-                    ) : filteredAppointments.map((app) => (
-                        <Tr key={app.id} _hover={{ bg: hoverTr }}>
-                            <Td fontWeight="bold" color={patientNameColor}>{app.patient_nome}</Td>
-                            <Td>{calculateAge(app.patient_id)}</Td>
-                            <Td fontWeight="medium">{formatDateTime(app.data_horario)}</Td>
-                            <Td fontSize="xs">{app.doctor_nome}</Td>
-                            <Td maxW="150px" isTruncated>{app.observacoes || '-'}</Td>
-                            <Td><Text fontWeight="extrabold" fontSize="xs" color={getStatusColor(app.status)}>{app.status === 'em_andamento' ? 'EM ANDAMENTO' : app.status.toUpperCase()}</Text></Td>
-                            <Td><HStack justify="center" spacing={2}>
-                                {(app.status === 'agendado' || app.status === 'em_andamento') && (
-                                    <>
-                                        {app.status === 'agendado' && <IconButton icon={<FaTimes />} size="xs" colorScheme="red" variant="ghost" onClick={() => openCancelModal(app)} />}
-                                        {app.status === 'agendado' && <IconButton icon={<FaRedo />} size="xs" colorScheme="blue" variant="ghost" onClick={() => openRescheduleModal(app)} />}
-                                        
-                                        {/* CORREÇÃO 2: LÓGICA DE PERMISSÃO INTELIGENTE E BLINDADA */}
-                                        {(() => {
-                                            const docOfApp = doctors.find(d => String(d.id) === String(app.doctor_id));
+        <Box sx={calendarStyles} p={4} bg={bgCard} shadow="sm" borderRadius="lg" border="1px solid" borderColor={borderColor}>
+          
+          {currentUserRole === 'superuser' && !selectedClinicId ? (
+              <Flex direction="column" align="center" py={20} color="gray.500">
+                  <Icon as={FaCalendarAlt} w={12} h={12} mb={3} opacity={0.3} />
+                  <Text fontSize="lg">Selecione uma Clínica para ver a agenda.</Text>
+              </Flex>
+          ) : (
+              <Calendar
+                    localizer={localizer}
+                    events={calendarEvents}
+                    startAccessor="start"
+                    endAccessor="end"
 
-                                            const userEmail = String(loggedUser?.email || loggedUser?.sub || '').toLowerCase().trim();
-                                            const docEmail = String(docOfApp?.email || '').toLowerCase().trim();
+                    // ---> ADICIONE ESTAS 4 PROPRIEDADES:
+                    date={currentDate}
+                    onNavigate={(newDate) => {
+                        setCurrentDate(newDate);
+                        setFilterDate(formatLocalDate(newDate)); // Mantém o seu input sincronizado!
+                    }}
+                    view={currentView}
+                    onView={(newView) => setCurrentView(newView)}
+                    // ------------------------------------
 
-                                            const isMyOwnAppointmentByEmail = (userEmail !== '' && docEmail !== '' && userEmail === docEmail);
-                                            const isMyOwnAppointmentById = String(app.doctor_id) === String(loggedUser?.doctor_id);
-
-                                            const canStart = currentUserRole === 'superuser' || 
-                                                             currentUserRole === 'doctor' || 
-                                                             currentUserRole === 'medico' || 
-                                                             isMyOwnAppointmentByEmail ||
-                                                             isMyOwnAppointmentById;
-
-                                            if (canStart) {
-                                                return (
-                                                    <Button leftIcon={app.status === 'em_andamento' ? <FaCheckDouble /> : <FaPlay />} size="xs" colorScheme={app.status === 'em_andamento' ? 'green' : 'blue'} onClick={() => handleStartConsultation(app)}>
-                                                        {app.status === 'em_andamento' ? 'Retomar' : 'Iniciar'}
-                                                    </Button>
-                                                );
-                                            }
-                                            return null;
-                                        })()}
-                                    </>
-                                )}
-                                {(app.status === 'realizado' || app.status === 'cancelado' || app.status === 'reagendado') && <Icon as={FaHistory} color="gray.300" />}
-                            </HStack></Td>
-                        </Tr>
-                    ))}
-                </Tbody>
-            </Table>
+                    views={['day', 'work_week', 'month']}
+                    step={30} 
+                    timeslots={1}
+                    min={new Date(2024, 0, 1, 0, 0)}
+                    max={new Date(2024, 0, 1, 23, 59)}
+                    culture="pt-BR"
+                    eventPropGetter={eventStyleGetter}
+                  // Componente customizado para inserir os botões de ação DENTRO do horário agendado
+                  components={{
+                      event: ({ event }) => {
+                          const app = event.resource;
+                          const docOfApp = doctors.find(d => String(d.id) === String(app.doctor_id));
+                          
+                          const userEmail = String(loggedUser?.email || loggedUser?.sub || '').toLowerCase().trim();
+                          const docEmail = String(docOfApp?.email || '').toLowerCase().trim();
+                          
+                          const isMyOwnAppointmentByEmail = (userEmail !== '' && docEmail !== '' && userEmail === docEmail);
+                          const isMyOwnAppointmentById = String(app.doctor_id) === String(loggedUser?.doctor_id);
+                          
+                          const canStart = currentUserRole === 'superuser' || 
+                                           currentUserRole === 'doctor' || 
+                                           currentUserRole === 'medico' || 
+                                           isMyOwnAppointmentByEmail ||
+                                           isMyOwnAppointmentById;
+                            if (currentView === 'month') {
+                              return (
+                                  <Box p={1}>
+                                      <Text fontWeight="bold" fontSize="xs" isTruncated>{app.patient_nome}</Text>
+                                      <Text fontSize="2xs" isTruncated>{app.status.toUpperCase()}</Text>
+                                  </Box>
+                              );
+                          }
+                          return (
+                              <Box p={1} h="100%" display="flex" flexDirection="column" justifyContent="space-between">
+                                  <Box>
+                                      <Text fontWeight="bold" fontSize="xs" isTruncated>{app.patient_nome}</Text>
+                                      <Text fontSize="2xs" isTruncated>{app.doctor_nome}</Text>
+                                      <Text fontSize="2xs" fontWeight="extrabold">{app.status.toUpperCase()}</Text>
+                                  </Box>
+                                  
+                                  <HStack spacing={1} mt={1} onClick={(e) => e.stopPropagation()}>
+                                      {(app.status === 'agendado' || app.status === 'em_andamento') && (
+                                          <>
+                                              {app.status === 'agendado' && <IconButton icon={<FaTimes />} size="xs" colorScheme="red" variant="solid" onClick={() => openCancelModal(app)} h="20px" minW="20px" aria-label="Cancelar"/>}
+                                              {app.status === 'agendado' && <IconButton icon={<FaRedo />} size="xs" colorScheme="blue" variant="solid" onClick={() => openRescheduleModal(app)} h="20px" minW="20px" aria-label="Reagendar"/>}
+                                              
+                                              {canStart && (
+                                                  <Button leftIcon={app.status === 'em_andamento' ? <FaCheckDouble /> : <FaPlay />} size="xs" colorScheme={app.status === 'em_andamento' ? 'green' : 'blue'} variant="solid" onClick={() => handleStartConsultation(app)} h="20px" fontSize="2xs" px={2}>
+                                                      {app.status === 'em_andamento' ? 'Retomar' : 'Iniciar'}
+                                                  </Button>
+                                              )}
+                                          </>
+                                      )}
+                                      {(app.status === 'realizado' || app.status === 'cancelado' || app.status === 'reagendado') && <Icon as={FaHistory} color="whiteAlpha.700" ml="auto"/>}
+                                  </HStack>
+                              </Box>
+                          );
+                      }
+                  }}
+                  messages={{
+                      next: "Próximo",
+                      previous: "Anterior",
+                      today: "Hoje",
+                      month: "Mês",
+                      week: "Semana",
+                      day: "Dia",
+                      work_week: "Semana",
+                      noEventsInRange: "Não há agendamentos neste período.",
+                  }}
+              />
+          )}
         </Box>
       )}
 

@@ -1,0 +1,12 @@
+{
+  "id": "vWrY0r0Ao46nLppt",
+  "operations": [
+    {
+      "type": "updateNode",
+      "nodeName": "WhatsApp",
+      "updates": {
+        "parameters.textBody": "={{ $json.output }}"
+      }
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+{
+  "description": "Create a WhatsApp AI Agent receptionist workflow. 1) n8n-nodes-base.whatsAppTrigger (trigger on messages). 2) Switch node routing by message type (audio or text). 3) If audio, download the media via HTTP Request (GET to Meta API using media ID) and use OpenAI to transcribe it. 4) Use AI Agent with Chat OpenAI and Window Buffer Memory. 5) Agent has 5 HTTP Request Tools to a MedicalApp backend (consultar_horarios, agendar_consulta, reagendar, confirmar_consulta, cancelar_agendamento). 6) Finally send WhatsApp message reply back to user.",
+  "save": false
+}
