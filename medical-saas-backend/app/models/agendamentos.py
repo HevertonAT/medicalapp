@@ -13,7 +13,7 @@ class Appointment(Base):
     
     # Duração da Consulta
     duracao = Column(Integer, default=40) # Em minutos
-    status = Column(String, default="agendado") # agendado, confirmado, cancelado, concluido
+    status = Column(Integer, default=1) # 1=Agendado, 2=Em Andamento, 3=Realizado, 4=Cancelado, 5=Reagendado
 
     # Observações
     observacoes = Column(String, nullable=True)

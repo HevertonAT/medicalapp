@@ -70,7 +70,7 @@ def get_available_slots(
             Appointment.doctor_id == doctor_id,
             Appointment.data_horario >= start_of_day,
             Appointment.data_horario <= end_of_day,
-            Appointment.status.in_(["agendado", "confirmado", "em_andamento"]) 
+            Appointment.status.in_([1, 2]) # 1: Agendado, 2: Em andamento
         ).all()
 
         horas_ocupadas = [app.data_horario.strftime("%H:%M") for app in appointments_ocupados]
@@ -173,10 +173,15 @@ def create_agendamentos(agendamento: agendamentosCreate, db: Session = Depends(g
         if current_user.role != 'superuser' and doctor.clinic_id != current_user.clinic_id:
             raise HTTPException(status_code=403, detail="Acesso negado. Este profissional não pertence à sua clínica.")
 
+    # Bloqueio de agendamentos no passado
+    fuso_brasil = timezone(timedelta(hours=-3))
+    if agendamento.data_horario.replace(tzinfo=fuso_brasil) < datetime.now(fuso_brasil):
+        raise HTTPException(status_code=400, detail="Não é possível agendar no passado.")
+
     horario_conflito = db.query(Appointment).filter(
         Appointment.doctor_id == agendamento.doctor_id,
         Appointment.data_horario == agendamento.data_horario,
-        Appointment.status.in_(["agendado", "confirmado"])
+        Appointment.status == 1 # Agendado
     ).first()
 
     if horario_conflito:
@@ -189,7 +194,7 @@ def create_agendamentos(agendamento: agendamentosCreate, db: Session = Depends(g
         data_horario=agendamento.data_horario, 
         observacoes=agendamento.observacoes,
         duracao=agendamento.duracao, 
-        status="agendado"
+        status=1 # 1 = Agendado
     )
     db.add(new_app)
     db.commit()
@@ -212,7 +217,7 @@ def cancel_appointment(appointment_id: int, body: dict = Body(default={}), db: S
     elif current_user.role != 'superuser' and app.clinic_id != current_user.clinic_id:
         raise HTTPException(status_code=403, detail="Acesso negado a este agendamento.")
     
-    app.status = "cancelado"
+    app.status = 4 # Cancelado
     db.commit()
     return {"message": "Consulta cancelada com sucesso"}
 
@@ -236,7 +241,7 @@ def reschedule_appointment(appointment_id: int, body: dict = Body(...), db: Sess
     if nova_data:
         app.data_horario = datetime.strptime(nova_data, "%Y-%m-%dT%H:%M:%S")
     
-    app.status = "agendado"
+    app.status = 5 # Reagendado (na criação usa-se 1 para o novo, mas aqui vamos manter a semântica de reagendado ou mudar para 1 se for só remarcar o atual)
     db.commit()
     return {"message": "Consulta reagendada com sucesso"}
 
@@ -245,12 +250,11 @@ def reschedule_appointment(appointment_id: int, body: dict = Body(...), db: Sess
 @router.patch("/{appointment_id}/status")
 def update_appointment_status(
     appointment_id: int, 
-    novo_status: Optional[str] = Query(None),
+    novo_status: Optional[int] = Query(None),
     body: Optional[dict] = Body(default=None),
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
 ):
-    # AQUI ESTÁ A MÁGICA: Recepcionista adicionada à lista de permissão!
     if current_user.role not in ['doctor', 'admin', 'superuser', 'medico', 'recepcionista']:
         raise HTTPException(status_code=403, detail="Sem permissão para alterar status.")
 
@@ -262,12 +266,21 @@ def update_appointment_status(
         raise HTTPException(status_code=403, detail="Acesso negado a este agendamento.")
     
     status_final = novo_status
-    if not status_final and body and "novo_status" in body:
-        status_final = body.get("novo_status")
+    if status_final is None and body and "novo_status" in body:
+        status_final = int(body.get("novo_status"))
 
-    if not status_final:
+    if status_final is None:
         raise HTTPException(status_code=400, detail="O novo status não foi informado na requisição.")
 
+    # 1=Agendado, 2=Em Andamento, 3=Realizado, 4=Cancelado, 5=Reagendado
+    
+    if status_final in [2, 3]: # Iniciar ou Finalizar
+        # Só o profissional dono do agendamento (ou superuser) pode
+        if current_user.role not in ['superuser']:
+            doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
+            if not doctor or app_db.doctor_id != doctor.id:
+                raise HTTPException(status_code=403, detail="Apenas o profissional responsável pode iniciar ou finalizar esta consulta.")
+    
     app_db.status = status_final
     db.commit()
     return {"message": f"Status atualizado para {status_final} com sucesso"}

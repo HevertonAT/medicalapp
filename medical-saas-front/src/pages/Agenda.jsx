@@ -29,6 +29,7 @@ import { format, parse, startOfWeek, getDay } from 'date-fns';
 import api from '../services/api';
 import SpecialtyFormRenderer from '../components/SpecialtyFormRenderer';
 import CidAutocomplete from '../components/profissionais/CidAutocomplete';
+import { STATUS_AGENDAMENTO, STATUS_COLORS, STATUS_LABELS } from '../theme/constants';
 
 registerLocale('pt-BR', ptBR);
 
@@ -338,8 +339,8 @@ export default function Agenda() {
     setLastSavedRecord(null); 
     
     try {
-      if (app.status === 'agendado' || app.status === 'AGENDADO') {
-          await api.patch(`/appointments/${app.id}/status?novo_status=em_andamento`);
+      if (app.status === STATUS_AGENDAMENTO.AGENDADO) {
+          await api.patch(`/appointments/${app.id}/status?novo_status=${STATUS_AGENDAMENTO.EM_ANDAMENTO}`);
           fetchData();
       }
       
@@ -518,7 +519,7 @@ export default function Agenda() {
   const handleConfirmCancel = async () => {
     if (!actionReason) { toast({ title: 'Informe o motivo.', status: 'warning' }); return; }
     try {
-        await api.patch(`/appointments/${currentAppointment.id}/status?novo_status=cancelado`);
+        await api.patch(`/appointments/${currentAppointment.id}/status?novo_status=${STATUS_AGENDAMENTO.CANCELADO}`);
         toast({ title: 'Cancelado.', status: 'warning' });
         onCancelClose();
         fetchData();
@@ -608,12 +609,7 @@ export default function Agenda() {
 
   const eventStyleGetter = (event) => {
     const status = event.resource.status;
-    let backgroundColor = '#3182ce'; // blue.500
-
-    if (status === 'realizado') backgroundColor = '#38a169'; // green.500
-    if (status === 'cancelado') backgroundColor = '#e53e3e'; // red.500
-    if (status === 'em_andamento') backgroundColor = '#dd6b20'; // orange.500
-    if (status === 'reagendado') backgroundColor = '#00b5d8'; // cyan.500
+    let backgroundColor = STATUS_COLORS[status] || STATUS_COLORS[STATUS_AGENDAMENTO.AGENDADO];
 
     return {
       style: {
@@ -747,11 +743,11 @@ export default function Agenda() {
                                            currentUserRole === 'medico' || 
                                            isMyOwnAppointmentByEmail ||
                                            isMyOwnAppointmentById;
-                            if (currentView === 'month') {
+                          if (currentView === 'month') {
                               return (
                                   <Box p={1}>
                                       <Text fontWeight="bold" fontSize="xs" isTruncated>{app.patient_nome}</Text>
-                                      <Text fontSize="2xs" isTruncated>{app.status.toUpperCase()}</Text>
+                                      <Text fontSize="2xs" isTruncated>{STATUS_LABELS[app.status] || ''}</Text>
                                   </Box>
                               );
                           }
@@ -760,23 +756,23 @@ export default function Agenda() {
                                   <Box>
                                       <Text fontWeight="bold" fontSize="xs" isTruncated>{app.patient_nome}</Text>
                                       <Text fontSize="2xs" isTruncated>{app.doctor_nome}</Text>
-                                      <Text fontSize="2xs" fontWeight="extrabold">{app.status.toUpperCase()}</Text>
+                                      <Text fontSize="2xs" fontWeight="extrabold">{STATUS_LABELS[app.status] || ''}</Text>
                                   </Box>
                                   
                                   <HStack spacing={1} mt={1} onClick={(e) => e.stopPropagation()}>
-                                      {(app.status === 'agendado' || app.status === 'em_andamento') && (
+                                      {(app.status === STATUS_AGENDAMENTO.AGENDADO || app.status === STATUS_AGENDAMENTO.EM_ANDAMENTO) && (
                                           <>
-                                              {app.status === 'agendado' && <IconButton icon={<FaTimes />} size="xs" colorScheme="red" variant="solid" onClick={() => openCancelModal(app)} h="20px" minW="20px" aria-label="Cancelar"/>}
-                                              {app.status === 'agendado' && <IconButton icon={<FaRedo />} size="xs" colorScheme="blue" variant="solid" onClick={() => openRescheduleModal(app)} h="20px" minW="20px" aria-label="Reagendar"/>}
+                                              {app.status === STATUS_AGENDAMENTO.AGENDADO && <IconButton icon={<FaTimes />} size="xs" colorScheme="red" variant="solid" onClick={() => openCancelModal(app)} h="20px" minW="20px" aria-label="Cancelar"/>}
+                                              {app.status === STATUS_AGENDAMENTO.AGENDADO && <IconButton icon={<FaRedo />} size="xs" colorScheme="blue" variant="solid" onClick={() => openRescheduleModal(app)} h="20px" minW="20px" aria-label="Reagendar"/>}
                                               
                                               {canStart && (
-                                                  <Button leftIcon={app.status === 'em_andamento' ? <FaCheckDouble /> : <FaPlay />} size="xs" colorScheme={app.status === 'em_andamento' ? 'green' : 'blue'} variant="solid" onClick={() => handleStartConsultation(app)} h="20px" fontSize="2xs" px={2}>
-                                                      {app.status === 'em_andamento' ? 'Retomar' : 'Iniciar'}
+                                                  <Button leftIcon={app.status === STATUS_AGENDAMENTO.EM_ANDAMENTO ? <FaCheckDouble /> : <FaPlay />} size="xs" colorScheme={app.status === STATUS_AGENDAMENTO.EM_ANDAMENTO ? 'green' : 'blue'} variant="solid" onClick={() => handleStartConsultation(app)} h="20px" fontSize="2xs" px={2}>
+                                                      {app.status === STATUS_AGENDAMENTO.EM_ANDAMENTO ? 'Retomar' : 'Iniciar'}
                                                   </Button>
                                               )}
                                           </>
                                       )}
-                                      {(app.status === 'realizado' || app.status === 'cancelado' || app.status === 'reagendado') && <Icon as={FaHistory} color="whiteAlpha.700" ml="auto"/>}
+                                      {(app.status === STATUS_AGENDAMENTO.REALIZADO || app.status === STATUS_AGENDAMENTO.CANCELADO || app.status === STATUS_AGENDAMENTO.REAGENDADO) && <Icon as={FaHistory} color="whiteAlpha.700" ml="auto"/>}
                                   </HStack>
                               </Box>
                           );

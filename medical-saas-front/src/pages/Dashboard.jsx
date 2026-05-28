@@ -1,26 +1,42 @@
 import { useState, useEffect, useCallback } from 'react';
 import { 
-  Box, Flex, Heading, Text, Icon, Table, Thead, Tbody, Tr, Th, Td, 
-  SimpleGrid, useColorModeValue, Spinner, Select, Input, FormControl, FormLabel
+  Box, Flex, Heading, Text, Icon, 
+  SimpleGrid, useColorModeValue, Spinner
 } from '@chakra-ui/react';
 import { FaUserInjured, FaCalendarAlt } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 
-// 1. IMPORTANDO API
 import api from '../services/api';
+import { STATUS_AGENDAMENTO, STATUS_COLORS, STATUS_LABELS } from '../theme/constants';
+
+// --- IMPORTAÇÕES DO CALENDÁRIO GRID ---
+import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+import { format, parse, startOfWeek, getDay } from 'date-fns';
+import ptBR from 'date-fns/locale/pt-BR';
+
+const locales = {
+  'pt-BR': ptBR,
+};
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek,
+  getDay,
+  locales,
+});
 
 export default function Dashboard() {
   const bgCard = useColorModeValue('white', 'gray.800');
-  const inputBg = useColorModeValue('gray.50', 'gray.700');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
   const textColor = useColorModeValue('gray.600', 'gray.200');
   const headingColor = useColorModeValue('gray.700', 'white');
   const headerBg = useColorModeValue('gray.50', 'gray.700');
+  const mutedTextColor = useColorModeValue('gray.400', 'gray.500');
 
-  const [period, setPeriod] = useState('today'); 
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentView, setCurrentView] = useState('day'); // Padrão é Dia, como solicitado
+  
   const [stats, setStats] = useState({
     total_patients: 0,
     appointments_count: 0,
@@ -30,214 +46,175 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  const getStatusColor = (status) => {
-    switch (status) {
-        case 'concluido': return useColorModeValue('green.600', 'green.300'); 
-        case 'cancelado': return useColorModeValue('red.600', 'red.300');     
-        case 'em_andamento': return useColorModeValue('orange.500', 'orange.300'); 
-        case 'reagendado': return useColorModeValue('cyan.600', 'cyan.300');   
-        default: return useColorModeValue('purple.600', 'purple.300');         
-    }
+  // Função para garantir formato ISO local
+  const formatLocalDate = (date) => {
+    if (!date) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
-  // --- TRAVA DE ANO MÁXIMO (Hoje + 4 anos) ---
-  const maxYear = new Date().getFullYear() + 4;
-  const maxDateLimit = `${maxYear}-12-31`;
-
-  const enforceDateLimit = (dateString) => {
-      if (!dateString) return dateString;
-      const partes = dateString.split('-');
-      // Corta para não passar de 4 dígitos no ano
-      if (partes[0].length > 4) {
-          partes[0] = partes[0].slice(0, 4);
-      }
-      // Se o ano for maior que a data atual + 4, ele trava no ano máximo
-      if (parseInt(partes[0]) > maxYear) {
-          partes[0] = maxYear.toString();
-      }
-      return partes.join('-');
-  };
-
-  const updateDatesByPeriod = useCallback((selectedPeriod) => {
-    const today = new Date();
-    let start = new Date();
-    let end = new Date();
-
-    if (selectedPeriod === 'today') {
-       // Hoje
-    } else if (selectedPeriod === 'weekly') {
-       const day = today.getDay();
-       const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-       start.setDate(diff);
-    } else if (selectedPeriod === 'monthly') {
-       start = new Date(today.getFullYear(), today.getMonth(), 1);
-    }
-    
-    if (selectedPeriod !== 'custom') {
-        setStartDate(start.toISOString().split('T')[0]);
-        setEndDate(end.toISOString().split('T')[0]);
-    }
-  }, []);
-
-  useEffect(() => {
-    updateDatesByPeriod(period);
-  }, [period, updateDatesByPeriod]);
-
-  // 2. USO DA API
-  const fetchDashboardData = useCallback(async () => {
+  const fetchDashboardData = useCallback(async (targetDate, view) => {
     try {
       setLoading(true);
-      // Rota limpa, sem http://127...
-      const response = await api.get(`/dashboard/?period=${period}&start_date=${startDate}&end_date=${endDate}`);
+      
+      // Vamos buscar o período do mês atual daquela navegação, para garantir que os dados estejam carregados se ele trocar pra semana/mês
+      // Isso simplifica a lógica: a cada mudança de mês/data, pegamos o range customizado.
+      let start = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+      let end = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0);
+      
+      const startStr = formatLocalDate(start);
+      const endStr = formatLocalDate(end);
+
+      const response = await api.get(`/dashboard/?period=custom&start_date=${startStr}&end_date=${endStr}`);
       setStats(response.data);
     } catch (error) {
       console.error("Erro dashboard:", error);
     } finally {
       setLoading(false);
     }
-  }, [navigate, period, startDate, endDate]);
+  }, []);
 
-    useEffect(() => {
-      const tempoEspera = setTimeout(() => {
-        if (startDate && endDate) {
-            fetchDashboardData();
-        }
-    }, 600);
+  useEffect(() => {
+    fetchDashboardData(currentDate, currentView);
+  }, [fetchDashboardData, currentDate, currentView]);
 
-    return () => clearTimeout(tempoEspera);
-  }, [fetchDashboardData, startDate, endDate]);
+  // Transformando os atendimentos retornados no formato do Calendário
+  const calendarEvents = stats.appointments_list.map((app) => {
+    const startDate = new Date(app.data_horario);
+    const endDate = new Date(startDate.getTime() + 40 * 60000); // Estimativa de 40min para exibição na Dashboard
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+    return {
+      id: app.id,
+      title: app.patient_name,
+      start: startDate,
+      end: endDate,
+      resource: app, 
+    };
+  });
+
+  const eventStyleGetter = (event) => {
+    const status = event.resource.status;
+    let backgroundColor = STATUS_COLORS[status] || STATUS_COLORS[STATUS_AGENDAMENTO.AGENDADO];
+
+    return {
+      style: {
+        backgroundColor,
+        color: 'white',
+        border: 'none',
+        display: 'block',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+        borderRadius: '4px',
+        opacity: status === STATUS_AGENDAMENTO.CANCELADO ? 0.6 : 1
+      }
+    };
   };
 
-  const getPeriodLabel = () => {
-    if (period === 'today') return 'Hoje';
-    if (period === 'weekly') return 'Esta Semana';
-    if (period === 'monthly') return 'Este Mês';
-    if (period === 'custom') return 'Período';
-    return '';
+  const calendarStyles = {
+    '.rbc-calendar': { fontFamily: 'inherit', color: textColor, minHeight: '650px' },
+    '.rbc-header': { bg: headerBg, borderColor: borderColor, color: textColor, py: 2, fontWeight: 'bold' },
+    '.rbc-time-view': { borderColor: borderColor, bg: bgCard, borderRadius: 'md', overflow: 'hidden' },
+    '.rbc-time-header': { bg: headerBg, color: textColor },
+    '.rbc-time-content': { borderTopColor: borderColor },
+    '.rbc-timeslot-group': { borderColor: borderColor },
+    '.rbc-day-bg': { borderColor: borderColor },
+    '.rbc-day-slot .rbc-time-slot': { borderColor: borderColor },
+    '.rbc-time-gutter .rbc-timeslot-group': { borderColor: borderColor, bg: headerBg },
+    '.rbc-label': { color: textColor, px: 2 },
+    '.rbc-event': { border: 'none', padding: '4px', borderRadius: '4px' },
+    '.rbc-today': { bg: useColorModeValue('blue.50', 'gray.700') },
+    '.rbc-allday-cell': { display: 'none' },
+    '.rbc-time-header-content': { borderLeftColor: borderColor },
+    '.rbc-toolbar': { mb: 4, color: textColor },
+    '.rbc-btn-group button': {
+         color: textColor,
+         borderColor: borderColor,
+         bg: bgCard,
+         _hover: { bg: headerBg },
+         _active: { bg: useColorModeValue('gray.200', 'gray.600'), boxShadow: 'none' }
+    },
+    '.rbc-toolbar button.rbc-active': { bg: useColorModeValue('gray.200', 'gray.600'), color: textColor },
+    '.rbc-off-range-bg': { background: useColorModeValue('gray.100', 'gray.900') },
+    '.rbc-off-range .rbc-button-link': { color: mutedTextColor },
   };
 
   return (
     <Box p={8}>
       <Heading size="lg" color={headingColor} mb={6}>Visão Geral</Heading>
       
-      <Box bg={bgCard} p={4} borderRadius="lg" shadow="sm" mb={8} border="1px" borderColor={borderColor}>
-        <Flex gap={4} align="flex-end" wrap="wrap">
-            <FormControl w="200px">
-                <FormLabel fontSize="sm" color={textColor}>Período Rápido</FormLabel>
-                <Select 
-                    bg={inputBg} 
-                    borderColor={borderColor}
-                    color={textColor}
-                    value={period} 
-                    onChange={(e) => setPeriod(e.target.value)}
-                    sx={{ '& > option': { background: bgCard, color: textColor } }}
-                >
-                    <option value="today">Hoje</option>
-                    <option value="weekly">Esta Semana</option>
-                    <option value="monthly">Este Mês</option>
-                    <option value="custom">Personalizado</option>
-                </Select>
-            </FormControl>
-            
-            <FormControl w="180px">
-                <FormLabel fontSize="sm" color={textColor}>Data Inicial</FormLabel>
-                <Input 
-                    type="date" 
-                    max={maxDateLimit} // Nova trava nativa do navegador
-                    bg={inputBg} 
-                    borderColor={borderColor}
-                    color={textColor}
-                    value={startDate} 
-                    onChange={(e) => { 
-                        setPeriod('custom'); 
-                        setStartDate(enforceDateLimit(e.target.value)); // Função de segurança
-                    }} 
-                />
-            </FormControl>
-            <FormControl w="180px">
-                <FormLabel fontSize="sm" color={textColor}>Data Final</FormLabel>
-                <Input 
-                    type="date" 
-                    max={maxDateLimit} // Nova trava nativa do navegador
-                    bg={inputBg} 
-                    borderColor={borderColor}
-                    color={textColor}
-                    value={endDate} 
-                    onChange={(e) => { 
-                        setPeriod('custom'); 
-                        setEndDate(enforceDateLimit(e.target.value)); // Função de segurança
-                    }} 
-                />
-            </FormControl>
-        </Flex>
-      </Box>
-
       <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6} mb={8}>
-        <Box bg={bgCard} p={6} borderRadius="lg" shadow="sm" borderLeft="4px solid" borderColor="blue.400">
-          <Text color="gray.500" fontSize="sm">Total de Pacientes</Text>
+        <Box bg={bgCard} p={6} borderRadius="lg" shadow="md" borderLeft="4px solid" borderColor="blue.400">
+          <Text color="gray.500" fontSize="sm">Pacientes Totais</Text>
           <Flex justify="space-between" align="center" mt={2}>
             <Heading size="lg" color={headingColor}>{stats.total_patients}</Heading>
             <Icon as={FaUserInjured} w={8} h={8} color="blue.200" />
           </Flex>
         </Box>
 
-        <Box bg={bgCard} p={6} borderRadius="lg" shadow="sm" borderLeft="4px solid" borderColor="purple.400">
-          <Text color="gray.500" fontSize="sm">Consultas ({getPeriodLabel()})</Text>
+        <Box bg={bgCard} p={6} borderRadius="lg" shadow="md" borderLeft="4px solid" borderColor="cyan.400">
+          <Text color="gray.500" fontSize="sm">Consultas Agendadas no Mês</Text>
           <Flex justify="space-between" align="center" mt={2}>
             <Heading size="lg" color={headingColor}>{stats.appointments_count}</Heading>
-            <Icon as={FaCalendarAlt} w={8} h={8} color="purple.200" />
+            <Icon as={FaCalendarAlt} w={8} h={8} color="cyan.200" />
           </Flex>
         </Box>
       </SimpleGrid>
 
-      <Box bg={bgCard} p={6} borderRadius="lg" shadow="sm">
-        <Heading size="md" mb={4} color={headingColor}>Atendimentos do Período</Heading>
-        
-        <Box maxH="400px" overflowY="auto">
-            <Table variant="simple">
-            <Thead position="sticky" top={0} bg={headerBg} zIndex={1}>
-                <Tr>
-                <Th color={textColor}>Paciente</Th>
-                <Th color={textColor}>Profissional</Th>
-                <Th color={textColor}>Data/Hora</Th>
-                <Th color={textColor}>Status</Th>
-                </Tr>
-            </Thead>
-            <Tbody>
-                {stats.appointments_list.length === 0 ? (
-                <Tr>
-                    <Td colSpan={4} textAlign="center" color="gray.500" py={6}>
-                    Nenhum atendimento encontrado.
-                    </Td>
-                </Tr>
-                ) : (
-                stats.appointments_list.map((app) => (
-                    <Tr key={app.id} _hover={{ bg: inputBg }}>
-                    <Td fontWeight="bold" color={headingColor}>{app.patient_name}</Td>
-                    <Td fontSize="sm" color={textColor}>{app.doctor_name}</Td>
-                    <Td color={textColor}>{formatDate(app.data_horario)}</Td>
-                    
-                    <Td>
-                        <Text 
-                            fontWeight="extrabold" 
-                            fontSize="xs" 
-                            letterSpacing="wide"
-                            textTransform="uppercase"
-                            color={getStatusColor(app.status)}
-                        >
-                            {app.status === 'em_andamento' ? 'EM ANDAMENTO' : app.status}
-                        </Text>
-                    </Td>
-                    </Tr>
-                ))
-                )}
-            </Tbody>
-            </Table>
-        </Box>
+      <Box sx={calendarStyles} p={4} bg={bgCard} shadow="md" borderRadius="lg" border="1px solid" borderColor={borderColor}>
+        {loading && stats.appointments_list.length === 0 ? (
+          <Flex justify="center" align="center" h="400px">
+            <Spinner size="xl" color="blue.500" />
+          </Flex>
+        ) : (
+          <Calendar
+            localizer={localizer}
+            events={calendarEvents}
+            startAccessor="start"
+            endAccessor="end"
+            
+            date={currentDate}
+            onNavigate={(newDate) => setCurrentDate(newDate)}
+            
+            view={currentView}
+            onView={(newView) => setCurrentView(newView)}
+            views={['day', 'work_week', 'month']}
+            
+            step={30} 
+            timeslots={1}
+            min={new Date(2024, 0, 1, 0, 0)}
+            max={new Date(2024, 0, 1, 23, 59)}
+            culture="pt-BR"
+            eventPropGetter={eventStyleGetter}
+            
+            components={{
+                event: ({ event }) => {
+                    const app = event.resource;
+                    return (
+                        <Box p={1} h="100%" display="flex" flexDirection="column" justifyContent="space-between">
+                            <Box>
+                                <Text fontWeight="bold" fontSize="xs" isTruncated>{app.patient_name}</Text>
+                                {currentView !== 'month' && (
+                                    <Text fontSize="2xs" isTruncated>{app.doctor_name}</Text>
+                                )}
+                                <Text fontSize="2xs" fontWeight="extrabold">{STATUS_LABELS[app.status] || ''}</Text>
+                            </Box>
+                        </Box>
+                    );
+                }
+            }}
+            messages={{
+                next: "Próximo",
+                previous: "Anterior",
+                today: "Hoje",
+                month: "Mês",
+                week: "Semana Útil",
+                work_week: "Semana",
+                day: "Dia",
+                noEventsInRange: "Não há atendimentos para este dia.",
+            }}
+          />
+        )}
       </Box>
     </Box>
   );

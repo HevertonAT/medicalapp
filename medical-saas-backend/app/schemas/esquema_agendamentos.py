@@ -35,7 +35,7 @@ class agendamentosResponse(BaseModel):
     doctor_id: Optional[int] = None 
     patient_id: Optional[int] = None
     
-    status: str
+    status: int
     data_horario: datetime
     observacoes: Optional[str] = None
     

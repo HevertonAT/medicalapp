@@ -48,16 +48,19 @@ export default function DevTools() {
             
             <VStack align="stretch" spacing={3}>
                 <Button leftIcon={<FaUserShield />} colorScheme="purple" onClick={() => switchRole('superuser')}>
-                    Virar Superusuário (Ver Tudo)
+                    Virar Desenvolvedor
                 </Button>
                 <Button leftIcon={<FaUserShield />} colorScheme="blue" onClick={() => switchRole('admin')}>
-                    Virar Admin (Dono da Clínica)
+                    Virar Administrador
                 </Button>
                 <Button leftIcon={<FaUserMd />} colorScheme="green" onClick={() => switchRole('doctor')}>
-                    Virar Médico (Ver Agenda/Prontuário)
+                    Virar Médico
                 </Button>
                 <Button leftIcon={<FaUserInjured />} colorScheme="orange" onClick={() => switchRole('patient')}>
-                    Virar Paciente (Apenas Agenda)
+                    Virar Paciente
+                </Button>
+                <Button leftIcon={<FaUserShield />} colorScheme="teal" onClick={() => switchRole('recepcionista')}>
+                    Virar Recepcionista
                 </Button>
             </VStack>
         </Box>

@@ -48,8 +48,7 @@ def get_dashboard_stats(
         func.date(Appointment.data_horario) >= filter_start,
         func.date(Appointment.data_horario) <= filter_end
     )
-    
-    appointments_count = appointments_query.filter(Appointment.status != 'cancelado').count()
+    appointments_count = appointments_query.filter(Appointment.status != 4).count()
 
     period_appointments = appointments_query.order_by(Appointment.data_horario.desc()).all()
 
