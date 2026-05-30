@@ -4,7 +4,7 @@ from sqlalchemy.orm import relationship
 from app.db.base import Base
 
 class Appointment(Base):
-    __tablename__ = "agendamentos" # Nome da tabela no banco em Português
+    __tablename__ = "agendamentos"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     

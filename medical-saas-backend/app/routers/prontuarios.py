@@ -116,7 +116,7 @@ def create_medical_record(
 
         db.add(new_record)
         
-        appointment.status = 3 # 3 = Realizado
+        appointment.status = 3 #3 = Realizado
         db.add(appointment)
         
         db.commit()

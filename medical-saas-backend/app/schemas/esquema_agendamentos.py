@@ -51,3 +51,4 @@ class agendamentosResponse(BaseModel):
 class agendamentosReschedule(BaseModel):
     data_horario: datetime
     motivo: str
+    

@@ -42,7 +42,7 @@ def get_dashboard_stats(
         Patient.ativo == True
     ).count()
 
-    # 2. Consultas no Período (Contagem)
+    # 2. Consultas no Período
     appointments_query = db.query(Appointment).filter(
         Appointment.clinic_id == current_user.clinic_id,
         func.date(Appointment.data_horario) >= filter_start,

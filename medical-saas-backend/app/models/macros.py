@@ -10,7 +10,7 @@ class Macro(Base):
     
     doctor_id = Column(Integer, ForeignKey("profissionais.id"), nullable=False)
     
-    titulo = Column(String, nullable=False) # Ex: "Evolução X", "Anamnese Inicial"
+    titulo = Column(String, nullable=False)
     texto_padrao = Column(Text, nullable=False)
 
     # Relacionamento 

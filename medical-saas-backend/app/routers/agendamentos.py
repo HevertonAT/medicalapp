@@ -275,7 +275,7 @@ def update_appointment_status(
     # 1=Agendado, 2=Em Andamento, 3=Realizado, 4=Cancelado, 5=Reagendado
     
     if status_final in [2, 3]: # Iniciar ou Finalizar
-        # Só o profissional dono do agendamento (ou superuser) pode
+        # Só o profissional dono do agendamento (ou superuser)
         if current_user.role not in ['superuser']:
             doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
             if not doctor or app_db.doctor_id != doctor.id:
