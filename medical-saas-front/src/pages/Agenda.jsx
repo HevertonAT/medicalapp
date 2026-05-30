@@ -441,7 +441,7 @@ export default function Agenda() {
     }
 
     const doc = doctors.find(d => String(d.id) === String(currentAppointment?.doctor_id));
-    const docReg = doc?.conselho_regional || doc?.numero_conselho || doc?.registro_conselho || doc?.documento || doc?.conselho || "CR não informado";
+    const docReg = doc?.crm || doc?.conselho_regional || doc?.numero_conselho || doc?.registro_conselho || doc?.documento || doc?.conselho || "CR não informado";
     const docInfo = formatDoctorInfo(currentAppointment?.doctor_nome, doc?.especialidade, doc?.genero);
     
     const patientAge = calculateAge(currentAppointment?.patient_id);

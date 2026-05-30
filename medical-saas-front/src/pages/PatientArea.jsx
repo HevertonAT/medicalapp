@@ -13,6 +13,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 import ptBR from 'date-fns/locale/pt-BR';
 
 import api from '../services/api';
+import { STATUS_AGENDAMENTO, STATUS_LABELS } from '../theme/constants';
 
 registerLocale('pt-BR', ptBR);
 
@@ -283,18 +284,14 @@ export default function PatientArea() {
                         </Text>
                         
                         <Text fontSize="sm" mt={1}
-                          color={app.status?.toLowerCase() === 'cancelado' ? 'red.500' : subTextColor} 
-                          fontWeight={app.status?.toLowerCase() === 'cancelado' ? 'bold' : 'normal'}
+                          color={app.status === STATUS_AGENDAMENTO.CANCELADO ? 'red.500' : subTextColor} 
+                          fontWeight={app.status === STATUS_AGENDAMENTO.CANCELADO ? 'bold' : 'normal'}
                         >
-                          Status: {
-                            app.status?.toLowerCase() === 'cancelado' ? 'CANCELADO' : 
-                            (app.status?.toLowerCase() === 'concluido' || app.status?.toLowerCase() === 'finalizado') ? 'CONCLUÍDO' : 
-                            'AGENDADO'
-                          }
+                          Status: {STATUS_LABELS[app.status] || 'AGENDADO'}
                         </Text>
                       </Box>
                       
-                      {app.status?.toLowerCase() !== 'cancelado' && (
+                      {app.status !== STATUS_AGENDAMENTO.CANCELADO && (
                         <HStack spacing={3} mt={{ base: 4, md: 0 }}>
                           <Button size="sm" colorScheme="blue" variant="outline" onClick={() => {
                             setSelectedApp(app);
