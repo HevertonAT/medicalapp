@@ -53,12 +53,37 @@ def login_for_access_token(
         expires_delta=access_token_expires
     )
     
-    return {
+    from fastapi.responses import JSONResponse
+    
+    response = JSONResponse(content={
         "access_token": access_token, 
         "token_type": "bearer",
         "role": user.role,
         "user_id": user.id
-    }
+    })
+    
+    # Define o cookie HTTPOnly
+    response.set_cookie(
+        key="access_token",
+        value=f"Bearer {access_token}",
+        httponly=True,
+        secure=False, # Deve ser True em produção com HTTPS
+        samesite="lax",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
+    
+    return response
+
+@router.post("/logout")
+def logout():
+    from fastapi.responses import JSONResponse
+    response = JSONResponse(content={"message": "Logout realizado com sucesso"})
+    response.delete_cookie(
+        key="access_token",
+        samesite="lax",
+        secure=False
+    )
+    return response
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 def register(user: UserCreate, db: Session = Depends(get_db)):

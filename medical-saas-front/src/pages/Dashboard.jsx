@@ -35,7 +35,7 @@ export default function Dashboard() {
   const mutedTextColor = useColorModeValue('gray.400', 'gray.500');
 
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [currentView, setCurrentView] = useState('month'); // Visão Mensal como padrão
+  const [currentView, setCurrentView] = useState('day'); // Padrão é Dia, como solicitado
   
   const [stats, setStats] = useState({
     total_patients: 0,

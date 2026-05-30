@@ -5,7 +5,7 @@ import {
 } from '@chakra-ui/react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { jwtDecode } from "jwt-decode"; // <-- IMPORTAÇÃO DO DECODE
+import { jwtDecode } from "jwt-decode";
 import { ColorModeSwitcher } from '../components/ColorModeSwitcher';
 import { API_BASE } from '../services/api';
 
@@ -91,15 +91,18 @@ export default function Login() {
       const response = await axios.post(
         `${API_BASE}/auth/login`, 
         params,
-        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, withCredentials: true }
       );
 
-      const token = response.data.access_token;
-      localStorage.setItem('medical_token', token);
-
-      // Decodifica o token para ter certeza do cargo
-      const decoded = jwtDecode(token);
-      const userRole = decoded.role || response.data.role || 'admin';
+      // Token agora é gerenciado via Cookie HttpOnly pelo backend
+      // Mas precisamos dos dados do usuário (role, clinic_id) no frontend
+      const tokenString = response.data.access_token;
+      if (tokenString) {
+          const decoded = jwtDecode(tokenString);
+          localStorage.setItem('user_data', JSON.stringify(decoded));
+      }
+      
+      const userRole = response.data.role || 'admin';
       localStorage.setItem('user_role', userRole);
 
       toast({ title: 'Bem-vindo(a)!', status: 'success', duration: 2000, isClosable: true });

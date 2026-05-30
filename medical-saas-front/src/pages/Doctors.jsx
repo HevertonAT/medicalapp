@@ -58,17 +58,21 @@ export default function Doctors() {
   const inactiveColor = useColorModeValue('red.600', 'red.300');
 
   useEffect(() => {
-      const token = localStorage.getItem('medical_token');
-      if (token) {
-          const decoded = jwtDecode(token);
-          setLoggedUser(decoded);
-          
-          if (decoded.role === 'superuser') {
-              api.get('/clinics/').then(res => {
-                  setAllClinics(Array.isArray(res.data) ? res.data : []);
-              }).catch(e => console.error("Erro ao buscar clínicas", e));
-          } else {
-              setSelectedClinicId(decoded.clinic_id);
+      const userData = localStorage.getItem('user_data');
+      if (userData) {
+          try {
+              const decoded = JSON.parse(userData);
+              setLoggedUser(decoded);
+              
+              if (decoded.role === 'superuser') {
+                  api.get('/clinics/').then(res => {
+                      setAllClinics(Array.isArray(res.data) ? res.data : []);
+                  }).catch(e => console.error("Erro ao buscar clínicas", e));
+              } else {
+                  setSelectedClinicId(decoded.clinic_id);
+              }
+          } catch (e) {
+              console.error("Erro ao carregar dados do usuário", e);
           }
       }
       fetchDoctors(); 

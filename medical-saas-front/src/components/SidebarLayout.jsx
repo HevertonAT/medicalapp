@@ -33,19 +33,15 @@ export default function SidebarLayout() {
   const headingColor = useColorModeValue('blue.600', 'blue.200');
 
   useEffect(() => {
-    const token = localStorage.getItem('medical_token');
-    if (token) {
-        try {
-            const decoded = jwtDecode(token);
-            const trueRole = decoded.role || 'admin';
-            setRealRole(trueRole);
-
-            const savedRole = localStorage.getItem('user_role');
-            setSimulatedRole(savedRole || trueRole);
-        } catch (e) {
-            console.error(e);
-            setSimulatedRole('admin'); 
-        }
+    // O token agora fica em um Cookie HttpOnly
+    const savedRole = localStorage.getItem('user_role');
+    if (savedRole) {
+        setRealRole(savedRole);
+        setSimulatedRole(savedRole);
+    } else {
+        // Se não tem role, não está logado propriamente (ou cookie expirou, mas não temos como checar sincrono aqui)
+        // Opcional: fazer um check no backend
+        setSimulatedRole('admin'); 
     }
   }, []);
 
@@ -68,8 +64,15 @@ export default function SidebarLayout() {
     { name: 'Meus Exames', icon: FaFileMedical, path: '/meus-exames', roles: ['patient', 'paciente'] },
   ];
 
-  const handleLogout = () => {
-    localStorage.removeItem('medical_token');
+  const handleLogout = async () => {
+    try {
+        const { default: api } = await import('../services/api');
+        await api.post('/auth/logout');
+    } catch(e) {
+        console.error("Erro no logout da API", e);
+    }
+    localStorage.removeItem('medical_token'); // Limpeza de resíduos
+    localStorage.removeItem('user_data');
     localStorage.removeItem('user_role');
     navigate('/');
   };

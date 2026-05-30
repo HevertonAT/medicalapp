@@ -4,12 +4,12 @@ from sqlalchemy.orm import relationship
 from app.db.base import Base
 
 class Appointment(Base):
-    __tablename__ = "agendamentos"
+    __tablename__ = "agendamentos" # Nome da tabela no banco em Português
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     
     # Data e Hora da Consulta
-    data_horario = Column(DateTime, nullable=False)
+    data_horario = Column(DateTime, nullable=False, index=True)
     
     # Duração da Consulta
     duracao = Column(Integer, default=40) # Em minutos
@@ -19,9 +19,9 @@ class Appointment(Base):
     observacoes = Column(String, nullable=True)
 
     # Chaves Estrangeiras 
-    clinic_id = Column(Integer, ForeignKey("clinicas.id"), nullable=True)
-    doctor_id = Column(Integer, ForeignKey("profissionais.id"), nullable=False)
-    patient_id = Column(Integer, ForeignKey("pacientes.id"), nullable=False)
+    clinic_id = Column(Integer, ForeignKey("clinicas.id"), nullable=True, index=True)
+    doctor_id = Column(Integer, ForeignKey("profissionais.id"), nullable=False, index=True)
+    patient_id = Column(Integer, ForeignKey("pacientes.id"), nullable=False, index=True)
 
     criado_em = Column(DateTime(timezone=True), server_default=func.now())
     atualizado_em = Column(DateTime(timezone=True), onupdate=func.now())

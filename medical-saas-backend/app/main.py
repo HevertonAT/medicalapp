@@ -45,7 +45,7 @@ from app.routers import (
     usuarios 
 )
 
-Base.metadata.create_all(bind=engine)
+# Base.metadata.create_all(bind=engine) # Removido: agora usamos o Alembic
 
 app = FastAPI(
     title="VezzCare", 

@@ -70,7 +70,7 @@ def get_available_slots(
             Appointment.doctor_id == doctor_id,
             Appointment.data_horario >= start_of_day,
             Appointment.data_horario <= end_of_day,
-            Appointment.status.in_([1, 2]) # 1: Agendado, 2: Em andamento
+            Appointment.status.in_([1, 2, 5]) # 1: Agendado, 2: Em andamento, 5: Reagendado
         ).all()
 
         horas_ocupadas = [app.data_horario.strftime("%H:%M") for app in appointments_ocupados]
@@ -181,7 +181,7 @@ def create_agendamentos(agendamento: agendamentosCreate, db: Session = Depends(g
     horario_conflito = db.query(Appointment).filter(
         Appointment.doctor_id == agendamento.doctor_id,
         Appointment.data_horario == agendamento.data_horario,
-        Appointment.status == 1 # Agendado
+        Appointment.status.in_([1, 2, 5]) # 1=Agendado, 2=Em Andamento, 5=Reagendado
     ).first()
 
     if horario_conflito:
@@ -239,9 +239,22 @@ def reschedule_appointment(appointment_id: int, body: dict = Body(...), db: Sess
     
     nova_data = body.get("data_horario")
     if nova_data:
-        app.data_horario = datetime.strptime(nova_data, "%Y-%m-%dT%H:%M:%S")
+        data_formatada = datetime.strptime(nova_data, "%Y-%m-%dT%H:%M:%S")
+        
+        # Validação de conflito
+        horario_conflito = db.query(Appointment).filter(
+            Appointment.doctor_id == app.doctor_id,
+            Appointment.data_horario == data_formatada,
+            Appointment.status.in_([1, 2, 5]),
+            Appointment.id != appointment_id
+        ).first()
+
+        if horario_conflito:
+            raise HTTPException(status_code=400, detail="Este horário já foi preenchido. Por favor, escolha outro.")
+            
+        app.data_horario = data_formatada
     
-    app.status = 5 # Reagendado (na criação usa-se 1 para o novo, mas aqui vamos manter a semântica de reagendado ou mudar para 1 se for só remarcar o atual)
+    app.status = 5 # Reagendado
     db.commit()
     return {"message": "Consulta reagendada com sucesso"}
 
@@ -275,7 +288,7 @@ def update_appointment_status(
     # 1=Agendado, 2=Em Andamento, 3=Realizado, 4=Cancelado, 5=Reagendado
     
     if status_final in [2, 3]: # Iniciar ou Finalizar
-        # Só o profissional dono do agendamento (ou superuser)
+        # Só o profissional dono do agendamento (ou superuser) pode
         if current_user.role not in ['superuser']:
             doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
             if not doctor or app_db.doctor_id != doctor.id:

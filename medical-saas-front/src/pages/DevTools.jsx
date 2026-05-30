@@ -12,7 +12,7 @@ export default function DevTools() {
   const textColor = useColorModeValue('gray.600', 'gray.200');
 
   const currentRole = localStorage.getItem('user_role') || 'Não definido';
-  const token = localStorage.getItem('medical_token') || 'Sem token';
+  const token = localStorage.getItem('user_data') || 'Sem token';
 
   // Função para trocar de role forçadamente (apenas para testes locais)
   const switchRole = (newRole) => {

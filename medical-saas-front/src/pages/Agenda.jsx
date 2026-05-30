@@ -247,10 +247,10 @@ export default function Agenda() {
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem('medical_token');
-    if (token) {
+    const userData = localStorage.getItem('user_data');
+    if (userData) {
         try {
-            const decoded = jwtDecode(token);
+            const decoded = JSON.parse(userData);
             setLoggedUser(decoded);
             const role = decoded.role || localStorage.getItem('user_role');
             setCurrentUserRole(role);

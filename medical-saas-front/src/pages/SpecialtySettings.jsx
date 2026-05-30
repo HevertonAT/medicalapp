@@ -45,28 +45,24 @@ export default function SpecialtySettings() {
   const inputBg = useColorModeValue("white", "gray.700");
 
   // 1. Descobrir quem está logado (Ajustado para resiliência no token do Admin)
+  // 1. Descobrir quem está logado
   useEffect(() => {
-      const token = localStorage.getItem('medical_token');
-      if (token) {
-          const decoded = jwtDecode(token);
-          
-          // LOG ADICIONADO AQUI:
-          console.log("CONTEÚDO DO TOKEN:", decoded);
-          
-          setLoggedUser(decoded);
-          
-          if (decoded.role === 'superuser') {
-              fetchClinicsForSuperuser();
-          } else {
-              // Garante que vai pegar o ID da clínica independente do nome da propriedade no token
-              const idDaClinica = decoded.clinic_id || decoded.clinica_id || decoded.id_clinica || decoded.clinic;
+      const userData = localStorage.getItem('user_data');
+      if (userData) {
+          try {
+              const decoded = JSON.parse(userData);
+              setLoggedUser(decoded);
               
-              if (idDaClinica) {
-                  setSelectedClinicId(idDaClinica);
+              if (decoded.role === 'superuser') {
+                  fetchClinicsForSuperuser();
               } else {
-                  console.error("ID da clínica não encontrado no token do Admin!", decoded);
-                  // Opcional: Você pode disparar um toast de erro aqui se quiser
+                  const idDaClinica = decoded.clinic_id || decoded.clinica_id || decoded.id_clinica || decoded.clinic;
+                  if (idDaClinica) {
+                      setSelectedClinicId(idDaClinica);
+                  }
               }
+          } catch (e) {
+              console.error("Erro ao ler dados do usuário", e);
           }
       }
   }, []);

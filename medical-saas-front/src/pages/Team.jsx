@@ -30,9 +30,9 @@ export default function Team() {
   const borderColor = useColorModeValue('gray.200', 'gray.600');
 
   const getLoggedUser = () => {
-    const token = localStorage.getItem('medical_token') || localStorage.getItem('token');
-    if (token) {
-        try { return jwtDecode(token); } catch (e) { return null; }
+    const userData = localStorage.getItem('user_data');
+    if (userData) {
+        try { return JSON.parse(userData); } catch (e) { return null; }
     }
     return null;
   };

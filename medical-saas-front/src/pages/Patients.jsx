@@ -151,14 +151,9 @@ export default function Patients() {
 
   // --- BUSCA OS PACIENTES E IDENTIFICA QUEM ESTÁ LOGADO ---
   useEffect(() => { 
-      const token = localStorage.getItem('medical_token');
-      if (token) {
-          try {
-              const decoded = jwtDecode(token);
-              setCurrentUserRole(decoded.role || localStorage.getItem('user_role'));
-          } catch (e) {
-              console.error("Erro ao decodificar token", e);
-          }
+      const role = localStorage.getItem('user_role');
+      if (role) {
+          setCurrentUserRole(role);
       }
       fetchPatients(); 
   }, []);
