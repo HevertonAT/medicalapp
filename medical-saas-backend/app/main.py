@@ -1,9 +1,11 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.base import engine
 from app.db.base import Base
+
 # --- IMPORTAÇÃO DOS MODELOS ---
 from app.models.arquivos_pacientes import PatientFile
 from app.models.documentos import Document
@@ -25,7 +27,8 @@ from app.models.logs_auditoria import AuditLog
 from app.models.regras_especialidades import SpecialtyRule
 from app.models.cids import Cid
 
-# --- IMPORTAÇÃO DAS ROTAS ---
+# --- IMPORTAÇÃO DAS ROTAS E LOGGER ---
+from app.core.logger import logger
 from app.routers import (
     agendamentos,
     arquivos,
@@ -97,5 +100,21 @@ app.include_router(saas.router, prefix="/saas", tags=["SaaS"])
 app.include_router(usuarios.router, prefix="/users", tags=["Usuários"])
 
 @app.get("/")
-def health_check():
-    return {"status": "API online 🚀"}
+def read_root():
+    return {"message": "Bem-vindo à VezzCare API!"}
+
+# --- GLOBAL EXCEPTION HANDLER ---
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception(f"Erro global não capturado em {request.method} {request.url.path}: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Ocorreu um erro interno no servidor.", "error_code": "INTERNAL_SERVER_ERROR"}
+    )
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logger.info(f"Requisição recebida: {request.method} {request.url.path}")
+    response = await call_next(request)
+    logger.info(f"Requisição finalizada: {request.method} {request.url.path} - Status: {response.status_code}")
+    return response

@@ -1,5 +1,5 @@
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.db.base import get_db
@@ -8,15 +8,17 @@ from app.core.config import settings
 from app.models.usuarios import User
 from app.models.pacientes import Patient 
 from app.schemas.esquema_usuarios import UserCreate
+from app.core.logger import logger
 
 router = APIRouter()
 
 @router.post("/login")
 def login_for_access_token(
+    response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(), 
     db: Session = Depends(get_db)
 ):
-    print(f"🔍 TENTATIVA DE LOGIN: {form_data.username}")
+    logger.info(f"🔍 TENTATIVA DE LOGIN: {form_data.username}")
 
     email_limpo = form_data.username.strip()
 
@@ -87,7 +89,7 @@ def logout():
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 def register(user: UserCreate, db: Session = Depends(get_db)):
-    print(f"📝 Iniciando cadastro para: {user.email}")
+    logger.info(f"📝 Iniciando cadastro para: {user.email}")
 
     # 1. Verifica se e-mail já existe
     user_exists = db.query(User).filter(User.email == user.email).first()
@@ -112,14 +114,14 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
-        print(f"✅ Usuário criado com ID: {new_user.id}")
+        logger.info(f"✅ Usuário criado com ID: {new_user.id}")
     except Exception as e:
-        print(f"❌ ERRO FATAL AO CRIAR USER: {e}")
+        logger.error(f"❌ ERRO FATAL AO CRIAR USER: {e}")
         raise HTTPException(status_code=500, detail="Erro ao salvar usuário no banco.")
 
     if user.role == 'paciente' or user.role == 'patient':
         try:
-            print(f"   -> Criando perfil de Paciente para ID {new_user.id}...")
+            logger.info(f"   -> Criando perfil de Paciente para ID {new_user.id}...")
             
             new_patient = Patient(
                 nome_completo=user.full_name, 
@@ -132,11 +134,11 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
             )
             db.add(new_patient)
             db.commit()
-            print("   -> ✅ Perfil de paciente criado com sucesso.")
+            logger.info("   -> ✅ Perfil de paciente criado com sucesso.")
             
         except Exception as e:
-            print(f"❌ ERRO AO CRIAR PERFIL DE PACIENTE: {e}")
-            print("⚠️ O usuário foi criado, mas o vínculo com Paciente falhou.")
+            logger.error(f"❌ ERRO AO CRIAR PERFIL DE PACIENTE: {e}")
+            logger.warning("⚠️ O usuário foi criado, mas o vínculo com Paciente falhou.")
             db.rollback()
 
     return {

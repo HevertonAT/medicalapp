@@ -6,6 +6,7 @@ import {
 } from "@chakra-ui/react";
 import { FaStethoscope, FaBuilding } from 'react-icons/fa';
 import { jwtDecode } from "jwt-decode";
+import { useAuthStore } from '../store/useAuthStore';
 import api from '../services/api';
 import { listRules, createRule, updateRule, MASTER_SPECIALTIES } from "../services/specialtyService";
 
@@ -46,26 +47,22 @@ export default function SpecialtySettings() {
 
   // 1. Descobrir quem está logado (Ajustado para resiliência no token do Admin)
   // 1. Descobrir quem está logado
+  const { user } = useAuthStore();
+  
   useEffect(() => {
-      const userData = localStorage.getItem('user_data');
-      if (userData) {
-          try {
-              const decoded = JSON.parse(userData);
-              setLoggedUser(decoded);
-              
-              if (decoded.role === 'superuser') {
-                  fetchClinicsForSuperuser();
-              } else {
-                  const idDaClinica = decoded.clinic_id || decoded.clinica_id || decoded.id_clinica || decoded.clinic;
-                  if (idDaClinica) {
-                      setSelectedClinicId(idDaClinica);
-                  }
+      if (user) {
+          setLoggedUser(user);
+          
+          if (user.role === 'superuser') {
+              fetchClinicsForSuperuser();
+          } else {
+              const idDaClinica = user.clinic_id || user.clinica_id || user.id_clinica || user.clinic;
+              if (idDaClinica) {
+                  setSelectedClinicId(idDaClinica);
               }
-          } catch (e) {
-              console.error("Erro ao ler dados do usuário", e);
           }
       }
-  }, []);
+  }, [user]);
 
   const fetchClinicsForSuperuser = async () => {
       try {

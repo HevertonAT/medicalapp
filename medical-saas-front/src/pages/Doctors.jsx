@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { MASTER_SPECIALTIES } from '../services/specialtyService';
 import { jwtDecode } from "jwt-decode";
+import { useAuthStore } from '../store/useAuthStore';
 
 import AgendaConfigFields from '../components/profissionais/AgendaConfigFields';
 
@@ -57,27 +58,23 @@ export default function Doctors() {
   const activeColor = useColorModeValue('green.600', 'green.300');
   const inactiveColor = useColorModeValue('red.600', 'red.300');
 
+  const { user } = useAuthStore();
+
   useEffect(() => {
-      const userData = localStorage.getItem('user_data');
-      if (userData) {
-          try {
-              const decoded = JSON.parse(userData);
-              setLoggedUser(decoded);
-              
-              if (decoded.role === 'superuser') {
-                  api.get('/clinics/').then(res => {
-                      setAllClinics(Array.isArray(res.data) ? res.data : []);
-                  }).catch(e => console.error("Erro ao buscar clínicas", e));
-              } else {
-                  setSelectedClinicId(decoded.clinic_id);
-              }
-          } catch (e) {
-              console.error("Erro ao carregar dados do usuário", e);
+      if (user) {
+          setLoggedUser(user);
+          
+          if (user.role === 'superuser') {
+              api.get('/clinics/').then(res => {
+                  setAllClinics(Array.isArray(res.data) ? res.data : []);
+              }).catch(e => console.error("Erro ao buscar clínicas", e));
+          } else {
+              setSelectedClinicId(user.clinic_id);
           }
       }
       fetchDoctors(); 
       fetchRules();
-  }, []);
+  }, [user]);
 
   const fetchDoctors = async () => {
     setLoading(true);

@@ -8,7 +8,8 @@ import {
 } from '@chakra-ui/react';
 import { FaPlus, FaFileMedical, FaHistory, FaPrescriptionBottleAlt, FaEdit, FaBan, FaCheck, FaPrint, FaSearch } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
-import { jwtDecode } from "jwt-decode"; // <-- IMPORTAÇÃO ADICIONADA AQUI
+import { jwtDecode } from "jwt-decode";
+import { useAuthStore } from '../store/useAuthStore';
 
 import api from '../services/api';
 
@@ -26,12 +27,15 @@ export default function Patients() {
     id: '', nome_completo: '', telefone: '', cpf: '', data_nascimento: '', email: '',
     cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: ''
   });
-  
   const [isEditing, setIsEditing] = useState(false);
   const [records, setRecords] = useState([]);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [cpfError, setCpfError] = useState('');
-  const [isFetchingCep, setIsFetchingCep] = useState(false); 
+  const [newFile, setNewFile] = useState(null);
+  const [description, setDescription] = useState('');
+  
+  const { role } = useAuthStore();
+  const [isFetchingCep, setIsFetchingCep] = useState(false);
   
   const [filter, setFilter] = useState('ativos'); 
 
@@ -151,12 +155,11 @@ export default function Patients() {
 
   // --- BUSCA OS PACIENTES E IDENTIFICA QUEM ESTÁ LOGADO ---
   useEffect(() => { 
-      const role = localStorage.getItem('user_role');
       if (role) {
           setCurrentUserRole(role);
       }
       fetchPatients(); 
-  }, []);
+  }, [role]);
 
   const filteredPatients = patients.filter(p => {
     if (filter === 'ativos') return p.ativo === true;

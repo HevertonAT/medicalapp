@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { jwtDecode } from "jwt-decode";
 import { ColorModeSwitcher } from '../components/ColorModeSwitcher';
 import { API_BASE } from '../services/api';
+import { useAuthStore } from '../store/useAuthStore';
 
 export default function Login() {
   const [isLoginView, setIsLoginView] = useState(true);
@@ -97,13 +98,16 @@ export default function Login() {
       // Token agora é gerenciado via Cookie HttpOnly pelo backend
       // Mas precisamos dos dados do usuário (role, clinic_id) no frontend
       const tokenString = response.data.access_token;
+      const userRole = response.data.role || 'admin';
+      
+      const loginAction = useAuthStore.getState().login;
+
       if (tokenString) {
           const decoded = jwtDecode(tokenString);
-          localStorage.setItem('user_data', JSON.stringify(decoded));
+          loginAction(decoded, userRole);
+      } else {
+          loginAction({ email }, userRole);
       }
-      
-      const userRole = response.data.role || 'admin';
-      localStorage.setItem('user_role', userRole);
 
       toast({ title: 'Bem-vindo(a)!', status: 'success', duration: 2000, isClosable: true });
       

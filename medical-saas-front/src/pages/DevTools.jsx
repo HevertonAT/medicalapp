@@ -3,6 +3,7 @@ import {
   useColorModeValue, SimpleGrid, Icon // <--- ADICIONEI O 'Icon' AQUI QUE FALTAVA
 } from '@chakra-ui/react';
 import { FaUserMd, FaUserInjured, FaUserShield, FaBug } from 'react-icons/fa';
+import { useAuthStore } from '../store/useAuthStore';
 
 export default function DevTools() {
   const toast = useToast();
@@ -11,12 +12,13 @@ export default function DevTools() {
   const bgCard = useColorModeValue('white', 'gray.800');
   const textColor = useColorModeValue('gray.600', 'gray.200');
 
-  const currentRole = localStorage.getItem('user_role') || 'Não definido';
-  const token = localStorage.getItem('user_data') || 'Sem token';
+  const { user, role, login } = useAuthStore();
+  const currentRole = role || 'Não definido';
+  const token = user ? JSON.stringify(user) : 'Sem token';
 
   // Função para trocar de role forçadamente (apenas para testes locais)
   const switchRole = (newRole) => {
-    localStorage.setItem('user_role', newRole);
+    login(user || {}, newRole);
     toast({
       title: `Modo trocado para: ${newRole.toUpperCase()}`,
       description: "Recarregando a página para aplicar permissões...",

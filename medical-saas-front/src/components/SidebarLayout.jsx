@@ -11,6 +11,8 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { jwtDecode } from "jwt-decode"; 
 import { ColorModeSwitcher } from './ColorModeSwitcher';
+import { useAuthStore } from '../store/useAuthStore';
+import api from '../services/api';
 
 export default function SidebarLayout() {
   const location = useLocation();
@@ -21,8 +23,10 @@ export default function SidebarLayout() {
 
   // Estado da Sidebar Desktop
   const [isSidebarOpen, setSidebarOpen] = useState(true);
-  const [simulatedRole, setSimulatedRole] = useState('');
-  const [realRole, setRealRole] = useState('');
+  
+  const { role, logout } = useAuthStore();
+  const simulatedRole = role || 'admin';
+  const realRole = role || 'admin';
 
   // Cores Dark Mode
   const bgSidebar = useColorModeValue('white', 'gray.800');
@@ -32,18 +36,7 @@ export default function SidebarLayout() {
   const activeColor = useColorModeValue('blue.600', 'blue.200');
   const headingColor = useColorModeValue('blue.600', 'blue.200');
 
-  useEffect(() => {
-    // O token agora fica em um Cookie HttpOnly
-    const savedRole = localStorage.getItem('user_role');
-    if (savedRole) {
-        setRealRole(savedRole);
-        setSimulatedRole(savedRole);
-    } else {
-        // Se não tem role, não está logado propriamente (ou cookie expirou, mas não temos como checar sincrono aqui)
-        // Opcional: fazer um check no backend
-        setSimulatedRole('admin'); 
-    }
-  }, []);
+  // Efeito removido, usando Zustand diretamente
 
   // --- CONTROLE DE ACESSO DO MENU ---
   // A recepcionista não vê: Dashboard, Configurações, Profissionais, Financeiro e Equipe.
@@ -71,9 +64,7 @@ export default function SidebarLayout() {
     } catch(e) {
         console.error("Erro no logout da API", e);
     }
-    localStorage.removeItem('medical_token'); // Limpeza de resíduos
-    localStorage.removeItem('user_data');
-    localStorage.removeItem('user_role');
+    logout();
     navigate('/');
   };
 

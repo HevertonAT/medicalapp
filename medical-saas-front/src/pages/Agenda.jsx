@@ -25,6 +25,7 @@ import ptBR from 'date-fns/locale/pt-BR';
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
+import { useAuthStore } from '../store/useAuthStore';
 
 import api from '../services/api';
 import SpecialtyFormRenderer from '../components/SpecialtyFormRenderer';
@@ -40,10 +41,27 @@ const locales = {
 const localizer = dateFnsLocalizer({
   format,
   parse,
-  startOfWeek,
+  startOfWeek: () => startOfWeek(new Date(), { weekStartsOn: 0 }),
   getDay,
   locales,
 });
+
+const calendarMessages = {
+  allDay: 'Dia Inteiro',
+  previous: 'Anterior',
+  next: 'Próximo',
+  today: 'Hoje',
+  month: 'Mês',
+  week: 'Semana',
+  work_week: 'Semana',
+  day: 'Dia',
+  agenda: 'Agenda',
+  date: 'Data',
+  time: 'Hora',
+  event: 'Evento',
+  noEventsInRange: 'Não há agendamentos neste período.',
+  showMore: total => `+ mais ${total}`
+};
 
 export default function Agenda() {
   const dataLimiteObj = new Date();
@@ -76,6 +94,7 @@ export default function Agenda() {
 
   const toast = useToast();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
 
   const [newApp, setNewApp] = useState({ 
     doctor_id: '', patient_id: '', data: '', hora: '', duracao: '40', observacoes: '' 
@@ -247,32 +266,28 @@ export default function Agenda() {
   }, []);
 
   useEffect(() => {
-    const userData = localStorage.getItem('user_data');
-    if (userData) {
-        try {
-            const decoded = JSON.parse(userData);
-            setLoggedUser(decoded);
-            const role = decoded.role || localStorage.getItem('user_role');
-            setCurrentUserRole(role);
-            
-            if (role === 'superuser') {
-                api.get('/clinics/').then(res => setAllClinics(Array.isArray(res.data) ? res.data : []));
-            } else {
-                setSelectedClinicId(decoded.clinic_id);
-            }
-            
-            if (role === 'doctor' || role === 'medico' || role === 'admin') {
-                api.get('/doctors/me').then(res => {
-                    if (res.data && res.data.id) {
-                        setNewApp(prev => ({...prev, doctor_id: res.data.id}));
-                        setLoggedUser(prev => ({...prev, doctor_id: res.data.id})); 
-                    }
-                }).catch(e => console.log("Usuário não tem perfil de médico vinculado."));
-            }
-        } catch(e) { console.error("Erro ao ler token", e); }
+    if (user) {
+        setLoggedUser(user);
+        const role = user.role;
+        setCurrentUserRole(role);
+        
+        if (role === 'superuser') {
+            api.get('/clinics/').then(res => setAllClinics(Array.isArray(res.data) ? res.data : []));
+        } else {
+            setSelectedClinicId(user.clinic_id);
+        }
+        
+        if (role === 'doctor' || role === 'medico' || role === 'admin') {
+            api.get('/doctors/me').then(res => {
+                if (res.data && res.data.id) {
+                    setNewApp(prev => ({...prev, doctor_id: res.data.id}));
+                    setLoggedUser(prev => ({...prev, doctor_id: res.data.id})); 
+                }
+            }).catch(e => console.log("Usuário não tem perfil de médico vinculado."));
+        }
     }
     fetchData(); 
-  }, [fetchData]);
+  }, [user, fetchData]);
 
   useEffect(() => {
       if (newApp.doctor_id && newApp.data) {
@@ -725,6 +740,8 @@ export default function Agenda() {
                     min={new Date(2024, 0, 1, 0, 0)}
                     max={new Date(2024, 0, 1, 23, 59)}
                     culture="pt-BR"
+                    messages={calendarMessages}
+                    dayLayoutAlgorithm={'no-overlap'}
                     eventPropGetter={eventStyleGetter}
                   // Componente customizado para inserir os botões de ação DENTRO do horário agendado
                   components={{

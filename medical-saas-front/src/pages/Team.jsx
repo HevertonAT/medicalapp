@@ -6,7 +6,8 @@ import {
   HStack, Badge, FormControl, FormLabel, Input, ModalFooter, Select, useColorModeValue,
   Tooltip
 } from '@chakra-ui/react';
-import { FaPlus, FaTrash, FaUserTie, FaUserCog, FaUserMd, FaConciergeBell } from 'react-icons/fa';
+import { FaPlus, FaTrash, FaUserTie, FaUserMd, FaUserShield, FaUserFriends, FaUserAstronaut, FaUserCog, FaConciergeBell } from 'react-icons/fa';
+import { useAuthStore } from '../store/useAuthStore';
 import api from '../services/api';
 import { jwtDecode } from "jwt-decode";
 
@@ -29,15 +30,7 @@ export default function Team() {
   const textColor = useColorModeValue('gray.600', 'gray.200');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
 
-  const getLoggedUser = () => {
-    const userData = localStorage.getItem('user_data');
-    if (userData) {
-        try { return JSON.parse(userData); } catch (e) { return null; }
-    }
-    return null;
-  };
-
-  const loggedUser = getLoggedUser();
+  const { user: loggedUser } = useAuthStore();
 
   const fetchTeam = async () => {
     try {
